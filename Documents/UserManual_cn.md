@@ -1,103 +1,91 @@
-# 【Debugx 用户手册】
-## 【简介】
+# Debugx 用户手册
+## 简介
 Github：https://github.com/BlurFeng/Debugx
 
-这是一个Unity引擎的插件。\
-用于按调试成员管理DebugLog，并输出log文件到本地。使用宏"DEBUG_X"来开启功能。
+Debugx 是一个专为 Unity 引擎开发的调试插件。  
+该插件可以按调试成员分类管理 DebugLog，并将日志文件输出到本地。通过宏 "DEBUG_X" 来启用功能。
 
-在多人开发项目时，所有人都使用UnityEngine.Debug.Log()会导致Log难以管理和区分。\
-我们在测试自己的功能时，并不想被其他人的Log影响。\
-我们仅需要将"DEBUG_X"宏添加到我们的项目，并简单地进行配置，就可以开始使用Debugx的功能了。\
-Debugx在ProjectSettings和Preferences中分别提供了配置界面，在ProjectSettings中的配置会影响整个项目，而Preferences中的用户配置仅会影响你本地个人，不会对项目和其他人造成影响。\
-DebugxConsole用于在项目运行时操作打印开关等内容。
+在多人协作开发项目时，所有开发者都使用 UnityEngine.Debug.Log() 会导致日志难以管理和区分。  
+当我们测试自己的功能时，不希望被其他人的日志输出干扰。  
+只需要将 "DEBUG_X" 宏添加到项目中，并进行简单配置，即可开始使用 Debugx 的功能。  
+Debugx 在 ProjectSettings 和 Preferences 中分别提供了配置界面。  
+ProjectSettings 中的配置会影响整个项目，而 Preferences 中的用户配置仅影响你的本地环境，不会对项目和其他开发者产生影响。  
+DebugxConsole 用于在项目运行时管理打印开关等功能。
 
-## 【添加插件到项目并配置】
-跟随手册，快速安装Debugx插件并配置。
+## 插件安装与配置
+按照本手册快速安装并配置 Debugx 插件。
 
-### 【添加插件到你的项目】
-下载Releases包，使用.unitypackage包安装Debugx插件到你的项目。
-在Unity版本相同时（否则可能产生位置的问题导致不可用），你也可以直接下载Github项目中的Debugx文件夹并放入你的项目中。
-![](Images/Debugx1.png)
+### 添加插件到项目
+从 Releases 页面下载发布包，使用 .unitypackage 文件将 Debugx 插件安装到你的项目中。
 
-### 【添加宏到你的项目】
-我们必须在项目中添加宏DEBUG_X才能开启打印功能。
-在项目打包时，我们可以去除宏DEBUG_X来快速的关闭Debugx的功能。
+或者通过 UPM (Unity Package Manager) 方式安装插件。
+```
+https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+```
+
+### 添加宏到项目
+必须在项目中添加宏 DEBUG_X 才能启用日志打印功能。  
+在项目发布时，可以移除宏 DEBUG_X 来快速禁用 Debugx 的功能。
 ![](Images/Debugx2.png)
 
-### 【Debugx配置】
-鼠标悬停在字段上，会出现tooltip提示，这会更好的帮助你上手Debugx。\
-所以我不会对每个条目进行介绍，因为你可以自己查看tooltip。
+### Debugx 配置
+将鼠标悬停在字段上时会显示工具提示，这能更好地帮助你熟悉 Debugx。  
+由于可以通过工具提示查看详细说明，因此这里不会对每个选项进行详细介绍。  
 ![](Images/Debugx3.png)
 
-#### 【ProjectSettings 项目设置】
-在Editor>ProjectSettings>Debugx中打开Debugx项目设置界面。\
-项目设置会对整个项目都产生影响。当我们想要添加新的成员时，就是在这里添加的。
+#### ProjectSettings 项目设置
+通过 Editor > ProjectSettings > Debugx 打开 Debugx 项目设置界面。  
+项目设置会影响整个项目。当需要添加新的调试成员时，在此处进行配置。
 ![](Images/Debugx4.png)
 
-##### 【Toggle 开关】
-这里是一些开关设置。总控开关会在这显示，而调试成员可以在成员信息中单独设置开关。
+##### Toggle 开关设置
+这里是各种开关设置。主开关在此显示，调试成员可以在成员信息中单独设置开关。  
 ![](Images/Debugx5.png)
 
-##### 【MemberSettings 调试成员设置】
-成员设置用于配置调试成员。这里有一些默认的成员，他们不能被删除，仅能进行有限的编辑。\
-我们可以在自定义成员中添加你的专用成员配置，按项目的使用者去区分。\
-我们可以设置开关，签名，颜色等内容。最重要的是成员的Key，这在我们打印时会用到。一个成员只需要记住自己的Key就行了。\
+##### MemberSettings 调试成员设置
+成员设置用于配置调试成员。这里有一些预设的成员，它们不能被删除，只能进行有限的编辑。  
+可以在自定义成员中添加专属的成员配置，按项目使用者进行区分。  
+可以设置开关、签名、颜色等属性。最重要的是成员的 Key，这在日志打印时会用到。每个成员只需要记住自己的 Key 即可。  
 ![](Images/Debugx6.png)
 
-##### 【LogOutput】
-日志输出功能会在每次项目开始运行时开始记录，在项目停止运行时结束记录并输出到本地。\
-在编辑器时，log本地文件会输出到你项目根目录的Logs文件夹下。\
-在打包时，根据不同的平台，log本地文件会存储到不同的目录中。\
-PC平台一般在C:\Users\UserName\AppData\LocalLow\DefaultCompany\ProjectName目录下。
+##### LogOutput 日志输出
+日志输出功能会在项目开始运行时启动记录，在项目停止运行时结束记录并输出到本地文件。  
+在编辑器环境下，日志文件会输出到项目根目录的 Logs 文件夹中。  
+在发布版本中，根据不同平台，日志文件会存储到对应的目录中。  
+PC 平台通常在 C:\Users\UserName\AppData\LocalLow\DefaultCompany\ProjectName 目录下。
 ![](Images/Debugx7.png)
 
-#### 【Preferences用户偏好设置】
-在Editor>Preferences>Debugx中打开Debugx用户偏好设置界面。\
-用户偏好设置仅会对你个人本地的项目产生影响，并不会影响其他人的项目。也不会对打包产生作用。\
-主要是为了不同的开发者在自己本地，按个人需求进行配置。每个人在自己的项目上，一般只会打开自己的调试成员的开关。因为我们不想被其他人的调试打印影响。
+#### Preferences 用户偏好设置
+通过 Editor > Preferences > Debugx 打开 Debugx 用户偏好设置界面。  
+用户偏好设置仅影响你的本地项目环境，不会影响其他开发者的项目，也不会影响发布版本。  
+主要用于不同开发者在本地环境中按个人需求进行配置。每个人通常只会启用自己的调试成员开关，以避免被其他人的调试输出干扰。  
 ![](Images/Debugx8.png)
 
-## 【在代码中使用Log打印】
-现在，我们可以开始打印我们的Log了。直接调用Debugx类的静态方法来打印我们的Log。
+## 在代码中使用日志打印
+现在可以开始使用日志打印功能了。直接调用 Debugx 类的静态方法来输出日志。  
 ![](Images/Debugx9.png)
 
-### 【打印方法】
-**Debugx.Log(key, message)**\
-Log系列方法是我们最常使用的方法，我们需要传入Key和打印内容。Key是我们在调试成员配置中配置的成员所分配的Key。每个成员需要记住和使用自己的Key。\
-**Debugx.LogNom(message)**\
-LogNom系列方法是Normal普通成员使用的Log打印方法。一般成员不应当使用，否则容易混淆使用者。也可以让所有成员在打印通用的报错或者警告时使用LogNom，保证一些关键信息总是保持打印。\
-**Debugx.LogMst(message)**\
-LogMst系列方法是Master高级成员使用的Log打印方法。除了主程，一般人都不应该直接使用此系列方法。\
-**Debugx.LogAdm(message)**\
-LogAdm系列方法是由Debugx插件的开发者使用的！任何人都不应当使用此方法，因为此方法打印的Log并不能通过DebugxManager来进行开关。但他还是受到宏DEBUG_X的影响。
+### 打印方法
+**Debugx.Log(key, message)**  
+Log 系列方法是最常使用的方法，需要传入 Key 和打印内容。Key 是在调试成员配置中为成员分配的标识。每个成员需要记住并使用自己的 Key。  
+**Debugx.LogNom(message)**  
+LogNom 系列方法是 Normal 普通成员使用的日志打印方法。一般成员不应使用，否则容易造成混淆。也可以让所有成员在打印通用错误或警告时使用 LogNom，确保关键信息总是能够输出。  
+**Debugx.LogMst(message)**  
+LogMst 系列方法是 Master 高级成员使用的日志打印方法。除了主程序员，一般人员不应直接使用此系列方法。  
+**Debugx.LogAdm(message)**  
+LogAdm 系列方法是 Debugx 插件开发者专用的！任何人都不应使用此方法，因为通过此方法打印的日志无法通过 DebugxManager 进行开关控制，但仍受到宏 DEBUG_X 的影响。
 
-## 【DebugxConsole】
-debugx控制台主要用于在项目运行时对Debugx功能进行一些开关操作。在Window>Debugx>DebugxConsole中打开窗口。/
-为了方便，我们可以将它和Game页签放在一起。
+## DebugxConsole 控制台
+Debugx 控制台主要用于在项目运行时对 Debugx 功能进行开关操作。通过 Window > Debugx > DebugxConsole 打开窗口。  
+为了方便使用，可以将其与 Game 标签页放在一起。  
 ![](Images/Debugx10.png)
 
-### 【PlayingSettings】
-项目运行时设置的内容基本上和ProjectSetting中的一样，只是这是允许在运行时设置的。
+### PlayingSettings 运行时设置
+项目运行时设置的内容基本与 ProjectSetting 中的相同，但允许在运行时进行调整。  
 ![](Images/Debugx11.png)
-#### 【Test】
-测试用功能。提供了一些方便的测试用功能开关，用来确认Debugx功能是否正常的运作了。
+#### Test 测试
+测试功能模块。提供了一些便于测试的功能开关，用于确认 Debugx 功能是否正常运行。
 
-## 【DebugxManager】
-DebugxManager在游戏运行时自动创建，我们一般不用去管他。他的主要工作是对LogOutput进行操作。\
-只有在DEBUG_X宏添加到项目时，DebugxManager才会自动创建。
-
-## 【DebugxBurst】
-DebugxBurst类主要用于DOTS的Burst多线程中进行Log打印。其中的Log方法基本和Debux中的一致，最终会调用到Debugx中的打印方法。必须在Entities.ForEach().WithoutBurst().Run()时才能打印，否则Log会被排除。\
-DebugxBurst的Log方法都添加了[BurstDiscard]标记，用于在Burst多线程时被排除。直接使用Debugx的Log方法会导致编译报错。因为[BurstDiscard]特性，Debugx源码中的字典，列表和数组都不会导致Burst的报错。
-
-### 【LogInBurst】
-我们还提供了LogInBurst系列方法允许在Entities.ForEach().Schedule()时使用，但是此方法不支持任何调试成员信息。我们只能打印简单的string。
-
-### 【Burst中的限制】
-关于一些受到限制的代码和功能。这会在编译时会直接报红。\
-在DOTS的Burst多线程中，不能使用任何引用类型，string只能直接传递，使用String.Format时不能传入string类型。\
-UnityEngine.Debug.unityLogger()不能使用。只能直接使用UnityEngine.Debug.Log等方法，这类方法应该是由引擎开封这做过特殊处理，从而能够直接传参object类型。\
-使用外部的值时，值必须是只读的。\
-in ref out 都不支持。\
-所以使用[BurstDiscard]特性用于在多线程时直接排除此方法，添加此宏能够使一些被限制的代码在编译时不报错，但必须在Entities.ForEach().WithoutBurst().Run()才能工作;,因为所有[BurstDiscard]特性的方法在多线程中都不工作。\
-使用LogInBurst()方法可以直接在Burst多线程中打印（但不支持任何成员配置信息），效果和UnityEngine.Debug.Log()是一样的，这种方法应该经过处理，所以直接传参object也不会报错。
+## DebugxManager 管理器
+DebugxManager 在游戏运行时自动创建，通常无需手动管理。它的主要职责是处理 LogOutput 相关操作。  
+只有在项目中添加了 DEBUG_X 宏时，DebugxManager 才会自动创建。

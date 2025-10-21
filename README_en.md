@@ -1,29 +1,42 @@
-# 【Debugx】
-***阅读中文文档 >[中文](README.md)***\
-***日本語のドキュメントを読む >[日本語](README_ja.md)***\
-***Read this document in >[English](README_en.md)***
+![](Documents/Images/Debugx.png)
 
-## 【User Manual】
-**阅读中文用户手册 >[中文用户手册](Documents/UserManual_cn.md)**\
-**日本語のユーザーマニュアルを読む >[日本語ユーザーマニュアル](Documents/UserManual_ja.md)**\
-**Read this User Manual in >[English User Manual](Documents/UserManual_en.md)**
+<p align="center">
+  <img alt="GitHub Release" src="https://img.shields.io/github/v/release/blurfeng/debugx?color=blue">
+  <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/blurfeng/debugx/total?color=green">
+  <img alt="GitHub Repo License" src="https://img.shields.io/github/license/blurfeng/debugx?color=blueviolet">
+  <img alt="GitHub Repo Issues" src="https://img.shields.io/github/issues/blurfeng/debugx?color=yellow">
+</p>
 
-## 【UPM】
-Allows the plugin to be loaded into a Unity project via the Package Manager.\
-Open the Unity menu and go to Window > Package Manager.\
-Click the + button in the top-left corner of the window, then select Add package from git URL...\
-Paste the following URL to install the plugin as a package:\
+<p align="center">
+  🌍
+  <a href="./README.md">中文</a> |
+  English |
+  <a href="./README_JA.md">日本語</a>
+</p>
+
+# Debugx
+A debugging extension plugin specifically for Unity. Allows configuration-based categorized printing and management of Debug Logs by debugging members, with local log file output.
+
+You can read the [User Manual](Documents/UserManual_en.md) for more information.
+
+## UPM Installation
+Install the plugin using UPM (Unity Package Manager).
+```
 https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+```
+1. Copy the link above
+2. Open Unity Editor, go to Window > Package Manager
+3. Click the + button in the upper left corner of the window, select "Add package from git URL..."
+4. Paste the link to install the plugin to your project
 
-## 【Overview】
-This is a plugin for Unity engine.\
-The debug log is managed according to its members. Later export the log file to the local. use macro "DEBUG_X" open the functional.
+## Overview
+Debugx is a debugging plugin specifically developed for the Unity engine.  
+Used to manage DebugLog by debugging members and output log files locally. Use the macro "DEBUG_X" to enable functionality.
 
-In your code, use debugx.log () to print like this.\
-Different members use different keys, you can easily print by member, and quickly find the person in charge of the corresponding code.\
+Use Debugx.Log() directly in your code for easy log printing.  
+Different members use different keys, allowing convenient categorized printing by member and quick identification of corresponding code owners.  
 ![](Documents/Images/DebugxCode.png)
 
-In the Burst of UnityDOTS. \
-We must use DebugxBurst instead of Debugx because many methods and fields will not be available in Burst.\
-However, because UnityDOTS is updated very frequently, this method cannot guarantee complete reliability under different DOTS versions.\
+In Unity DOTS Burst environment, you must use DebugxBurst instead of Debugx, as many methods and fields are unavailable in Burst.  
+However, since Unity DOTS updates very frequently, this method cannot guarantee complete reliability across different DOTS versions.  
 ![](Documents/Images/DebugxBurst.png)
