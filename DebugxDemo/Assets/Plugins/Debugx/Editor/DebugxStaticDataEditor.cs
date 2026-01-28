@@ -6,33 +6,33 @@ namespace DebugxLog.Editor
     public static class DebugxStaticDataEditor
     {
         #region ProjectSettings
-        public static bool FAMemberConfigSettingOpen
+        public static bool FaMemberConfigSettingOpen
         {
             get => EditorPrefs.GetBool("DebugxStaticData.FAMemberConfigSettingOpen", true);
             set => EditorPrefs.SetBool("DebugxStaticData.FAMemberConfigSettingOpen", value);
         }
 
-        public static ActionHandler<bool> OnAutoSaveChange = new ActionHandler<bool>();
+        public static readonly ActionHandler<bool> OnAutoSaveChange = new ActionHandler<bool>();
         // 0 = Not set 1 = Automatic saving 2 = Do not automatically save.
         // 0=未设置 1=自动保存 2=不自动保存。
-        public static byte autoSave;
+        private static byte _autoSaveByte;
         public static bool AutoSave
         {
             get
             {
-                if (autoSave == 0)
+                if (_autoSaveByte == 0)
                 {
-                    autoSave = (byte)(EditorPrefs.GetBool("DebugxStaticData.AutoSave", true) ? 1 : 2);
+                    _autoSaveByte = (byte)(EditorPrefs.GetBool("DebugxStaticData.AutoSave", true) ? 1 : 2);
                 }
 
-                return autoSave == 1;
+                return _autoSaveByte == 1;
             }
             set
             {
-                if (value != (autoSave == 1))
+                if (value != (_autoSaveByte == 1))
                 {
                     EditorPrefs.SetBool("DebugxStaticData.AutoSave", value);
-                    autoSave = (byte)(value ? 1 : 2);
+                    _autoSaveByte = (byte)(value ? 1 : 2);
 
                     OnAutoSaveChange.Invoke(AutoSave);
                 }

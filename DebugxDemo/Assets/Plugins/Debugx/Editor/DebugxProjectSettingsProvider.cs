@@ -94,17 +94,17 @@ namespace DebugxLog.Editor
 
             EditorGUILayout.BeginHorizontal();
 
-            DebugxStaticDataEditor.AutoSave = GUILayoutx.Toggle(
+            DebugxStaticDataEditor.AutoSave = GUILayoutEx.Toggle(
                 "AutoSave Asset",
                 DebugxStaticData.IsChineseSimplified
                     ? "自动保存配置资源，自动保存时在修改内容时会有卡顿。"
                     : "Automatically save configuration assets. There may be a lag during automatic saving when content is being modified.",
                 DebugxStaticDataEditor.AutoSave);
             EditorGUI.BeginDisabledGroup(!assetIsDirty);
-            if (GUILayoutx.ButtonGreen("Save Asset")) Apply();
+            if (GUILayoutEx.ButtonGreen("Save Asset")) Apply();
             EditorGUI.EndDisabledGroup();
 
-            if (GUILayoutx.ButtonRed("Reset to Default"))
+            if (GUILayoutEx.ButtonRed("Reset to Default"))
             {
                 if (EditorUtility.DisplayDialog(
                         "Reset To Default",
@@ -122,7 +122,7 @@ namespace DebugxLog.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Config Settings", GUIStylex.Get.TitleStyle_3);
+            EditorGUILayout.LabelField("Config Settings", GUIStylEx.Get.TitleStyle3);
             EditorGUI.BeginDisabledGroup(true);
             EditorGUILayout.ObjectField("", SettingsAsset, typeof(DebugxProjectSettingsAsset), false);
             EditorGUI.EndDisabledGroup();
@@ -134,40 +134,40 @@ namespace DebugxLog.Editor
             EditorGUI.BeginChangeCheck();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Toggle", GUIStylex.Get.TitleStyle_2);
+            EditorGUILayout.LabelField("Toggle", GUIStylEx.Get.TitleStyle2);
 
-            SettingsAsset.enableLogDefault = Toggle("EnableLog Default", DebugxStaticData.ToolTip_EnableLogDefault,
+            SettingsAsset.enableLogDefault = ToggleUndo("EnableLog Default", DebugxStaticData.ToolTipEnableLogDefault,
                 SettingsAsset.enableLogDefault);
-            SettingsAsset.enableLogMemberDefault = Toggle("EnableLogMember Default",
-                DebugxStaticData.ToolTip_EnableLogMemberDefault, SettingsAsset.enableLogMemberDefault);
-            SettingsAsset.allowUnregisteredMember = Toggle("AllowUnregisteredMember",
-                DebugxStaticData.ToolTip_AllowUnregisteredMember, SettingsAsset.allowUnregisteredMember);
-            SettingsAsset.logThisKeyMemberOnlyDefault = IntField("LogThisKeyMemberOnly Default",
-                DebugxStaticData.ToolTip_LogThisKeyMemberOnlyDefault, SettingsAsset.logThisKeyMemberOnlyDefault);
+            SettingsAsset.enableLogMemberDefault = ToggleUndo("EnableLogMember Default",
+                DebugxStaticData.ToolTipEnableLogMemberDefault, SettingsAsset.enableLogMemberDefault);
+            SettingsAsset.allowUnregisteredMember = ToggleUndo("AllowUnregisteredMember",
+                DebugxStaticData.ToolTipAllowUnregisteredMember, SettingsAsset.allowUnregisteredMember);
+            SettingsAsset.logThisKeyMemberOnlyDefault = IntFieldUndo("LogThisKeyMemberOnly Default",
+                DebugxStaticData.ToolTipLogThisKeyMemberOnlyDefault, SettingsAsset.logThisKeyMemberOnlyDefault);
 
             // Member configuration modification.
             // 成员配置修改。
             DrawMemberConfigSetting();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Log Output", GUIStylex.Get.TitleStyle_2);
+            EditorGUILayout.LabelField("Log Output", GUIStylEx.Get.TitleStyle2);
             SettingsAsset.logOutput =
-                Toggle("EnableLogOutput", DebugxStaticData.ToolTip_LogOutput, SettingsAsset.logOutput);
+                ToggleUndo("EnableLogOutput", DebugxStaticData.ToolTipLogOutput, SettingsAsset.logOutput);
             EditorGUI.BeginDisabledGroup(!SettingsAsset.logOutput);
-            SettingsAsset.enableLogStackTrace = Toggle("EnableLogStackTrace",
-                DebugxStaticData.ToolTip_EnableLogStackTrace, SettingsAsset.enableLogStackTrace);
-            SettingsAsset.enableWarningStackTrace = Toggle("EnableWarningStackTrace",
-                DebugxStaticData.ToolTip_EnableWarningStackTrace, SettingsAsset.enableWarningStackTrace);
-            SettingsAsset.enableErrorStackTrace = Toggle("EnableErrorStackTrace",
-                DebugxStaticData.ToolTip_EnableErrorStackTrace, SettingsAsset.enableErrorStackTrace);
-            SettingsAsset.recordAllNonDebugxLogs = Toggle("RecordAllNonDebugxLogs",
-                DebugxStaticData.ToolTip_RecordAllNonDebugxLogs, SettingsAsset.recordAllNonDebugxLogs);
-            SettingsAsset.drawLogToScreen = Toggle("DrawLogToScreen", DebugxStaticData.ToolTip_DrawLogToScreen,
+            SettingsAsset.enableLogStackTrace = ToggleUndo("EnableLogStackTrace",
+                DebugxStaticData.ToolTipEnableLogStackTrace, SettingsAsset.enableLogStackTrace);
+            SettingsAsset.enableWarningStackTrace = ToggleUndo("EnableWarningStackTrace",
+                DebugxStaticData.ToolTipEnableWarningStackTrace, SettingsAsset.enableWarningStackTrace);
+            SettingsAsset.enableErrorStackTrace = ToggleUndo("EnableErrorStackTrace",
+                DebugxStaticData.ToolTipEnableErrorStackTrace, SettingsAsset.enableErrorStackTrace);
+            SettingsAsset.recordAllNonDebugxLogs = ToggleUndo("RecordAllNonDebugxLogs",
+                DebugxStaticData.ToolTipRecordAllNonDebugxLogs, SettingsAsset.recordAllNonDebugxLogs);
+            SettingsAsset.drawLogToScreen = ToggleUndo("DrawLogToScreen", DebugxStaticData.ToolTipDrawLogToScreen,
                 SettingsAsset.drawLogToScreen);
             EditorGUI.BeginDisabledGroup(!SettingsAsset.drawLogToScreen);
-            SettingsAsset.restrictDrawLogCount = Toggle("RestrictDrawLogCount",
-                DebugxStaticData.ToolTip_RestrictDrawLogCount, SettingsAsset.restrictDrawLogCount);
-            SettingsAsset.maxDrawLogs = IntField("MaxDrawLogs", DebugxStaticData.ToolTip_MaxDrawLogs,
+            SettingsAsset.restrictDrawLogCount = ToggleUndo("RestrictDrawLogCount",
+                DebugxStaticData.ToolTipRestrictDrawLogCount, SettingsAsset.restrictDrawLogCount);
+            SettingsAsset.maxDrawLogs = IntFieldUndo("MaxDrawLogs", DebugxStaticData.ToolTipMaxDrawLogs,
                 SettingsAsset.maxDrawLogs);
             EditorGUI.EndDisabledGroup();
             EditorGUI.EndDisabledGroup();
@@ -183,13 +183,13 @@ namespace DebugxLog.Editor
         private static void DrawMemberConfigSetting()
         {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Member Settings", GUIStylex.Get.TitleStyle_2);
+            EditorGUILayout.LabelField("Member Settings", GUIStylEx.Get.TitleStyle2);
 
             faMemberConfigSetting.Begin();
             FadeAreaHeaderIsDirty = faMemberConfigSetting.Header("Members");
 
-            DebugxStaticDataEditor.FAMemberConfigSettingOpen = faMemberConfigSetting.BeginFade();
-            if (DebugxStaticDataEditor.FAMemberConfigSettingOpen)
+            DebugxStaticDataEditor.FaMemberConfigSettingOpen = faMemberConfigSetting.BeginFade();
+            if (DebugxStaticDataEditor.FaMemberConfigSettingOpen)
             {
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button(new GUIContent(
@@ -237,8 +237,8 @@ namespace DebugxLog.Editor
                 {
                     EditorGUILayout.Space();
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Default", GUIStylex.Get.TitleStyle_3);
-                    if (GUILayoutx.ButtonYellow(
+                    EditorGUILayout.LabelField("Default", GUIStylEx.Get.TitleStyle3);
+                    if (GUILayoutEx.ButtonYellow(
                             "Reset Default Members",
                             DebugxStaticData.IsChineseSimplified
                                 ? "重置默认成员，这会重置默认成员的所有数据。"
@@ -258,7 +258,6 @@ namespace DebugxLog.Editor
 
                     EditorGUILayout.EndHorizontal();
 
-                    FadeArea faTemp;
                     for (int i = 0; i < SettingsAsset.defaultMemberAssets.Length; i++)
                     {
                         DebugxMemberInfoAsset mInfo = SettingsAsset.defaultMemberAssets[i];
@@ -271,7 +270,7 @@ namespace DebugxLog.Editor
                             break;
                         }
 
-                        faTemp = memberInfosFadeAreaPool[i];
+                        var faTemp = memberInfosFadeAreaPool[i];
                         faTemp.Begin();
                         FadeAreaHeaderIsDirty = faTemp.Header(string.IsNullOrEmpty(mInfo.signature)
                             ? $"Member {mInfo.key}"
@@ -287,8 +286,8 @@ namespace DebugxLog.Editor
                 // 自定义成员。
                 EditorGUILayout.Space();
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Custom Members", GUIStylex.Get.TitleStyle_3);
-                if (GUILayoutx.ButtonYellow(
+                EditorGUILayout.LabelField("Custom Members", GUIStylEx.Get.TitleStyle3);
+                if (GUILayoutEx.ButtonYellow(
                         "Automatically Reassign Colors",
                         DebugxStaticData.IsChineseSimplified
                             ? "自动重分配所有自定义成员的颜色，颜色将根据成员数量平均分配。"
@@ -330,7 +329,6 @@ namespace DebugxLog.Editor
                 {
                     int removeIndex = -1;
 
-                    FadeArea faTemp;
                     for (int i = 0; i < SettingsAsset.customMemberAssets.Length; i++)
                     {
                         int index = i + SettingsAsset.DefaultMemberAssetsLength;
@@ -342,7 +340,7 @@ namespace DebugxLog.Editor
                             break;
                         }
 
-                        faTemp = memberInfosFadeAreaPool[index];
+                        var faTemp = memberInfosFadeAreaPool[index];
                         DebugxMemberInfoAsset mInfo = SettingsAsset.customMemberAssets[i];
 
                         faTemp.Begin();
@@ -393,10 +391,9 @@ namespace DebugxLog.Editor
             faMemberConfigSetting.End();
         }
 
-        public static void DrawMemberInfo(ref DebugxMemberInfoAsset mInfo, bool lockSignature = false,
-            bool lockKey = false)
+        private static void DrawMemberInfo(ref DebugxMemberInfoAsset mInfo, bool lockSignature = false, bool lockKey = false)
         {
-            mInfo.enableDefault = Toggle(
+            mInfo.enableDefault = ToggleUndo(
                 "Enable Default",
                 DebugxStaticData.IsChineseSimplified
                     ? "是否开启，在运行时也可通过DebugxConsole动态改变开关。"
@@ -418,7 +415,7 @@ namespace DebugxLog.Editor
             }
 
             EditorGUI.EndDisabledGroup();
-            mInfo.logSignature = Toggle("LogSignature",
+            mInfo.logSignature = ToggleUndo("LogSignature",
                 DebugxStaticData.IsChineseSimplified ? "是否打印签名" : "Whether to print the signature", mInfo.logSignature);
 
             // Print key. // 打印密钥。
@@ -454,10 +451,10 @@ namespace DebugxLog.Editor
 
             EditorGUI.EndDisabledGroup();
 
-            mInfo.header = TextField("Header", "头部信息，在答应log时打印在头部", mInfo.header);
+            mInfo.header = TextFieldUndo("Header", "头部信息，在答应log时打印在头部", mInfo.header);
 
             EditorGUILayout.BeginHorizontal();
-            mInfo.color = ColorField("Color", "Log颜色", mInfo.color);
+            mInfo.color = ColorFieldUndo("Color", "Log颜色", mInfo.color);
             if (GUILayout.Button(new GUIContent(
                         "Adapt Color",
                         DebugxStaticData.IsChineseSimplified
@@ -481,8 +478,8 @@ namespace DebugxLog.Editor
             // This method makes use of GUI.skin.button. The GUI class can only be called within the OnGUI function and cannot be called in OnEnable.
             // 此方法内调用到了GUI.skin.button，GUI类必须在OnGUI才能调用，不能在OnEnable。
 
-            faMemberConfigSetting = new FadeArea(settingsProvider, DebugxStaticDataEditor.FAMemberConfigSettingOpen,
-                GUIStylex.Get.AreaStyle_1, GUIStylex.Get.LabelStyle_FadeAreaHeader, 0.8f);
+            faMemberConfigSetting = new FadeArea(settingsProvider, DebugxStaticDataEditor.FaMemberConfigSettingOpen,
+                GUIStylEx.Get.AreaStyle1, GUIStylEx.Get.LabelStyleFadeAreaHeader, 0.8f);
 
             memberInfosFadeAreaPool.Clear();
 
@@ -514,7 +511,7 @@ namespace DebugxLog.Editor
                 new FadeArea(
                     settingsProvider, 
                     DebugxMemberInfoAssetEditor.GetFadeAreaOpenCached(info.key),
-                GUIStylex.Get.AreaStyle_1, GUIStylex.Get.LabelStyle_FadeAreaHeader));
+                GUIStylEx.Get.AreaStyle1, GUIStylEx.Get.LabelStyleFadeAreaHeader));
         }
 
         /// <summary>
@@ -565,7 +562,7 @@ namespace DebugxLog.Editor
             }
         }
 
-        public static void SaveCheck()
+        private static void SaveCheck()
         {
             assetIsDirty = true;
 
@@ -585,7 +582,7 @@ namespace DebugxLog.Editor
             }
         }
 
-        public static void Apply()
+        private static void Apply()
         {
             if (!DebugxStaticDataEditor.AutoSave && !assetIsDirty && !fadeAreaHeaderIsDirty) return;
             assetIsDirty = false;
@@ -601,7 +598,7 @@ namespace DebugxLog.Editor
 
         #region MemberInfo
 
-        private static readonly Regex regex_EndingDigit = new Regex(@"\d+$");
+        private static readonly Regex _regexEndingDigit = new Regex(@"\d+$");
 
         // Check if the key for member information is duplicated. If it is duplicated, return true.
         // 确认成员信息的Key是否重复，重复时返回true。
@@ -620,9 +617,9 @@ namespace DebugxLog.Editor
             return false;
         }
 
-        private static bool CheckMemberSignatureRepetition(ref string signature, string withoutSignature = "")
+        private static void CheckMemberSignatureRepetition(ref string signature, string withoutSignature = "")
         {
-            if (string.IsNullOrEmpty(signature)) return false;
+            if (string.IsNullOrEmpty(signature)) return;
 
             for (int i = 0; i < SettingsAsset.CustomMemberAssetsLength; i++)
             {
@@ -631,7 +628,7 @@ namespace DebugxLog.Editor
                 if (m.signature.Equals(signature))
                 {
                     GetSignatureUnique(ref signature, withoutSignature);
-                    return true;
+                    return;
                 }
             }
 
@@ -642,11 +639,9 @@ namespace DebugxLog.Editor
                 if (m.signature.Equals(signature))
                 {
                     GetSignatureUnique(ref signature, withoutSignature);
-                    return true;
+                    return;
                 }
             }
-
-            return false;
         }
 
         private static void GetSignatureUnique(ref string signature, string withoutSignature = "")
@@ -654,11 +649,11 @@ namespace DebugxLog.Editor
             string signatureOri = signature;
             string signatureBase = signature;
             int num = 1;
-            Match match = regex_EndingDigit.Match(signatureBase);
+            Match match = _regexEndingDigit.Match(signatureBase);
             if (match.Length != 0)
             {
                 int.TryParse(match.Value, out num);
-                signatureBase = regex_EndingDigit.Replace(signatureBase, "");
+                signatureBase = _regexEndingDigit.Replace(signatureBase, "");
             }
 
             string signatureNew = $"{signatureBase}{num}";
@@ -689,7 +684,7 @@ namespace DebugxLog.Editor
             key = 1;
             while (CheckMemberKeyRepetition(key, withoutKey))
             {
-                if (key > int.MaxValue)
+                if (key >= int.MaxValue)
                 {
                     return false;
                 }
@@ -704,59 +699,24 @@ namespace DebugxLog.Editor
 
         #region GUILayout for Undo
 
-        public static bool Toggle(string label, string tooltip, bool value, float width = 250f)
+        private static bool ToggleUndo(string label, string tooltip, bool value)
         {
-            bool valueNew = GUILayoutx.Toggle(label, tooltip, value, width);
-            if (valueNew != value)
-            {
-                Undo.RecordObject(SettingsAsset, "DebugxSettingsProvider Toggle Set");
-            }
-
-            return valueNew;
+            return GUILayoutEx.ToggleUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Toggle Set");
         }
 
-        public static int IntField(string label, string tooltip, int value, float width = 250f)
+        private static int IntFieldUndo(string label, string tooltip, int value, float width = 250f)
         {
-            int valueNew = GUILayoutx.IntField(label, tooltip, value, width);
-            if (valueNew != value)
-            {
-                Undo.RecordObject(SettingsAsset, "DebugxSettingsProvider Int Set");
-            }
-
-            return valueNew;
+            return GUILayoutEx.IntFieldUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Int Set", width);
         }
 
-        public static bool Toggle(string label, string tooltip, bool value)
+        private static string TextFieldUndo(string label, string tooltip, string value)
         {
-            bool valueNew = EditorGUILayout.Toggle(new GUIContent(label, tooltip), value);
-            if (valueNew != value)
-            {
-                Undo.RecordObject(SettingsAsset, "DebugxSettingsProvider Toggle Set");
-            }
-
-            return valueNew;
+            return GUILayoutEx.TextFieldUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Text Set");
         }
 
-        public static string TextField(string label, string tooltip, string value)
+        private static Color ColorFieldUndo(string label, string tooltip, Color value)
         {
-            string valueNew = EditorGUILayout.DelayedTextField(new GUIContent(label, tooltip), value);
-            if (valueNew != value)
-            {
-                Undo.RecordObject(SettingsAsset, "DebugxSettingsProvider Text Set");
-            }
-
-            return valueNew;
-        }
-
-        public static Color ColorField(string label, string tooltip, Color value)
-        {
-            Color valueNew = EditorGUILayout.ColorField(new GUIContent(label, tooltip), value);
-            if (valueNew != value)
-            {
-                Undo.RecordObject(SettingsAsset, "Member Color Set");
-            }
-
-            return valueNew;
+            return GUILayoutEx.ColorFieldUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Color Set");
         }
 
         #endregion

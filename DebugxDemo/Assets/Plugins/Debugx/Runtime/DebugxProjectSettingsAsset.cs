@@ -79,32 +79,29 @@ namespace DebugxLog
     /// </summary>
     public class DebugxProjectSettingsAsset : ScriptableObject, IDebugxProjectSettingsAsset
     {
-        private static DebugxProjectSettingsAsset instance;
+        private static DebugxProjectSettingsAsset _instance;
         public static DebugxProjectSettingsAsset Instance
         {
             get
             {
-                if (instance == null)
+                if (_instance == null)
                 {
                     try
                     {
-                        instance = Resources.Load<DebugxProjectSettingsAsset>(DebugxProjectSettings.fileName);
+                        _instance = Resources.Load<DebugxProjectSettingsAsset>(DebugxProjectSettings.fileName);
                     }
                     catch
                     {
-
+                        // ignored
                     }
 
                     //通过CheckDebugxProjectSettingsAsset方法来确认并自动创建配置资源
                     //在启动项目和打开ProjectSettings或Preferences时会确认
                 }
 
-                return instance;
+                return _instance;
             }
-            set
-            {
-                instance = value;
-            }
+            set => _instance = value;
         }
 
         #region Action
@@ -118,25 +115,25 @@ namespace DebugxLog
 
         #endregion
 
-        public static ActionHandler OnApplyTo = new ActionHandler();
+        public static readonly ActionHandler OnApplyTo = new ActionHandler();
 
-        [Tooltip(DebugxStaticData.ToolTip_EnableLogDefault)]
+        [Tooltip(DebugxStaticData.ToolTipEnableLogDefault)]
         public bool enableLogDefault = true;
 
-        [Tooltip(DebugxStaticData.ToolTip_EnableLogMemberDefault)]
+        [Tooltip(DebugxStaticData.ToolTipEnableLogMemberDefault)]
         public bool enableLogMemberDefault = true;
 
-        [Tooltip(DebugxStaticData.ToolTip_AllowUnregisteredMember)]
+        [Tooltip(DebugxStaticData.ToolTipAllowUnregisteredMember)]
         public bool allowUnregisteredMember = true;
 
-        [Tooltip(DebugxStaticData.ToolTip_LogThisKeyMemberOnlyDefault)]
-        public int logThisKeyMemberOnlyDefault = 0;
+        [Tooltip(DebugxStaticData.ToolTipLogThisKeyMemberOnlyDefault)]
+        public int logThisKeyMemberOnlyDefault;
 
-        [Tooltip(DebugxStaticData.ToolTip_CustomDebugxMemberAssets)]
+        [Tooltip(DebugxStaticData.ToolTipCustomDebugxMemberAssets)]
         public DebugxMemberInfoAsset[] defaultMemberAssets;
         public int DefaultMemberAssetsLength => defaultMemberAssets == null ? 0 : defaultMemberAssets.Length;
 
-        [Tooltip(DebugxStaticData.ToolTip_CustomDebugxMemberAssets)]
+        [Tooltip(DebugxStaticData.ToolTipCustomDebugxMemberAssets)]
         public DebugxMemberInfoAsset[] customMemberAssets;
         public int CustomMemberAssetsLength => customMemberAssets == null ? 0 : customMemberAssets.Length;
         
@@ -173,7 +170,7 @@ namespace DebugxLog
 
             if (resetCustom)
             {
-                customMemberAssets = new DebugxMemberInfoAsset[1]
+                customMemberAssets = new[]
                 {
                     new DebugxMemberInfoAsset()
                     {

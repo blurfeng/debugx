@@ -13,23 +13,23 @@ namespace DebugxLog
         // Add the macro "DEBUG_X" to the U3D project to enable the function.
         // 在U3D项目中添加宏“DEBUG_X”开启功能。
 
-        private static DebugxManager instance;
-        private static GameObject GameObject;
+        private static DebugxManager _instance;
+        private static GameObject _gameObject;
         public static DebugxManager Instance
         {
             get
             {
-                if (instance == null)
+                if (_instance == null)
                 {
-                    instance = FindObjectOfType<DebugxManager>();
+                    _instance = FindObjectOfType<DebugxManager>();
 
-                    if (instance == null)
+                    if (_instance == null)
                     {
-                        GameObject = new GameObject { name = typeof(DebugxManager).Name };
-                        instance = GameObject.AddComponent<DebugxManager>();
+                        _gameObject = new GameObject { name = typeof(DebugxManager).Name };
+                        _instance = _gameObject.AddComponent<DebugxManager>();
                     }
                 }
-                return instance;
+                return _instance;
             }
         }
 
@@ -39,12 +39,13 @@ namespace DebugxLog
         [RuntimeInitializeOnLoadMethod]
         private static void CheckInstance()
         {
-            if (instance == null && Application.isPlaying)
+            if (_instance == null && Application.isPlaying)
             {
                 DebugxManager.Instance.Create();
             }
         }
-        public void Create() { }
+        
+        public virtual void Create() { }
 #endif
 
         private void Awake()

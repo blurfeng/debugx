@@ -10,30 +10,30 @@ namespace DebugxLog.Editor
 
         // In the HSV color model, the Hue (H) component is measured on a circular scale, where 0 and 360 degrees represent the same color.
         // HSV中H色调的尺度，注意0和360的颜色是一样的。
-        private const int hDimension = 360;
+        private const int HDimension = 360;
 
-        private const float s_Dark = 0.15f;
-        private const float v_Dark = 0.95f;
-        private const float s_Light = 0.75f;
-        private const float v_Light = 0.17f;
+        private const float SDark = 0.15f;
+        private const float VDark = 0.95f;
+        private const float SLight = 0.75f;
+        private const float VLight = 0.17f;
 
-        private static bool isDarkSkin;
+        private static bool _isDarkSkin;
 
         /// <summary>
         /// HSV color model. Values range from 0 to 1.
         /// HSV颜色模型。值为0-1。
         /// </summary>
-        public struct ColorHSV
+        private struct ColorHSV
         {
-            public float h;
-            public float s;
-            public float v;
+            public readonly float h;
+            public readonly float s;
+            public readonly float v;
 
             public ColorHSV(float h)
             {
                 this.h = h;
-                s = isDarkSkin ? s_Dark : s_Light;
-                v = isDarkSkin ? v_Dark : v_Light;
+                s = _isDarkSkin ? SDark : SLight;
+                v = _isDarkSkin ? VDark : VLight;
             }
         }
 
@@ -42,7 +42,7 @@ namespace DebugxLog.Editor
             DebugxProjectSettingsAsset.GetRandomColorForMember += GetRandomColorForMember;
             DebugxProjectSettingsAsset.GetNormalMemberColor += GetNormalMemberColor;
             DebugxProjectSettingsAsset.GetMasterMemberColor += GetMasterMemberColor;
-            isDarkSkin = EditorGUIUtility.isProSkin;
+            _isDarkSkin = EditorGUIUtility.isProSkin;
         }
 
         public static void OnQuit()
@@ -55,21 +55,21 @@ namespace DebugxLog.Editor
         /// 为成员获取一个随机颜色。
         /// </summary>
         /// <returns></returns>
-        public static Color GetRandomColorForMember()
+        private static Color GetRandomColorForMember()
         {
-            ColorHSV colorHSV = new(GetColorH() * 1f / hDimension);
+            ColorHSV colorHSV = new(GetColorH() * 1f / HDimension);
 
             return Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
         }
 
-        public static Color GetNormalMemberColor()
+        private static Color GetNormalMemberColor()
         {
-            return isDarkSkin ? Color.white : Color.black;
+            return _isDarkSkin ? Color.white : Color.black;
         }
 
-        public static Color GetMasterMemberColor()
+        private static Color GetMasterMemberColor()
         {
-            ColorHSV colorHSV = new(5f / hDimension);
+            ColorHSV colorHSV = new(5f / HDimension);
 
             return Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
         }
@@ -89,7 +89,7 @@ namespace DebugxLog.Editor
             {
                 int num = GetColorH360(SettingsAsset.customMemberAssets[0].color);
                 num += 180;
-                if (num > hDimension) num -= hDimension;
+                if (num > HDimension) num -= HDimension;
                 return num;
             }
             else if (useLength == 2)
@@ -106,8 +106,8 @@ namespace DebugxLog.Editor
                 }
                 else
                 {
-                    int num = right2 + Mathf.FloorToInt((hDimension - line1) * 0.5f);
-                    if (num > hDimension) num -= hDimension;
+                    int num = right2 + Mathf.FloorToInt((HDimension - line1) * 0.5f);
+                    if (num > HDimension) num -= HDimension;
                     return num;
                 }
             }
@@ -127,7 +127,7 @@ namespace DebugxLog.Editor
             colorHArray.Sort();
             int min = colorHArray[0], max = colorHArray[colorHArray.Count - 1];
             int left = -1;
-            int line = hDimension - max + min;
+            int line = HDimension - max + min;
             for (int i = 0; i < colorHArray.Count - 1; i++)
             {
                 int lineTemp = colorHArray[i + 1] - colorHArray[i];
@@ -149,7 +149,7 @@ namespace DebugxLog.Editor
             else
             {
                 colorH = max + (int)(line * 0.5f);
-                if (colorH > hDimension) colorH -= hDimension;
+                if (colorH > HDimension) colorH -= HDimension;
             }
 
             return colorH;
@@ -161,10 +161,10 @@ namespace DebugxLog.Editor
         /// </summary>
         /// <param name="color"></param>
         /// <returns></returns>
-        public static int GetColorH360(Color color)
+        private static int GetColorH360(Color color)
         {
-            Color.RGBToHSV(color, out float h, out float s, out float v);
-            return Mathf.FloorToInt(h * hDimension);
+            Color.RGBToHSV(color, out float h, out _, out _);
+            return Mathf.FloorToInt(h * HDimension);
         }
 
         /// <summary>
@@ -178,11 +178,11 @@ namespace DebugxLog.Editor
             int length = SettingsAsset.CustomMemberAssetsLength;
             if (length == 0) return;
 
-            int step = hDimension / SettingsAsset.CustomMemberAssetsLength;
+            int step = HDimension / SettingsAsset.CustomMemberAssetsLength;
             int h = 0;
             for (int i = 0; i < length; i++)
             {
-                ColorHSV colorHSV = new(h * 1f / hDimension);
+                ColorHSV colorHSV = new(h * 1f / HDimension);
                 SettingsAsset.customMemberAssets[i].color = Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
                 h += step;
             }
@@ -204,12 +204,11 @@ namespace DebugxLog.Editor
 
         private static bool ResetMembersColorByEditorSkin(DebugxMemberInfoAsset[] debugxMemberInfoAsset)
         {
-            int length = debugxMemberInfoAsset != null ? debugxMemberInfoAsset.Length : 0;
-            if (length == 0) return false;
+            if (debugxMemberInfoAsset == null || debugxMemberInfoAsset.Length == 0) return false;
 
             bool isDark = EditorGUIUtility.isProSkin;
-
             bool change = false;
+            int length = debugxMemberInfoAsset.Length;
 
             for (int i = 0; i < length; i++)
             {
@@ -218,7 +217,7 @@ namespace DebugxLog.Editor
                 Color color = mInfo.color;
                 Color.RGBToHSV(color, out float h, out float s, out float v);
 
-                if (s == (isDark ? s_Dark : s_Light) && v == (isDark ? v_Dark : v_Light)) continue;
+                if (Mathf.Approximately(s, (isDark ? SDark : SLight)) && Mathf.Approximately(v, (isDark ? VDark : VLight))) continue;
                 change = true;
 
                 var colorHSV = new ColorHSV(h);
@@ -233,7 +232,7 @@ namespace DebugxLog.Editor
         {
             Color.RGBToHSV(color, out float h, out float s, out float v);
             bool isDark = EditorGUIUtility.isProSkin;
-            if (s == (isDark ? s_Dark : s_Light) && v == (isDark ? v_Dark : v_Light)) return color;
+            if (Mathf.Approximately(s, (isDark ? SDark : SLight)) && Mathf.Approximately(v, (isDark ? VDark : VLight))) return color;
 
             var colorHSV = new ColorHSV(h);
             color = Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);

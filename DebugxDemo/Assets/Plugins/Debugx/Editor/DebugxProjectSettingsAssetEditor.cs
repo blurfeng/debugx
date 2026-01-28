@@ -6,7 +6,7 @@ namespace DebugxLog.Editor
 {
     public static class DebugxMemberInfoAssetEditor
     {
-        private static Dictionary<int, bool> _fadeAreaOpenCached = new Dictionary<int, bool>();
+        private static readonly Dictionary<int, bool> _fadeAreaOpenCached = new Dictionary<int, bool>();
 
         public static bool GetFadeAreaOpenCached(int key)
         {
@@ -22,23 +22,12 @@ namespace DebugxLog.Editor
         
         public static bool SetFadeAreaOpenCached(int key, bool value)
         {
-            if (!_fadeAreaOpenCached.ContainsKey(key))
-            {
-                _fadeAreaOpenCached.Add(key, value);
-            }
-            else
-            {
-                _fadeAreaOpenCached[key] = value;
-            }
-            
+            _fadeAreaOpenCached[key] = value;
             return _fadeAreaOpenCached[key];
         }
 
         public static void DeleteFadeAreaOpenCached(int key)
         {
-            if (!_fadeAreaOpenCached.ContainsKey(key))
-                return;
-
             _fadeAreaOpenCached.Remove(key);
             DebugxStaticData.PlayerPrefsDeleteKey(key.ToString());
         }
@@ -67,7 +56,7 @@ namespace DebugxLog.Editor
                 string path = AssetDatabase.GUIDToAssetPath(assetGUIDs[i]);
                 if (path.Contains("/Debugx/Resources/"))
                 {
-                    var ps = AssetDatabase.LoadAssetAtPath<DebugxProjectSettingsAsset>(path);
+                    AssetDatabase.LoadAssetAtPath<DebugxProjectSettingsAsset>(path);
                     haveAsset = true;
                 }
             }
@@ -95,7 +84,7 @@ namespace DebugxLog.Editor
 
             AssetDatabase.CreateAsset(DebugxProjectSettingsAsset.Instance, path);
 
-            DebugxProjectSettingsAsset.Instance.ResetMembers();
+            DebugxProjectSettingsAsset.Instance?.ResetMembers();
 
             EditorUtility.SetDirty(DebugxProjectSettingsAsset.Instance);
             AssetDatabase.SaveAssetIfDirty(DebugxProjectSettingsAsset.Instance);

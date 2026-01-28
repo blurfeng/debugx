@@ -66,21 +66,21 @@ namespace DebugxLog
         }
 
         #region Text
-        public const string ToolTip_CustomDebugxMemberAssets = "自定义调试成员信息列表";
+        public const string ToolTipCustomDebugxMemberAssets = "自定义调试成员信息列表";
 
-        public const string ToolTip_EnableLogDefault = "Log总开关，启动时默认状态";
-        public const string ToolTip_EnableLogMemberDefault = "成员Log总开关，启动时默认状态";
-        public const string ToolTip_AllowUnregisteredMember = "允许没有注册成员进行打印";
-        public const string ToolTip_LogThisKeyMemberOnlyDefault = "仅打印此Key的成员Log，0为关闭。启动时默认状态";
+        public const string ToolTipEnableLogDefault = "Log总开关，启动时默认状态";
+        public const string ToolTipEnableLogMemberDefault = "成员Log总开关，启动时默认状态";
+        public const string ToolTipAllowUnregisteredMember = "允许没有注册成员进行打印";
+        public const string ToolTipLogThisKeyMemberOnlyDefault = "仅打印此Key的成员Log，0为关闭。启动时默认状态";
 
-        public const string ToolTip_LogOutput = "输出Log到本地（启动前设置，运行时设置无效）。编辑器时输出到项目的Logs文件夹下，实机运行时根据平台输出到不同目录下";
-        public const string ToolTip_EnableLogStackTrace = "输出Log类型的堆栈跟踪";
-        public const string ToolTip_EnableWarningStackTrace = "输出Warning类型的堆栈跟踪";
-        public const string ToolTip_EnableErrorStackTrace = "输出Error类型的堆栈跟踪";
-        public const string ToolTip_RecordAllNonDebugxLogs = "记录所有非Debugx打印的Log";
-        public const string ToolTip_DrawLogToScreen = "绘制Log到屏幕";
-        public const string ToolTip_RestrictDrawLogCount = "限制绘制Log数量";
-        public const string ToolTip_MaxDrawLogs = "绘制Log最大数量";
+        public const string ToolTipLogOutput = "输出Log到本地（启动前设置，运行时设置无效）。编辑器时输出到项目的Logs文件夹下，实机运行时根据平台输出到不同目录下";
+        public const string ToolTipEnableLogStackTrace = "输出Log类型的堆栈跟踪";
+        public const string ToolTipEnableWarningStackTrace = "输出Warning类型的堆栈跟踪";
+        public const string ToolTipEnableErrorStackTrace = "输出Error类型的堆栈跟踪";
+        public const string ToolTipRecordAllNonDebugxLogs = "记录所有非Debugx打印的Log";
+        public const string ToolTipDrawLogToScreen = "绘制Log到屏幕";
+        public const string ToolTipRestrictDrawLogCount = "限制绘制Log数量";
+        public const string ToolTipMaxDrawLogs = "绘制Log最大数量";
 
         #endregion
 
@@ -161,14 +161,14 @@ namespace DebugxLog
             set => PlayerPrefs.SetInt("DebugxStaticData.LogThisKeyMemberOnlyDefault", value);
         }
 
-        private static Dictionary<int, bool> memberEnableDefaultDicPrefs;
+        private static Dictionary<int, bool> _memberEnableDefaultDicPrefs;
         public static Dictionary<int, bool> MemberEnableDefaultDicPrefs
         {
             get
             {
-                if (memberEnableDefaultDicPrefs == null)
+                if (_memberEnableDefaultDicPrefs == null)
                 {
-                    memberEnableDefaultDicPrefs = new Dictionary<int, bool>();
+                    _memberEnableDefaultDicPrefs = new Dictionary<int, bool>();
 
                     string data = PlayerPrefs.GetString("DebugxStaticData.MemberEnableDefaultDic");
                     if (!string.IsNullOrEmpty(data))
@@ -177,26 +177,26 @@ namespace DebugxLog
                         for (int i = 0; i < datas.Length; i++)
                         {
                             string[] item = datas[i].Split(',');
-                            memberEnableDefaultDicPrefs.Add(int.Parse(item[0]), bool.Parse(item[1]));
+                            _memberEnableDefaultDicPrefs.Add(int.Parse(item[0]), bool.Parse(item[1]));
                         }
                     }
                 }
 
-                return memberEnableDefaultDicPrefs;
+                return _memberEnableDefaultDicPrefs;
             }
         }
 
         public static void SaveMemberEnableDefaultDicPrefs()
         {
-            if (memberEnableDefaultDicPrefs != null)
+            if (_memberEnableDefaultDicPrefs != null)
             {
                 StringBuilder sb = new StringBuilder();
                 int counter = 0;
-                foreach (var item in memberEnableDefaultDicPrefs)
+                foreach (var item in _memberEnableDefaultDicPrefs)
                 {
                     counter++;
                     sb.Append($"{item.Key},{item.Value}");
-                    if (counter != memberEnableDefaultDicPrefs.Count) sb.Append(";");
+                    if (counter != _memberEnableDefaultDicPrefs.Count) sb.Append(";");
                 }
                 PlayerPrefs.SetString("DebugxStaticData.MemberEnableDefaultDic", sb.ToString());
             }
@@ -250,7 +250,7 @@ namespace DebugxLog
             set => PlayerPrefs.SetInt("DebugxStaticData.MaxDrawLogs", value);
         }
 
-        public static bool FAMemberEnableSettingOpen
+        public static bool FaMemberEnableSettingOpen
         {
             get => PlayerPrefsGetBool("DebugxStaticData.FAMemberEnableSettingOpen", true);
             set => PlayerPrefsSetBool("DebugxStaticData.FAMemberEnableSettingOpen", value);
