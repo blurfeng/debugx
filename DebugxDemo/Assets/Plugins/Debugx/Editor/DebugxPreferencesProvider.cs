@@ -53,8 +53,7 @@ namespace DebugxLog.Editor
             {
                 _isInitGUI = true;
 
-                _faMemberEnableSetting = new FadeArea(_settingsProvider, DebugxStaticData.FaMemberEnableSettingOpen,
-                    GUIStylEx.Get.AreaStyle1, GUIStylEx.Get.LabelStyleFadeAreaHeader, 0.8f);
+                _faMemberEnableSetting = new FadeArea(_settingsProvider, DebugxStaticData.FaMemberEnableSettingOpen);
                 _membersList = new ReorderableList(Settings.members, typeof(DebugxMemberInfo), false, true, false, false)
                 {
                     drawHeaderCallback = DrawMembersHeader,
@@ -97,7 +96,7 @@ namespace DebugxLog.Editor
             EditorGUI.EndDisabledGroup();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Toggle", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Toggle", GUIStyleEx.TitleStyle2);
 
             EditorGUI.BeginChangeCheck();
 
@@ -139,7 +138,7 @@ namespace DebugxLog.Editor
 
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Log Output", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Log Output", GUIStyleEx.TitleStyle2);
             DebugxStaticData.LogOutputPrefs = GUILayoutEx.Toggle("EnableLogOutput", DebugxStaticData.ToolTipLogOutput,
                 DebugxStaticData.LogOutputPrefs);
             EditorGUI.BeginDisabledGroup(!DebugxStaticData.LogOutputPrefs);

@@ -33,13 +33,13 @@ namespace DebugxLog.Editor
             _scrollViewPos = EditorGUILayout.BeginScrollView(_scrollViewPos);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Playing Settings", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Playing Settings", GUIStyleEx.TitleStyle2);
             if (!Application.isPlaying) EditorGUILayout.HelpBox(
                 DebugxStaticData.IsChineseSimplified ? 
                 "在游戏运行时才能设置这部分内容。" : "This part can only be set during game runtime.", 
                 MessageType.Info);
             EditorGUI.BeginDisabledGroup(!Application.isPlaying);
-            EditorGUILayout.LabelField("Toggle", GUIStylEx.Get.TitleStyle3);
+            EditorGUILayout.LabelField("Toggle", GUIStyleEx.TitleStyle3);
             Debugx.enableLog = GUILayoutEx.Toggle("EnableLog", 
                 DebugxStaticData.IsChineseSimplified ? "Log总开关" : "Master switch for logging", Debugx.enableLog);
             Debugx.enableLogMember = GUILayoutEx.Toggle("EnableLogMember", 
@@ -51,7 +51,7 @@ namespace DebugxLog.Editor
                 Debugx.logThisKeyMemberOnly);
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Members", GUIStylEx.Get.TitleStyle3);
+            EditorGUILayout.LabelField("Members", GUIStyleEx.TitleStyle3);
             if (Settings.members != null && Settings.members.Length > 0)
             {
                 for (int i = 0; i < Settings.members.Length; i++)
@@ -74,7 +74,7 @@ namespace DebugxLog.Editor
 
 #if UNITY_EDITOR
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Test", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Test", GUIStyleEx.TitleStyle2);
             DebugxStaticData.EnableAwakeTestLog = GUILayoutEx.Toggle("EnableAwakeTestLog", 
                 DebugxStaticData.IsChineseSimplified ? "打开Awake中测试用的Log打印。" : "Enable the test log printing in Awake.", DebugxStaticData.EnableAwakeTestLog);
             DebugxStaticData.EnableUpdateTestLog = GUILayoutEx.Toggle("EnableUpdateTestLog", 

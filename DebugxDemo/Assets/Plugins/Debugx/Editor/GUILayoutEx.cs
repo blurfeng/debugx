@@ -7,46 +7,72 @@ namespace DebugxLog.Editor
 {
     public static class GUILayoutEx
     {
-        public static bool ButtonGreen(string text, string tooltip = "")
+        #region Button
+
+        public static bool ButtonColor(string text, Color color, string tooltip = "", params GUILayoutOption[] options)
         {
-            GUIUtilityEx.PushTint(Color.green);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip));
-            GUIUtilityEx.PopTint();
+            GUIUtilityEx.PushTintBg(color);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
 
             return press;
         }
 
-        public static bool ButtonYellow(string text, string tooltip = "")
+        public static bool ButtonGreen(string text, string tooltip = "", params GUILayoutOption[] options)
         {
-            GUIUtilityEx.PushTint(Color.yellow);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip));
-            GUIUtilityEx.PopTint();
+            GUIUtilityEx.PushTintBg(Color.green);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
 
             return press;
         }
 
-        public static bool ButtonRed(string text, string tooltip = "")
+        public static bool ButtonYellow(string text, string tooltip = "", params GUILayoutOption[] options)
         {
-            GUIUtilityEx.PushTint(Color.red);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip));
-            GUIUtilityEx.PopTint();
+            GUIUtilityEx.PushTintBg(Color.yellow);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
 
             return press;
         }
 
-        public static bool Toggle(string label, string tooltip, bool value, float width = 250f)
+        public static bool ButtonRed(string text, string tooltip = "", params GUILayoutOption[] options)
         {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent(label, tooltip), GUILayout.Width(width));
-            bool change = EditorGUILayout.Toggle(value);
-            EditorGUILayout.EndHorizontal();
+            GUIUtilityEx.PushTintBg(Color.red);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
 
-            return change;
+            return press;
         }
         
-        public static bool ToggleUndo(string label, string tooltip, bool value, Object undoObject, string undoName, float width = 250f)
+        public static bool ButtonCyan(string text, string tooltip = "", params GUILayoutOption[] options)
         {
-            bool change = Toggle(label, tooltip, value, width);
+            GUIUtilityEx.PushTintBg(Color.cyan);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
+
+            return press;
+        }
+        
+        public static bool ButtonGray(string text, string tooltip = "", params GUILayoutOption[] options)
+        {
+            GUIUtilityEx.PushTintBg(Color.gray);
+            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            GUIUtilityEx.PopTintBg();
+
+            return press;
+        }
+
+        #endregion
+
+        public static bool Toggle(string label, string tooltip, bool value, params GUILayoutOption[] options)
+        {
+            return EditorGUILayout.Toggle(new GUIContent(label, tooltip), value, options);
+        }
+        
+        public static bool ToggleUndo(string label, string tooltip, bool value, Object undoObject, string undoName, params GUILayoutOption[] options)
+        {
+            bool change = Toggle(label, tooltip, value, options);
             if (change != value)
             {
                 Undo.RecordObject(undoObject, undoName);
@@ -55,19 +81,14 @@ namespace DebugxLog.Editor
             return change;
         }
 
-        public static int IntField(string label, string tooltip, int value, float width = 250f)
+        public static bool ToggleLeft(string label, string tooltip, bool value, params GUILayoutOption[] options)
         {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent(label, tooltip), GUILayout.Width(width));
-            int change = EditorGUILayout.DelayedIntField(value);
-            EditorGUILayout.EndHorizontal();
-
-            return change;
+            return EditorGUILayout.ToggleLeft(new GUIContent(label, tooltip), value, options);
         }
-        
-        public static int IntFieldUndo(string label, string tooltip, int value, Object undoObject, string undoName, float width = 250f)
+
+        public static bool ToggleLeftUndo(string label, string tooltip, bool value, Object undoObject, string undoName, params GUILayoutOption[] options)
         {
-            int change = IntField(label, tooltip, value, width);
+            bool change = ToggleLeft(label, tooltip, value, options);
             if (change != value)
             {
                 Undo.RecordObject(undoObject, undoName);
@@ -76,19 +97,14 @@ namespace DebugxLog.Editor
             return change;
         }
 
-        public static string TextField(string label, string tooltip, string value, float width = 250f)
+        public static int IntField(string label, string tooltip, int value, params GUILayoutOption[] options)
         {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent(label, tooltip), GUILayout.Width(width));
-            string change = EditorGUILayout.DelayedTextField(value);
-            EditorGUILayout.EndHorizontal();
-
-            return change;
+            return EditorGUILayout.IntField(new GUIContent(label, tooltip), value, options);
         }
-
-        public static string TextFieldUndo(string label, string tooltip, string value, Object undoObject, string undoName, float width = 250f)
+        
+        public static int IntFieldUndo(string label, string tooltip, int value, Object undoObject, string undoName, params GUILayoutOption[] options)
         {
-            string change = TextField(label, tooltip, value, width);
+            int change = IntField(label, tooltip, value, options);
             if (change != value)
             {
                 Undo.RecordObject(undoObject, undoName);
@@ -97,19 +113,30 @@ namespace DebugxLog.Editor
             return change;
         }
 
-        public static Color ColorField(string label, string tooltip, Color value, float width = 250f)
+        public static string TextField(string label, string tooltip, string value, params GUILayoutOption[] options)
         {
-            EditorGUILayout.BeginHorizontal();
-            EditorGUILayout.LabelField(new GUIContent(label, tooltip), GUILayout.Width(width));
-            Color change = EditorGUILayout.ColorField(value);
-            EditorGUILayout.EndHorizontal();
+            return EditorGUILayout.TextField(new GUIContent(label, tooltip), value, options);
+        }
+
+        public static string TextFieldUndo(string label, string tooltip, string value, Object undoObject, string undoName, params GUILayoutOption[] options)
+        {
+            string change = TextField(label, tooltip, value, options);
+            if (change != value)
+            {
+                Undo.RecordObject(undoObject, undoName);
+            }
 
             return change;
         }
-        
-        public static Color ColorFieldUndo(string label, string tooltip, Color value, Object undoObject, string undoName, float width = 250f)
+
+        public static Color ColorField(string label, string tooltip, Color value, params GUILayoutOption[] options)
         {
-            Color change = ColorField(label, tooltip, value, width);
+            return EditorGUILayout.ColorField(new GUIContent(label, tooltip), value, options);
+        }
+        
+        public static Color ColorFieldUndo(string label, string tooltip, Color value, Object undoObject, string undoName, params GUILayoutOption[] options)
+        {
+            Color change = ColorField(label, tooltip, value, options);
             if (change != value)
             {
                 Undo.RecordObject(undoObject, undoName);
@@ -125,14 +152,26 @@ namespace DebugxLog.Editor
     /// </summary>
     public static class GUIUtilityEx
     {
+        private static readonly Stack<Color> _colorsBg = new Stack<Color>();
         private static readonly Stack<Color> _colors = new Stack<Color>();
 
+        public static void PushTintBg(Color tint)
+        {
+            _colorsBg.Push(GUI.color);
+            GUI.backgroundColor = tint;
+        }
+
+        public static void PopTintBg()
+        {
+            GUI.backgroundColor = _colorsBg.Pop();
+        }
+        
         public static void PushTint(Color tint)
         {
             _colors.Push(GUI.color);
-            GUI.color *= tint;
+            GUI.color = tint;
         }
-
+        
         public static void PopTint()
         {
             GUI.color = _colors.Pop();
@@ -178,7 +217,7 @@ namespace DebugxLog.Editor
 
         private const float AnimationSpeed = 100f;
 
-        public FadeArea(EditorWindow editor, bool open, GUIStyle areaStyle, GUIStyle labelStyle = null, float beginSpace = 1.5f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        public FadeArea(EditorWindow editor, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
         {
             this._editorWindow = editor;
 
@@ -191,12 +230,38 @@ namespace DebugxLog.Editor
             this._changedExcludeHeaderClick = changedExcludeHeaderClick;
         }
 
-        public FadeArea(SettingsProvider settingsProvider, bool open, GUIStyle areaStyle, GUIStyle labelStyle = null, float beginSpace = 1.5f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        public FadeArea(EditorWindow editor, bool open = false, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        {
+            this._editorWindow = editor;
+
+            this._areaStyle = GUIStyleEx.AreaStyle1;
+            this._labelStyle = GUIStyleEx.LabelStyleFadeAreaHeader;
+            _visible = this._open = open;
+            _value = open ? 1 : 0;
+            this._beginSpace = beginSpace;
+            this._immediately = immediately;
+            this._changedExcludeHeaderClick = changedExcludeHeaderClick;
+        }
+
+        public FadeArea(SettingsProvider settingsProvider, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
         {
             this._settingsProvider = settingsProvider;
 
             this._areaStyle = areaStyle;
             this._labelStyle = labelStyle;
+            _visible = this._open = open;
+            _value = open ? 1 : 0;
+            this._beginSpace = beginSpace;
+            this._immediately = immediately;
+            this._changedExcludeHeaderClick = changedExcludeHeaderClick;
+        }
+        
+        public FadeArea(SettingsProvider settingsProvider, bool open = false, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        {
+            this._settingsProvider = settingsProvider;
+
+            this._areaStyle = GUIStyleEx.AreaStyle1;
+            this._labelStyle = GUIStyleEx.LabelStyleFadeAreaHeader;
             _visible = this._open = open;
             _value = open ? 1 : 0;
             this._beginSpace = beginSpace;
@@ -312,7 +377,7 @@ namespace DebugxLog.Editor
             var hermite = Hermite(0, 1, _value);
 
             _visible = EditorGUILayout.BeginFadeGroup(hermite);
-            GUIUtilityEx.PushTint(new Color(1, 1, 1, hermite));
+            GUIUtilityEx.PushTintBg(new Color(1, 1, 1, hermite));
             Tick();
 
             // Another vertical group is necessary to work around
@@ -335,7 +400,7 @@ namespace DebugxLog.Editor
 
             EditorGUILayout.EndFadeGroup();
             EditorGUILayout.EndVertical();
-            GUIUtilityEx.PopTint();
+            GUIUtilityEx.PopTintBg();
         }
     }
 }

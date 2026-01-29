@@ -122,7 +122,7 @@ namespace DebugxLog.Editor
             EditorGUILayout.EndHorizontal();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Config Settings", GUIStylEx.Get.TitleStyle3);
+            EditorGUILayout.LabelField("Config Settings", GUIStyleEx.TitleStyle3);
             EditorGUI.BeginDisabledGroup(true);
             EditorGUILayout.ObjectField("", SettingsAsset, typeof(DebugxProjectSettingsAsset), false);
             EditorGUI.EndDisabledGroup();
@@ -134,23 +134,23 @@ namespace DebugxLog.Editor
             EditorGUI.BeginChangeCheck();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Toggle", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Toggle", GUIStyleEx.TitleStyle2);
 
-            SettingsAsset.enableLogDefault = ToggleUndo("EnableLog Default", DebugxStaticData.ToolTipEnableLogDefault,
-                SettingsAsset.enableLogDefault);
-            SettingsAsset.enableLogMemberDefault = ToggleUndo("EnableLogMember Default",
-                DebugxStaticData.ToolTipEnableLogMemberDefault, SettingsAsset.enableLogMemberDefault);
-            SettingsAsset.allowUnregisteredMember = ToggleUndo("AllowUnregisteredMember",
-                DebugxStaticData.ToolTipAllowUnregisteredMember, SettingsAsset.allowUnregisteredMember);
-            SettingsAsset.logThisKeyMemberOnlyDefault = IntFieldUndo("LogThisKeyMemberOnly Default",
-                DebugxStaticData.ToolTipLogThisKeyMemberOnlyDefault, SettingsAsset.logThisKeyMemberOnlyDefault);
+            SettingsAsset.enableLogDefault = ToggleUndo(
+                "EnableLog Default", DebugxStaticData.ToolTipEnableLogDefault, SettingsAsset.enableLogDefault);
+            SettingsAsset.enableLogMemberDefault = ToggleUndo(
+                "EnableLogMember Default", DebugxStaticData.ToolTipEnableLogMemberDefault, SettingsAsset.enableLogMemberDefault);
+            SettingsAsset.allowUnregisteredMember = ToggleUndo(
+                "AllowUnregisteredMember", DebugxStaticData.ToolTipAllowUnregisteredMember, SettingsAsset.allowUnregisteredMember);
+            SettingsAsset.logThisKeyMemberOnlyDefault = IntFieldUndo(
+                "LogThisKeyMemberOnly Default", DebugxStaticData.ToolTipLogThisKeyMemberOnlyDefault, SettingsAsset.logThisKeyMemberOnlyDefault);
 
             // Member configuration modification.
             // 成员配置修改。
             DrawMemberConfigSetting();
 
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Log Output", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Log Output", GUIStyleEx.TitleStyle2);
             SettingsAsset.logOutput =
                 ToggleUndo("EnableLogOutput", DebugxStaticData.ToolTipLogOutput, SettingsAsset.logOutput);
             EditorGUI.BeginDisabledGroup(!SettingsAsset.logOutput);
@@ -183,7 +183,7 @@ namespace DebugxLog.Editor
         private static void DrawMemberConfigSetting()
         {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Member Settings", GUIStylEx.Get.TitleStyle2);
+            EditorGUILayout.LabelField("Member Settings", GUIStyleEx.TitleStyle2);
 
             faMemberConfigSetting.Begin();
             FadeAreaHeaderIsDirty = faMemberConfigSetting.Header("Members");
@@ -237,7 +237,7 @@ namespace DebugxLog.Editor
                 {
                     EditorGUILayout.Space();
                     EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField("Default", GUIStylEx.Get.TitleStyle3);
+                    EditorGUILayout.LabelField("Default", GUIStyleEx.TitleStyle3);
                     if (GUILayoutEx.ButtonYellow(
                             "Reset Default Members",
                             DebugxStaticData.IsChineseSimplified
@@ -286,7 +286,7 @@ namespace DebugxLog.Editor
                 // 自定义成员。
                 EditorGUILayout.Space();
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Custom Members", GUIStylEx.Get.TitleStyle3);
+                EditorGUILayout.LabelField("Custom Members", GUIStyleEx.TitleStyle3);
                 if (GUILayoutEx.ButtonYellow(
                         "Automatically Reassign Colors",
                         DebugxStaticData.IsChineseSimplified
@@ -478,8 +478,7 @@ namespace DebugxLog.Editor
             // This method makes use of GUI.skin.button. The GUI class can only be called within the OnGUI function and cannot be called in OnEnable.
             // 此方法内调用到了GUI.skin.button，GUI类必须在OnGUI才能调用，不能在OnEnable。
 
-            faMemberConfigSetting = new FadeArea(settingsProvider, DebugxStaticDataEditor.FaMemberConfigSettingOpen,
-                GUIStylEx.Get.AreaStyle1, GUIStylEx.Get.LabelStyleFadeAreaHeader, 0.8f);
+            faMemberConfigSetting = new FadeArea(settingsProvider, DebugxStaticDataEditor.FaMemberConfigSettingOpen);
 
             memberInfosFadeAreaPool.Clear();
 
@@ -507,11 +506,7 @@ namespace DebugxLog.Editor
         /// <param name="info"></param>
         private static void OnAddMemberInfo(DebugxMemberInfoAsset info)
         {
-            memberInfosFadeAreaPool.Add(
-                new FadeArea(
-                    settingsProvider, 
-                    DebugxMemberInfoAssetEditor.GetFadeAreaOpenCached(info.key),
-                GUIStylEx.Get.AreaStyle1, GUIStylEx.Get.LabelStyleFadeAreaHeader));
+            memberInfosFadeAreaPool.Add(new FadeArea(settingsProvider, DebugxMemberInfoAssetEditor.GetFadeAreaOpenCached(info.key)));
         }
 
         /// <summary>
@@ -704,9 +699,9 @@ namespace DebugxLog.Editor
             return GUILayoutEx.ToggleUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Toggle Set");
         }
 
-        private static int IntFieldUndo(string label, string tooltip, int value, float width = 250f)
+        private static int IntFieldUndo(string label, string tooltip, int value)
         {
-            return GUILayoutEx.IntFieldUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Int Set", width);
+            return GUILayoutEx.IntFieldUndo(label, tooltip, value, SettingsAsset, "DebugxSettingsProvider Int Set");
         }
 
         private static string TextFieldUndo(string label, string tooltip, string value)
