@@ -9,11 +9,25 @@ namespace DebugxLog.Editor
     {
         #region Button
 
-        public static bool ButtonColor(string text, Color color, string tooltip = "", params GUILayoutOption[] options)
+        public static bool ButtonColor(string text, Color color, bool? showColor = null, string tooltip = "",
+            params GUILayoutOption[] options)
         {
-            GUIUtilityEx.PushTintBg(color);
+            if (showColor != null && showColor.Value)
+                GUIUtilityEx.PushTintBg(color);
             bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
-            GUIUtilityEx.PopTintBg();
+            if (showColor != null && showColor.Value)
+                GUIUtilityEx.PopTintBg();
+
+            return press;
+        }
+
+        public static bool ButtonColor(Rect rect, string text, Color color, bool? showColor = null, string tooltip = "")
+        {
+            if (showColor != null && showColor.Value)
+                GUIUtilityEx.PushTintBg(color);
+            bool press = GUI.Button(rect, new GUIContent(text, tooltip));
+            if (showColor != null && showColor.Value)
+                GUIUtilityEx.PopTintBg();
 
             return press;
         }
@@ -27,6 +41,11 @@ namespace DebugxLog.Editor
             return press;
         }
 
+        public static bool ButtonGreen(string text, params GUILayoutOption[] options)
+        {
+            return ButtonGreen(text, "", options);
+        }
+
         public static bool ButtonYellow(string text, string tooltip = "", params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.yellow);
@@ -36,15 +55,53 @@ namespace DebugxLog.Editor
             return press;
         }
 
-        public static bool ButtonRed(string text, string tooltip = "", params GUILayoutOption[] options)
+        public static bool ButtonYellow(string text, params GUILayoutOption[] options)
+        {
+            return ButtonYellow(text, "", options);
+        }
+        
+        public static bool ButtonRed(GUIContent content, GUIStyle style = null, params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.red);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
+            if (style == null)
+                style = GUI.skin.button;
+            bool press = GUILayout.Button(content, style, options);
             GUIUtilityEx.PopTintBg();
 
             return press;
         }
-        
+
+        public static bool ButtonRed(Rect rect, GUIContent content, GUIStyle style = null)
+        {
+            GUIUtilityEx.PushTintBg(Color.red);
+            if (style == null)
+                style = GUI.skin.button;
+            bool press = GUI.Button(rect, content, style);
+            GUIUtilityEx.PopTintBg();
+
+            return press;
+        }
+
+        public static bool ButtonRed(Rect rect, string text, GUIStyle style = null)
+        {
+            return ButtonRed(rect, new GUIContent(text, ""), style);
+        }
+
+        public static bool ButtonRed(string text, string tooltip = "", params GUILayoutOption[] options)
+        {
+            return ButtonRed(new GUIContent(text, tooltip), null, options);
+        }
+
+        public static bool ButtonRed(string text, params GUILayoutOption[] options)
+        {
+            return ButtonRed(text, "", options);
+        }
+
+        public static bool ButtonRed(string text, GUIStyle style = null, params GUILayoutOption[] options)
+        {
+            return ButtonRed(new GUIContent(text, ""), style, options);
+        }
+
         public static bool ButtonCyan(string text, string tooltip = "", params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.cyan);
@@ -53,7 +110,12 @@ namespace DebugxLog.Editor
 
             return press;
         }
-        
+
+        public static bool ButtonCyan(string text, params GUILayoutOption[] options)
+        {
+            return ButtonCyan(text, "", options);
+        }
+
         public static bool ButtonGray(string text, string tooltip = "", params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.gray);
@@ -63,14 +125,20 @@ namespace DebugxLog.Editor
             return press;
         }
 
+        public static bool ButtonGray(string text, params GUILayoutOption[] options)
+        {
+            return ButtonGray(text, "", options);
+        }
+
         #endregion
 
         public static bool Toggle(string label, string tooltip, bool value, params GUILayoutOption[] options)
         {
             return EditorGUILayout.Toggle(new GUIContent(label, tooltip), value, options);
         }
-        
-        public static bool ToggleUndo(string label, string tooltip, bool value, Object undoObject, string undoName, params GUILayoutOption[] options)
+
+        public static bool ToggleUndo(string label, string tooltip, bool value, Object undoObject, string undoName,
+            params GUILayoutOption[] options)
         {
             bool change = Toggle(label, tooltip, value, options);
             if (change != value)
@@ -86,7 +154,8 @@ namespace DebugxLog.Editor
             return EditorGUILayout.ToggleLeft(new GUIContent(label, tooltip), value, options);
         }
 
-        public static bool ToggleLeftUndo(string label, string tooltip, bool value, Object undoObject, string undoName, params GUILayoutOption[] options)
+        public static bool ToggleLeftUndo(string label, string tooltip, bool value, Object undoObject, string undoName,
+            params GUILayoutOption[] options)
         {
             bool change = ToggleLeft(label, tooltip, value, options);
             if (change != value)
@@ -101,8 +170,9 @@ namespace DebugxLog.Editor
         {
             return EditorGUILayout.IntField(new GUIContent(label, tooltip), value, options);
         }
-        
-        public static int IntFieldUndo(string label, string tooltip, int value, Object undoObject, string undoName, params GUILayoutOption[] options)
+
+        public static int IntFieldUndo(string label, string tooltip, int value, Object undoObject, string undoName,
+            params GUILayoutOption[] options)
         {
             int change = IntField(label, tooltip, value, options);
             if (change != value)
@@ -118,7 +188,8 @@ namespace DebugxLog.Editor
             return EditorGUILayout.TextField(new GUIContent(label, tooltip), value, options);
         }
 
-        public static string TextFieldUndo(string label, string tooltip, string value, Object undoObject, string undoName, params GUILayoutOption[] options)
+        public static string TextFieldUndo(string label, string tooltip, string value, Object undoObject,
+            string undoName, params GUILayoutOption[] options)
         {
             string change = TextField(label, tooltip, value, options);
             if (change != value)
@@ -133,8 +204,9 @@ namespace DebugxLog.Editor
         {
             return EditorGUILayout.ColorField(new GUIContent(label, tooltip), value, options);
         }
-        
-        public static Color ColorFieldUndo(string label, string tooltip, Color value, Object undoObject, string undoName, params GUILayoutOption[] options)
+
+        public static Color ColorFieldUndo(string label, string tooltip, Color value, Object undoObject,
+            string undoName, params GUILayoutOption[] options)
         {
             Color change = ColorField(label, tooltip, value, options);
             if (change != value)
@@ -145,7 +217,7 @@ namespace DebugxLog.Editor
             return change;
         }
     }
-    
+
     /// <summary>
     /// GUI extension tool. It includes the GUI drawing class taken from the AstarPathfindingProject plugin.
     /// GUI扩展工具。有从AstarPathfindingProject插件拿过来的GUI绘制类
@@ -165,13 +237,13 @@ namespace DebugxLog.Editor
         {
             GUI.backgroundColor = _colorsBg.Pop();
         }
-        
+
         public static void PushTint(Color tint)
         {
             _colors.Push(GUI.color);
             GUI.color = tint;
         }
-        
+
         public static void PopTint()
         {
             GUI.color = _colors.Pop();
@@ -203,6 +275,7 @@ namespace DebugxLog.Editor
         private bool _changedCached;
 
         private readonly float _beginSpace;
+
         // Exclude the "Header" from the "GUI.changed" list. // 将点击Header排除出GUI.changed。
         private readonly bool _changedExcludeHeaderClick;
 
@@ -217,7 +290,8 @@ namespace DebugxLog.Editor
 
         private const float AnimationSpeed = 100f;
 
-        public FadeArea(EditorWindow editor, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        public FadeArea(EditorWindow editor, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f,
+            bool immediately = false, bool changedExcludeHeaderClick = true)
         {
             this._editorWindow = editor;
 
@@ -230,7 +304,8 @@ namespace DebugxLog.Editor
             this._changedExcludeHeaderClick = changedExcludeHeaderClick;
         }
 
-        public FadeArea(EditorWindow editor, bool open = false, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        public FadeArea(EditorWindow editor, bool open = false, float beginSpace = 1f, bool immediately = false,
+            bool changedExcludeHeaderClick = true)
         {
             this._editorWindow = editor;
 
@@ -243,7 +318,8 @@ namespace DebugxLog.Editor
             this._changedExcludeHeaderClick = changedExcludeHeaderClick;
         }
 
-        public FadeArea(SettingsProvider settingsProvider, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+        public FadeArea(SettingsProvider settingsProvider, GUIStyle areaStyle, GUIStyle labelStyle, bool open,
+            float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
         {
             this._settingsProvider = settingsProvider;
 
@@ -255,8 +331,9 @@ namespace DebugxLog.Editor
             this._immediately = immediately;
             this._changedExcludeHeaderClick = changedExcludeHeaderClick;
         }
-        
-        public FadeArea(SettingsProvider settingsProvider, bool open = false, float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
+
+        public FadeArea(SettingsProvider settingsProvider, bool open = false, float beginSpace = 1f,
+            bool immediately = false, bool changedExcludeHeaderClick = true)
         {
             this._settingsProvider = settingsProvider;
 
@@ -310,7 +387,9 @@ namespace DebugxLog.Editor
 
         public void Begin()
         {
-            _lastRect = _areaStyle != null ? EditorGUILayout.BeginVertical(_areaStyle) : EditorGUILayout.BeginVertical();
+            _lastRect = _areaStyle != null
+                ? EditorGUILayout.BeginVertical(_areaStyle)
+                : EditorGUILayout.BeginVertical();
             EditorGUILayout.Space(_beginSpace);
         }
 
@@ -358,10 +437,11 @@ namespace DebugxLog.Editor
                 _settingsProvider?.Repaint();
                 _editorWindow?.Repaint();
             }
+
             this._open = open;
             if (_immediately) _value = open ? 1f : 0f;
 
-            if (_changedExcludeHeaderClick && !_changedCached) GUI.changed = _changedCached;//开关FadeArea排除Changed判断
+            if (_changedExcludeHeaderClick && !_changedCached) GUI.changed = _changedCached; //开关FadeArea排除Changed判断
 
             return press;
         }

@@ -2,7 +2,7 @@
 
 namespace DebugxLog.Tools
 {
-    class DebugxTools
+    internal static class DebugxTools
     {
         /// <summary>
         /// 确认委托是否已经包含。

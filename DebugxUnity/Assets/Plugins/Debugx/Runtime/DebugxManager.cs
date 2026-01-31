@@ -82,8 +82,6 @@ namespace DebugxLog
             {
                 // Try to print. It can be annotated. The member information with the corresponding key will be printed.
                 // 试打印，可注释。有对应key的成员信息时才会被打印。
-                Debugx.LogNom("LogNom Print Test");
-                Debugx.LogMst("LogMst Print Test");
                 Debugx.Log(1, "Key 1 Print Test");
                 Debugx.Log(2, "Key 2 Print Test");
                 Debugx.Log(999, "Key 999 Print Test");
@@ -100,8 +98,6 @@ namespace DebugxLog
                 // Test print, with comments. It will only be printed when there is corresponding key for the member information.
                 // 测试打印，可注释。有对应key的成员信息时才会被打印。
                 Debugx.Log(1, "MemberKey 1 Update");
-                Debugx.LogNom("LogNom Update");
-                Debugx.LogMst("LogMst Update");
             }
 #endif
         }

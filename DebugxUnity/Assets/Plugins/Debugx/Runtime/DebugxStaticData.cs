@@ -21,7 +21,7 @@ namespace DebugxLog
                 if (string.IsNullOrEmpty(_resourcesPath))
                 {
                     _resourcesPath = Application.dataPath + FolderPath;
-                    Debugx.LogMst($"ResourcesPath: {_resourcesPath}");
+                    Debugx.LogAdm($"ResourcesPath: {_resourcesPath}");
                 }
                 
                 //确认文件夹是否存在，否则创建
@@ -66,6 +66,7 @@ namespace DebugxLog
         }
 
         #region Text
+        public const string ToolTipDefaultDebugxMemberAssets = "默认调试成员信息列表";
         public const string ToolTipCustomDebugxMemberAssets = "自定义调试成员信息列表";
 
         public const string ToolTipEnableLogDefault = "Log总开关，启动时默认状态";

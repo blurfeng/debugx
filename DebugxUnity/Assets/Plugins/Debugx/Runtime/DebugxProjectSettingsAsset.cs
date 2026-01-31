@@ -1,78 +1,9 @@
-﻿using DebugxLog.Tools;
-using System;
+﻿using System;
 using UnityEngine;
+using DebugxLog.Tools;
 
 namespace DebugxLog
 {
-    /// <summary>
-    /// Debugx provides debugging member information. It is used for configuring data.
-    /// Debugx调试成员信息。用于配置的数据。
-    /// </summary>
-    [Serializable]
-    public struct DebugxMemberInfoAsset
-    {
-        [Tooltip("是否开启")]
-        public bool enableDefault;
-
-        [Tooltip("使用者签名")]
-        public string signature;
-
-        [Tooltip("使用者签名是否打印在Log中")]
-        public bool logSignature;
-
-        [Tooltip("此成员信息密钥,不要重复")]
-        public int key;
-
-        [Tooltip("头部信息，在打印Log会打印在头部")]
-        public string header;
-
-        [Tooltip("打印Log颜色")]
-        public Color color;
-
-        public DebugxMemberInfoAsset(int key)
-        {
-            enableDefault = true;
-            signature = $"Menber {key}";
-            logSignature = true;
-            this.key = key;
-            header = String.Empty;
-            color = DebugxProjectSettingsAsset.GetRandomColorForMember != null ? DebugxProjectSettingsAsset.GetRandomColorForMember.Invoke() : Color.white;
-        }
-
-        /// <summary>
-        /// 将部分数据重置到默认
-        /// </summary>
-        public void ResetToDefaultPart()
-        {
-            enableDefault = true;
-            logSignature = true;
-        }
-
-        public DebugxMemberInfo CreateDebugxMemberInfo()
-        {
-            DebugxMemberInfo info = new DebugxMemberInfo()
-            {
-                key = key,
-                enableDefault = enableDefault,
-                signature = signature,
-                logSignature = logSignature,
-                header = header,
-                color = ColorUtility.ToHtmlStringRGB(color),
-
-                haveSignature = !string.IsNullOrEmpty(signature),
-                haveHeader = !string.IsNullOrEmpty(header),
-            };
-
-            //本地用户设置覆盖
-            if (Application.isEditor && DebugxStaticData.MemberEnableDefaultDicPrefs.ContainsKey(key))
-            {
-                info.enableDefault = DebugxStaticData.MemberEnableDefaultDicPrefs[key];
-            }
-
-            return info;
-        }
-    }
-
     /// <summary>
     /// Debugx调试配置
     /// 推荐使用编辑器工具编辑，也可以直接编辑.asset文件
@@ -88,7 +19,7 @@ namespace DebugxLog
                 {
                     try
                     {
-                        _instance = Resources.Load<DebugxProjectSettingsAsset>(DebugxProjectSettings.fileName);
+                        _instance = Resources.Load<DebugxProjectSettingsAsset>(DebugxProjectSettings.FileName);
                     }
                     catch
                     {
@@ -129,7 +60,7 @@ namespace DebugxLog
         [Tooltip(DebugxStaticData.ToolTipLogThisKeyMemberOnlyDefault)]
         public int logThisKeyMemberOnlyDefault;
 
-        [Tooltip(DebugxStaticData.ToolTipCustomDebugxMemberAssets)]
+        [Tooltip(DebugxStaticData.ToolTipDefaultDebugxMemberAssets)]
         public DebugxMemberInfoAsset[] defaultMemberAssets;
         public int DefaultMemberAssetsLength => defaultMemberAssets == null ? 0 : defaultMemberAssets.Length;
 
@@ -148,9 +79,9 @@ namespace DebugxLog
                 //普通Log成员信息
                 DebugxMemberInfoAsset normalMember = new DebugxMemberInfoAsset()
                 {
-                    signature = DebugxProjectSettings.normalInfoSignature,
+                    signature = DebugxProjectSettings.NormalInfoSignature,
                     logSignature = true,
-                    key = DebugxProjectSettings.normalInfoKey,
+                    key = DebugxProjectSettings.NormalInfoKey,
                     color = GetNormalMemberColor != null ? GetNormalMemberColor.Invoke() : Color.white,
                     enableDefault = true,
                 };
@@ -159,9 +90,9 @@ namespace DebugxLog
                 //高级Log成员信息
                 DebugxMemberInfoAsset masterMember = new DebugxMemberInfoAsset()
                 {
-                    signature = DebugxProjectSettings.masterInfoSignature,
+                    signature = DebugxProjectSettings.MasterInfoSignature,
                     logSignature = true,
-                    key = DebugxProjectSettings.masterInfoKey,
+                    key = DebugxProjectSettings.MasterInfoKey,
                     color = GetMasterMemberColor != null ? GetMasterMemberColor.Invoke() : new Color(1f, 0.627f, 0.627f, 1f),
                     enableDefault = true,
                 };
@@ -216,7 +147,6 @@ namespace DebugxLog
         public void ApplyTo(DebugxProjectSettings settings)
         {
             if (settings == null) return;
-
 
             if (Application.isEditor)
             {

@@ -47,10 +47,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ActionHandler.cs" />
     <Compile Include="DebugxBurst.cs" />
-    <Compile Include="Debugx.cs" />
-    <Compile Include="DebugxTools.cs" />
+    <Compile Include="DebugxBase.cs" />
+    <Compile Include="DebugxProjectSettings.cs" />
     <Compile Include="LogOutput.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

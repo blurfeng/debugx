@@ -50,7 +50,7 @@ namespace DebugxLog.Editor
             //这会导致每次代码重编译时都创建了新的DebugxProjectSettingsAsset并覆盖了旧的
 
             bool haveAsset = false;
-            string[] assetGUIDs = AssetDatabase.FindAssets(DebugxProjectSettings.fileName);
+            string[] assetGUIDs = AssetDatabase.FindAssets(DebugxProjectSettings.FileName);
             for (int i = 0; i < assetGUIDs.Length; i++)
             {
                 string path = AssetDatabase.GUIDToAssetPath(assetGUIDs[i]);
@@ -72,7 +72,7 @@ namespace DebugxLog.Editor
             //在编辑器启动或代码编译时，创建Asset后直接Resources.Load此资源会导致一个堆栈溢出的Bug。所以我们使用DebugxProjectSettings.ApplyBy接口进行保存，避开会调用到Resources.Load的流程
             //调用Resources.Load加载已经存在的资源则不会有此问题，应该是Editor启动时创建的Asset资源还未成功进行保存
 
-            string path = $"{DebugxStaticData.ResourcesPathRelative}/{DebugxProjectSettings.fileName}.asset";
+            string path = $"{DebugxStaticData.ResourcesPathRelative}/{DebugxProjectSettings.FileName}.asset";
 
             if (DebugxProjectSettingsAsset.Instance) AssetDatabase.DeleteAsset(path);//移除旧资源
 
@@ -89,6 +89,10 @@ namespace DebugxLog.Editor
             EditorUtility.SetDirty(DebugxProjectSettingsAsset.Instance);
             AssetDatabase.SaveAssetIfDirty(DebugxProjectSettingsAsset.Instance);
             DebugxProjectSettings.ApplyBy(DebugxProjectSettingsAsset.Instance);
+            
+            // Generate Debugx class with member-specific Log methods.
+            // 生成包含成员专用 Log 方法的 Debugx 类。
+            DebugxCodeGenerator.GenerateDebugxClass();
         }
     }
 }

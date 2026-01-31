@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+﻿﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Build;
@@ -95,7 +95,7 @@ namespace DebugxLog.Editor
             EditorGUILayout.BeginHorizontal();
 
             DebugxStaticDataEditor.AutoSave = GUILayoutEx.Toggle(
-                "AutoSave Asset",
+                "Auto Save Asset",
                 DebugxStaticData.IsChineseSimplified
                     ? "自动保存配置资源，自动保存时在修改内容时会有卡顿。"
                     : "Automatically save configuration assets. There may be a lag during automatic saving when content is being modified.",
@@ -588,6 +588,10 @@ namespace DebugxLog.Editor
                 EditorUtility.SetDirty(SettingsAsset);
                 AssetDatabase.SaveAssetIfDirty(SettingsAsset);
                 SettingsAsset.ApplyTo(DebugxProjectSettings.Instance);
+                
+                // Generate Debugx class with member-specific Log methods.
+                // 生成包含成员专用 Log 方法的 Debugx 类。
+                DebugxCodeGenerator.GenerateDebugxClass();
             }
         }
 
