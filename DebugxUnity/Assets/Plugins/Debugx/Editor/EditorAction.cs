@@ -2,8 +2,7 @@
 
 namespace DebugxLog.Editor
 {
-    [InitializeOnLoad]
-    public class EditorAction
+    public static class EditorAction
     {
         [InitializeOnLoadMethod]
         static void InitializeOnLoadMethod()

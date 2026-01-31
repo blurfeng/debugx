@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace DebugxLog.Editor
 {
-    public class DebugxEditorLibrary
+    public static class DebugxEditorLibrary
     {
         /// <summary>
         /// Confirm that the Debugx project settings asset exists.

@@ -1,4 +1,4 @@
-﻿﻿using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditor.Build;
@@ -9,12 +9,16 @@ namespace DebugxLog.Editor
 {
     static class DebugxProjectSettingsProvider
     {
-        private static SettingsProvider settingsProvider;
+        private static SettingsProvider _settingsProvider;
         private static DebugxProjectSettingsAsset SettingsAsset => DebugxProjectSettingsAsset.Instance;
-        private static readonly List<FadeArea> memberInfosFadeAreaPool = new();
-        private static FadeArea faMemberConfigSetting;
-        private static bool isInitGUI;
-        private static bool assetIsDirty;
+        private static readonly List<FadeArea> _memberInfosFadeAreaPool = new();
+        private static FadeArea _faMemberConfigSetting;
+        private static bool _isInitGUI;
+        private static bool _assetIsDirty;
+        
+        private const float ButtonWidth1 = 100f;
+        private const float ButtonWidth2 = 150f;
+        private const float ButtonWidth3 = 200f;
 
         private static bool FadeAreaHeaderIsDirty
         {
@@ -24,21 +28,20 @@ namespace DebugxLog.Editor
                 // 标脏只能设为true。
                 if (value)
                 {
-                    fadeAreaHeaderIsDirty = true;
+                    _fadeAreaHeaderIsDirty = true;
                 }
             }
         }
-
-        private static bool fadeAreaHeaderIsDirty;
+        private static bool _fadeAreaHeaderIsDirty;
 
         [SettingsProvider]
         public static SettingsProvider DebugxProjectSettingsProviderCreate()
         {
-            if (settingsProvider == null)
+            if (_settingsProvider == null)
             {
-                isInitGUI = false;
+                _isInitGUI = false;
 
-                settingsProvider = new SettingsProvider("Project/Debugx", SettingsScope.Project)
+                _settingsProvider = new SettingsProvider("Project/Debugx", SettingsScope.Project)
                 {
                     label = "Debugx",
                     activateHandler = Enable,
@@ -47,7 +50,7 @@ namespace DebugxLog.Editor
                 };
             }
 
-            return settingsProvider;
+            return _settingsProvider;
         }
 
         private static void Enable(string searchContext, VisualElement rootElement)
@@ -68,11 +71,11 @@ namespace DebugxLog.Editor
         {
             if (SettingsAsset == null) return;
 
-            if (!isInitGUI)
+            if (!_isInitGUI)
             {
                 // Some initialization involving GUI classes must be called within OnGUI.
                 // 一些初始化内容调用到GUI类，必须在OnGUI内调用。
-                isInitGUI = true;
+                _isInitGUI = true;
                 ResetWindowData();
             }
 
@@ -100,11 +103,14 @@ namespace DebugxLog.Editor
                     ? "自动保存配置资源，自动保存时在修改内容时会有卡顿。"
                     : "Automatically save configuration assets. There may be a lag during automatic saving when content is being modified.",
                 DebugxStaticDataEditor.AutoSave);
-            EditorGUI.BeginDisabledGroup(!assetIsDirty);
-            if (GUILayoutEx.ButtonGreen("Save Asset")) Apply();
+            EditorGUI.BeginDisabledGroup(!_assetIsDirty);
+            if (GUILayoutEx.ButtonGreen("Save Asset", GUILayout.Width(ButtonWidth1))) 
+                Apply();
             EditorGUI.EndDisabledGroup();
+            
+            GUILayout.FlexibleSpace(); // Push the Save Asset button to the left side. // 将 Save Asset 按钮推到左侧。
 
-            if (GUILayoutEx.ButtonRed("Reset to Default"))
+            if (GUILayoutEx.ButtonRed("Reset to Default", GUILayout.Width(ButtonWidth3)))
             {
                 if (EditorUtility.DisplayDialog(
                         "Reset To Default",
@@ -131,7 +137,7 @@ namespace DebugxLog.Editor
 
             // Confirm whether any parameters have been modified.
             // 确认是否修改任何参数。
-            EditorGUI.BeginChangeCheck();
+            BeginChangeCheck();
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Toggle", GUIStyleEx.TitleStyle2);
@@ -172,10 +178,7 @@ namespace DebugxLog.Editor
             EditorGUI.EndDisabledGroup();
             EditorGUI.EndDisabledGroup();
 
-            if (EditorGUI.EndChangeCheck())
-            {
-                SaveCheck();
-            }
+            EndChangeCheck();
 
             EditorGUILayout.Space(16f);
         }
@@ -185,18 +188,38 @@ namespace DebugxLog.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Member Settings", GUIStyleEx.TitleStyle2);
 
-            faMemberConfigSetting.Begin();
-            FadeAreaHeaderIsDirty = faMemberConfigSetting.Header("Members");
+            _faMemberConfigSetting.Begin();
+            FadeAreaHeaderIsDirty = _faMemberConfigSetting.Header("Members");
 
-            DebugxStaticDataEditor.FaMemberConfigSettingOpen = faMemberConfigSetting.BeginFade();
+            DebugxStaticDataEditor.FaMemberConfigSettingOpen = _faMemberConfigSetting.BeginFade();
             if (DebugxStaticDataEditor.FaMemberConfigSettingOpen)
             {
                 EditorGUILayout.BeginHorizontal();
+                EndChangeCheck(); // 将生成代码按钮操作排除在外。 // Exclude the generate code button operation.
+                if (GUILayout.Button(new GUIContent("Generate Debugx Code",
+                        DebugxStaticData.IsChineseSimplified 
+                            ? "根据当前成员配置生成Debugx类代码，会覆盖原有代码文件。保存时也会自动生成代码，只有当成员和代码不匹配时才需要手动生成代码。"
+                            : "Generate Debugx class code based on the current member configuration, which will overwrite the existing code file.\nCode generation also occurs upon saving; manual generation is only necessary when members and code do not match."
+                        ), EditorStyles.miniButtonLeft, GUILayout.Width(ButtonWidth3)))
+                {
+                    // 保存成功时也会重新生成代码。没成功保存时主动调用生成代码。
+                    // Code will be regenerated when saved successfully. If saving fails, code generation is called proactively.
+                    if (!Apply())
+                    {
+                        DebugxCodeGenerator.GenerateDebugxClass();
+                        AssetDatabase.Refresh();
+                    }
+                }
+                BeginChangeCheck();
+                
+                GUILayout.FlexibleSpace();
+                
                 if (GUILayout.Button(new GUIContent(
                         "Reset Members Part Config",
                         DebugxStaticData.IsChineseSimplified
                             ? "重置成员设置，仅会重置部分成员的配置到默认值。（重置内容：EnableDefault,LogSignature,fadeAreaOpen）"
-                            : "Reset member settings; only some member configurations will be reset to default values.\n(Reset contents: EnableDefault, LogSignature, fadeAreaOpen)")))
+                            : "Reset member settings; only some member configurations will be reset to default values.\n(Reset contents: EnableDefault, LogSignature, fadeAreaOpen)"),
+                        GUILayout.Width(ButtonWidth3)))
                 {
                     if (EditorUtility.DisplayDialog(
                             "Reset Members Part Config",
@@ -214,7 +237,8 @@ namespace DebugxLog.Editor
                         "Adapt Color By Editor Skin",
                         DebugxStaticData.IsChineseSimplified
                             ? "颜色根据编辑器皮肤自动适应。在Dark暗皮肤时Log颜色会变亮，在Light亮皮肤时Log颜色会变暗。"
-                            : "Colors automatically adapt based on the editor skin. Log colors become brighter in Dark mode and darker in Light mode.")))
+                            : "Colors automatically adapt based on the editor skin. Log colors become brighter in Dark mode and darker in Light mode."),
+                        GUILayout.Width(ButtonWidth3)))
                 {
                     if (EditorUtility.DisplayDialog(
                             "Adapt Color By Editor Skin",
@@ -242,7 +266,8 @@ namespace DebugxLog.Editor
                             "Reset Default Members",
                             DebugxStaticData.IsChineseSimplified
                                 ? "重置默认成员，这会重置默认成员的所有数据。"
-                                : "Reset the default members; this will reset all data of the default members."))
+                                : "Reset the default members; this will reset all data of the default members.",
+                            GUILayout.Width(ButtonWidth3)))
                     {
                         if (EditorUtility.DisplayDialog(
                                 "Reset Default Members",
@@ -262,7 +287,7 @@ namespace DebugxLog.Editor
                     {
                         DebugxMemberInfoAsset mInfo = SettingsAsset.defaultMemberAssets[i];
 
-                        if (i >= memberInfosFadeAreaPool.Count)
+                        if (i >= _memberInfosFadeAreaPool.Count)
                         {
                             // Undo operation may cause memberInfosFadeAreaPool count to be incorrect.
                             // Undo回退可能导致memberInfosFadeAreaPool数量不正确。
@@ -270,7 +295,7 @@ namespace DebugxLog.Editor
                             break;
                         }
 
-                        var faTemp = memberInfosFadeAreaPool[i];
+                        var faTemp = _memberInfosFadeAreaPool[i];
                         faTemp.Begin();
                         FadeAreaHeaderIsDirty = faTemp.Header(string.IsNullOrEmpty(mInfo.signature)
                             ? $"Member {mInfo.key}"
@@ -286,26 +311,10 @@ namespace DebugxLog.Editor
                 // 自定义成员。
                 EditorGUILayout.Space();
                 EditorGUILayout.BeginHorizontal();
+                
                 EditorGUILayout.LabelField("Custom Members", GUIStyleEx.TitleStyle3);
-                if (GUILayoutEx.ButtonYellow(
-                        "Automatically Reassign Colors",
-                        DebugxStaticData.IsChineseSimplified
-                            ? "自动重分配所有自定义成员的颜色，颜色将根据成员数量平均分配。"
-                            : "Automatically reassign colors for all custom members; colors will be evenly distributed based on the number of members."))
-                {
-                    if (EditorUtility.DisplayDialog(
-                            "Automatically Reassign Colors",
-                            DebugxStaticData.IsChineseSimplified
-                                ? "确认要重分配所有自定义成员的颜色吗？"
-                                : "Are you sure you want to reassign colors for all custom members?",
-                            "Ok", "Cancel"))
-                    {
-                        Undo.RecordObject(SettingsAsset, "AutomaticallyReassignColors");
-                        ColorDispenser.AutomaticallyReassignColors();
-                    }
-                }
-
-                if (GUILayout.Button("Add Member"))
+                
+                if (GUILayoutEx.ButtonGreen("Add Member", GUILayout.Width(ButtonWidth3)))
                 {
                     Undo.RecordObject(SettingsAsset, "AddMember");
 
@@ -322,6 +331,27 @@ namespace DebugxLog.Editor
 
                     OnAddMemberInfo(mInfo);
                 }
+                
+                GUILayout.FlexibleSpace();
+                
+                if (GUILayoutEx.ButtonYellow(
+                        "Automatically Reassign Colors",
+                        DebugxStaticData.IsChineseSimplified
+                            ? "自动重分配所有自定义成员的颜色，颜色将根据成员数量平均分配。"
+                            : "Automatically reassign colors for all custom members; colors will be evenly distributed based on the number of members.",
+                        GUILayout.Width(ButtonWidth3)))
+                {
+                    if (EditorUtility.DisplayDialog(
+                            "Automatically Reassign Colors",
+                            DebugxStaticData.IsChineseSimplified
+                                ? "确认要重分配所有自定义成员的颜色吗？"
+                                : "Are you sure you want to reassign colors for all custom members?",
+                            "Ok", "Cancel"))
+                    {
+                        Undo.RecordObject(SettingsAsset, "AutomaticallyReassignColors");
+                        ColorDispenser.AutomaticallyReassignColors();
+                    }
+                }
 
                 EditorGUILayout.EndHorizontal();
 
@@ -332,7 +362,7 @@ namespace DebugxLog.Editor
                     for (int i = 0; i < SettingsAsset.customMemberAssets.Length; i++)
                     {
                         int index = i + SettingsAsset.DefaultMemberAssetsLength;
-                        if (index >= memberInfosFadeAreaPool.Count)
+                        if (index >= _memberInfosFadeAreaPool.Count)
                         {
                             // Undoing the operation may result in incorrect memberInfosFadeAreaPool quantity.
                             // Undo回退可能导致memberInfosFadeAreaPool数量不正确。
@@ -340,7 +370,7 @@ namespace DebugxLog.Editor
                             break;
                         }
 
-                        var faTemp = memberInfosFadeAreaPool[index];
+                        var faTemp = _memberInfosFadeAreaPool[index];
                         DebugxMemberInfoAsset mInfo = SettingsAsset.customMemberAssets[i];
 
                         faTemp.Begin();
@@ -348,7 +378,8 @@ namespace DebugxLog.Editor
                         FadeAreaHeaderIsDirty =
                             faTemp.Header(
                                 string.IsNullOrEmpty(mInfo.signature) ? $"Member {mInfo.key}" : mInfo.signature, 320);
-                        if (GUILayout.Button("Delete Member"))
+                        GUILayout.FlexibleSpace(); // Push the button to the right side. // 将按钮推到右侧。
+                        if (GUILayoutEx.ButtonRed("Delete Member", GUILayout.Width(ButtonWidth1)))
                         {
                             removeIndex = i;
                         }
@@ -388,7 +419,7 @@ namespace DebugxLog.Editor
                 }
             }
 
-            faMemberConfigSetting.End();
+            _faMemberConfigSetting.End();
         }
 
         private static void DrawMemberInfo(ref DebugxMemberInfoAsset mInfo, bool lockSignature = false, bool lockKey = false)
@@ -460,7 +491,7 @@ namespace DebugxLog.Editor
                         DebugxStaticData.IsChineseSimplified
                             ? "颜色根据编辑器皮肤自动适应。在Dark暗皮肤时Log颜色会变亮，在Light亮皮肤时Log颜色会变暗。"
                             : "Colors automatically adapt based on the editor skin. In Dark mode, log colors become brighter; in Light mode, log colors become darker."),
-                    GUILayout.Width(100)))
+                    GUILayout.Width(ButtonWidth1)))
             {
                 Undo.RecordObject(SettingsAsset, "AdaptColor Single");
                 mInfo.color = ColorDispenser.GetMemberColorByEditorSkin(mInfo.color);
@@ -478,9 +509,9 @@ namespace DebugxLog.Editor
             // This method makes use of GUI.skin.button. The GUI class can only be called within the OnGUI function and cannot be called in OnEnable.
             // 此方法内调用到了GUI.skin.button，GUI类必须在OnGUI才能调用，不能在OnEnable。
 
-            faMemberConfigSetting = new FadeArea(settingsProvider, DebugxStaticDataEditor.FaMemberConfigSettingOpen);
+            _faMemberConfigSetting = new FadeArea(_settingsProvider, DebugxStaticDataEditor.FaMemberConfigSettingOpen);
 
-            memberInfosFadeAreaPool.Clear();
+            _memberInfosFadeAreaPool.Clear();
 
             if (SettingsAsset.defaultMemberAssets != null)
             {
@@ -506,7 +537,7 @@ namespace DebugxLog.Editor
         /// <param name="info"></param>
         private static void OnAddMemberInfo(DebugxMemberInfoAsset info)
         {
-            memberInfosFadeAreaPool.Add(new FadeArea(settingsProvider, DebugxMemberInfoAssetEditor.GetFadeAreaOpenCached(info.key)));
+            _memberInfosFadeAreaPool.Add(new FadeArea(_settingsProvider, DebugxMemberInfoAssetEditor.GetFadeAreaOpenCached(info.key)));
         }
 
         /// <summary>
@@ -518,7 +549,7 @@ namespace DebugxLog.Editor
         private static void OnRemoveMemberInfo(int index, DebugxMemberInfoAsset info)
         {
             DebugxMemberInfoAssetEditor.DeleteFadeAreaOpenCached(info.key);
-            memberInfosFadeAreaPool.RemoveAt(index + 2); //前面两个时Normal和Master用的
+            _memberInfosFadeAreaPool.RemoveAt(index + 2); //前面两个时Normal和Master用的
         }
 
         private static void ResetProjectSettings()
@@ -556,10 +587,23 @@ namespace DebugxLog.Editor
                 SettingsAsset.customMemberAssets[i].ResetToDefaultPart();
             }
         }
+        
+        private static void BeginChangeCheck()
+        {
+            EditorGUI.BeginChangeCheck();
+        }
+        
+        private static void EndChangeCheck()
+        {
+            if (EditorGUI.EndChangeCheck())
+            {
+                SaveCheck();
+            }
+        }
 
         private static void SaveCheck()
         {
-            assetIsDirty = true;
+            _assetIsDirty = true;
 
             if (DebugxStaticDataEditor.AutoSave)
             {
@@ -577,11 +621,11 @@ namespace DebugxLog.Editor
             }
         }
 
-        private static void Apply()
+        private static bool Apply()
         {
-            if (!DebugxStaticDataEditor.AutoSave && !assetIsDirty && !fadeAreaHeaderIsDirty) return;
-            assetIsDirty = false;
-            fadeAreaHeaderIsDirty = false;
+            if (!DebugxStaticDataEditor.AutoSave && !_assetIsDirty && !_fadeAreaHeaderIsDirty) return false;
+            _assetIsDirty = false;
+            _fadeAreaHeaderIsDirty = false;
 
             if (SettingsAsset != null)
             {
@@ -593,6 +637,8 @@ namespace DebugxLog.Editor
                 // 生成包含成员专用 Log 方法的 Debugx 类。
                 DebugxCodeGenerator.GenerateDebugxClass();
             }
+            
+            return true;
         }
 
         #region MemberInfo
