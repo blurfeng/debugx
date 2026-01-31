@@ -19,6 +19,9 @@ A debugging extension plugin specifically for Unity. Allows configuration-based 
 
 You can read the [User Manual](Documents/UserManual_en.md) for more information.
 
+## Unity Version Requirement
+Unity 2021.3 and above.
+
 ## UPM Installation
 Install the plugin using UPM (Unity Package Manager).
 ```

@@ -19,6 +19,9 @@ Unity 专用的调试功能扩展插件。通过配置可以按调试成员分�
 
 你可以阅读 [用户手册](Documents/UserManual_cn.md) 来获得更多信息。
 
+## Unity 版本要求
+Unity 2021.3 及以上版本。
+
 ## UPM 安装
 使用 UPM（Unity Package Manager）方式安装插件。
 ```

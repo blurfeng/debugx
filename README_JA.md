@@ -19,6 +19,9 @@ Unity 専用のデバッグ機能拡張プラグイン。設定によりデバ�
 
 詳細情報は [ユーザーマニュアル](Documents/UserManual_ja.md) をご覧ください。
 
+## Unity バージョン要件
+Unity 2021.3 以上。
+
 ## UPM インストール
 UPM（Unity Package Manager）を使用してプラグインをインストールします。
 ```
