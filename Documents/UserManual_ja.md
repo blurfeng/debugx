@@ -24,8 +24,8 @@ https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
 ```
 
 ### プロジェクトへのマクロ追加
-ログ印刷機能を有効にするには、プロジェクトにマクロ DEBUG_X を追加する必要があります。  
-プロジェクト発布時には、マクロ DEBUG_X を除去して Debugx の機能を素早く無効にできます。
+ログ印刷機能を有効にするには、プロジェクトにマクロ `DEBUG_X` を追加する必要があります。  
+プロジェクト発布時には、マクロ `DEBUG_X` を除去して Debugx の機能を素早く無効にできます。
 ![](Images/Debugx2.png)
 
 ### Debugx 設定

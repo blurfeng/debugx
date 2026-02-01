@@ -19,6 +19,10 @@ Unity 专用的调试功能扩展插件。通过配置可以按调试成员分�
 
 你可以阅读 [用户手册](Documents/UserManual_cn.md) 来获得更多信息。
 
+# 注意事项
+> [!TIP]
+> 1. 插件在 2.3.0 之前的版本因为文件夹结构和 UPM 链接改变，无法正常更新，需要移除旧版本后重新安装。
+
 ## Unity 版本要求
 Unity 2021.3 及以上版本。
 
@@ -34,12 +38,15 @@ https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 
 ## 概要
 Debugx 是专为 Unity 引擎开发的调试插件。  
-用于按调试成员管理 DebugLog，并将日志文件输出到本地。使用宏 "DEBUG_X" 来启用功能。
+用于按调试成员管理 DebugLog，并将日志文件输出到本地。   
+需要在项目中添加宏 "DEBUG_X" 来启用Debugx功能。
 
-在代码中直接使用 Debugx.Log() 即可轻松进行日志打印。  
-不同成员使用不同的 key，可以方便地按成员分类打印，并快速定位对应代码的负责人。  
-![](Documents/Images/DebugxCode.png)
+### 如何使用
+根据配置的调试成员会自动生成对应的 Log 方法。   
+直接在代码中使用 Debugx.LogMemberName() 等方法即可轻松打印日志。   
+![](Documents/Images/Debugx_Use.png)
 
+### DOTS Burst 环境
 在 Unity DOTS 的 Burst 环境中，必须使用 DebugxBurst 而非 Debugx，因为许多方法和字段在 Burst 中不可用。  
 但由于 Unity DOTS 更新非常频繁，在不同 DOTS 版本下，此方法无法保证完全可靠。  
 ![](Documents/Images/DebugxBurst.png)

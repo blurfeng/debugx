@@ -19,6 +19,10 @@ Unity 専用のデバッグ機能拡張プラグイン。設定によりデバ�
 
 詳細情報は [ユーザーマニュアル](Documents/UserManual_ja.md) をご覧ください。
 
+# 注意事項
+> [!TIP]
+> 1. プラグインは 2.3.0 以前のバージョンではフォルダ構造と UPM リンクが変更されたため、正常に更新できず、古いバージョンを削除してから再インストールする必要があります。
+
 ## Unity バージョン要件
 Unity 2021.3 以上。
 
@@ -34,12 +38,15 @@ https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
 
 ## 概要
 Debugx は Unity エンジン専用に開発されたデバッグプラグインです。  
-デバッグメンバー別に DebugLog を管理し、ログファイルをローカルに出力するために使用されます。マクロ "DEBUG_X" を使用して機能を有効にします。
+デバッグメンバー別に DebugLog を管理し、ログファイルをローカルに出力します。  
+プロジェクトにマクロ "DEBUG_X" を追加して Debugx 機能を有効にする必要があります。
 
-コード内で Debugx.Log() を直接使用するだけで、簡単にログ印刷が可能です。  
-異なるメンバーが異なる key を使用することで、メンバー別に便利に分類印刷でき、対応するコードの担当者を素早く特定できます。  
-![](Documents/Images/DebugxCode.png)
+### 使い方
+設定されたデバッグメンバーに基づいて、対応する Log メソッドが自動的に生成されます。   
+コード内で Debugx.LogMemberName() などのメソッドを使用して、簡単にログを印刷できます。   
+![](Documents/Images/Debugx_Use.png)
 
+### DOTS Burst 環境
 Unity DOTS の Burst 環境では、多くのメソッドとフィールドが Burst で利用できないため、Debugx の代わりに DebugxBurst を使用する必要があります。  
 ただし、Unity DOTS の更新が非常に頻繁なため、異なる DOTS バージョンでは完全な信頼性を保証できません。  
 ![](Documents/Images/DebugxBurst.png)

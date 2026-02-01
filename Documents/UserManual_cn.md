@@ -24,8 +24,8 @@ https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
 ```
 
 ### 添加宏到项目
-必须在项目中添加宏 DEBUG_X 才能启用日志打印功能。  
-在项目发布时，可以移除宏 DEBUG_X 来快速禁用 Debugx 的功能。
+必须在项目中添加宏 `DEBUG_X` 才能启用日志打印功能。  
+在项目发布时，可以移除宏 `DEBUG_X` 来快速禁用 Debugx 的功能。
 ![](Images/Debugx2.png)
 
 ### Debugx 配置

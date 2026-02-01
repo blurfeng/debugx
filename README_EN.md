@@ -19,6 +19,10 @@ A debugging extension plugin specifically for Unity. Allows configuration-based 
 
 You can read the [User Manual](Documents/UserManual_en.md) for more information.
 
+# Notes
+> [!TIP]
+> 1. Due to changes in folder structure and UPM links, versions prior to 2.3.0 cannot be updated normally and require removal of the old version before reinstallation.
+
 ## Unity Version Requirement
 Unity 2021.3 and above.
 
@@ -33,13 +37,16 @@ https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
 4. Paste the link to install the plugin to your project
 
 ## Overview
-Debugx is a debugging plugin specifically developed for the Unity engine.  
-Used to manage DebugLog by debugging members and output log files locally. Use the macro "DEBUG_X" to enable functionality.
+Debugx is a debugging plugin developed specifically for the Unity engine.  
+Used to manage DebugLogs by debugging members and output log files locally.
+Requires adding the macro "DEBUG_X" in the project to enable Debugx functionality.
 
-Use Debugx.Log() directly in your code for easy log printing.  
-Different members use different keys, allowing convenient categorized printing by member and quick identification of corresponding code owners.  
-![](Documents/Images/DebugxCode.png)
+### How to Use
+Based on the configured debugging members, corresponding Log methods are automatically generated.    
+You can easily print logs by using methods like Debugx.LogMemberName() directly in your code.   
+![](Documents/Images/Debugx_Use.png)
 
+### DOTS Burst Environment
 In Unity DOTS Burst environment, you must use DebugxBurst instead of Debugx, as many methods and fields are unavailable in Burst.  
 However, since Unity DOTS updates very frequently, this method cannot guarantee complete reliability across different DOTS versions.  
 ![](Documents/Images/DebugxBurst.png)

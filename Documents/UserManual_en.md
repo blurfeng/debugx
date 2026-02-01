@@ -24,8 +24,8 @@ https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
 ```
 
 ### Adding Macro to Project
-You must add the DEBUG_X macro to the project to enable log printing functionality.  
-When releasing the project, you can remove the DEBUG_X macro to quickly disable Debugx functionality.
+You must add the `DEBUG_X` macro to the project to enable log printing functionality.  
+When releasing the project, you can remove the `DEBUG_X` macro to quickly disable Debugx functionality.
 ![](Images/Debugx2.png)
 
 ### Debugx Configuration
