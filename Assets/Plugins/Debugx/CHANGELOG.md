@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.0] - 2026-02-01
+### Changed
+- Promoted DebugxLog.dll source code directly into the Unity project to streamline assembly management and UPM integration.
+- Organized project resources and removed the standalone DebugxLog.dll build project.
+- Relocated the Unity project to the root directory for a cleaner repository structure.
+- Updated .gitignore to be specifically tailored for Unity projects.
+- Updated UPM (Unity Package Manager) links.
+### Warning
+- Due to updates in the project structure and UPM links, you must remove the existing package and re-import it to ensure proper installation.
+
 ## [2.2.1] - 2026-02-01
 ### ### Fixed
 - Removed redundant .meta files for invalid .docx documents.
