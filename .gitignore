@@ -327,3 +327,10 @@ crashlytics-build.properties
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+# --- Unity Package Manager (UPM) 白名单 ---
+# 强制不忽略根目录下的 Packages 文件夹（这是 Unity 的核心）
+!/Packages/
+# 确保 Packages 目录下的 json 和 yaml 配置文件被追踪
+!/Packages/*.json
+!/Packages/*.yaml
