@@ -25,7 +25,7 @@ Unity 2021.3 及以上版本。
 ## UPM 安装
 使用 UPM（Unity Package Manager）方式安装插件。
 ```
-https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 ```
 1. 复制上面的链接
 2. 打开 Unity 编辑器，进入 Window > Package Manager
