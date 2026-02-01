@@ -1,5 +1,9 @@
 # Changelog
 
+## [2.3.1] - 2026-02-01
+### Fixed
+- Addressed a potential editor freeze/hang caused by InitializeOnLoadMethod when loading the plugin via UPM.
+
 ## [2.3.0] - 2026-02-01
 ### Changed
 - Promoted DebugxLog.dll source code directly into the Unity project to streamline assembly management and UPM integration.
@@ -11,7 +15,7 @@
 - Due to updates in the project structure and UPM links, you must remove the existing package and re-import it to ensure proper installation.
 
 ## [2.2.1] - 2026-02-01
-### ### Fixed
+### Fixed
 - Removed redundant .meta files for invalid .docx documents.
 - Resolved .gitignore conflict where NuGet and Unity Packages folders were incorrectly conflated.
 - Optimized the auto-generated Debugx class by implementing the DEBUGX_IN_UPM macro via .asmdef version defines. The class is now conditionally compiled using #if !DEBUGX_IN_UPM, effectively resolving naming conflicts between the local Assets development scripts and the plugin scripts when loaded via UPM in the Packages folder.
