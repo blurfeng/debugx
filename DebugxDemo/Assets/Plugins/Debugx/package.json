@@ -1,7 +1,7 @@
 {
   "name": "com.blurfeng.debugx",
   "displayName": "Debugx",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "unity": "2021.3",
   "description": "A simple and handy debug utility for Unity.",
   "keywords": ["Debugx", "debug", "log", "console", "tools"],
