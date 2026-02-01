@@ -225,7 +225,7 @@ namespace DebugxLog.Editor
             var info = Settings.members[index];
             bool enable = MemberEnableDefaultDic.ContainsKey(info.key)
                 ? MemberEnableDefaultDic[info.key]
-                : Debugx.MemberIsEnable(info.key);
+                : DebugxBase.MemberIsEnable(info.key);
             EditorGUI.BeginChangeCheck();
 
             Rect idRect = rect;

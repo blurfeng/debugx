@@ -42,7 +42,7 @@ namespace DebugxLog.Editor
             sb.AppendLine("using System.Diagnostics;");
             sb.AppendLine("using DebugxLog;");
             sb.AppendLine();
-            sb.AppendLine("public class Debugx : DebugxBaseAgent");
+            sb.AppendLine("public class Debugx : DebugxBase");
             sb.AppendLine("{");
 
             // Generate methods for default members

@@ -206,7 +206,7 @@ namespace DebugxLog
                 settings.maxDrawLogs = maxDrawLogs;
             }
 
-            Debugx.ResetToDefault();
+            DebugxBase.ResetToDefault();
 
             OnApplyTo.Invoke();
         }

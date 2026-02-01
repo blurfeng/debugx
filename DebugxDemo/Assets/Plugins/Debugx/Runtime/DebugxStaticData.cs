@@ -21,7 +21,7 @@ namespace DebugxLog
                 if (string.IsNullOrEmpty(_resourcesPath))
                 {
                     _resourcesPath = Application.dataPath + FolderPath;
-                    Debugx.LogAdm($"ResourcesPath: {_resourcesPath}");
+                    DebugxBase.LogAdm($"ResourcesPath: {_resourcesPath}");
                 }
                 
                 //确认文件夹是否存在，否则创建

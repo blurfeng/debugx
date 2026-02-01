@@ -5,7 +5,7 @@
 using System.Diagnostics;
 using DebugxLog;
 
-public class Debugx : DebugxBaseAgent
+public class Debugx : DebugxBase
 {
     /// <summary>
     /// Log for member [Normal] (Key: -1).
