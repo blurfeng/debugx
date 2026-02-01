@@ -6,15 +6,6 @@ namespace DebugxLog.Editor
     public static class DebugxEditorLibrary
     {
         /// <summary>
-        /// Confirm that the Debugx project settings asset exists.
-        /// 确认Debugx项目设置资源存在。
-        /// </summary>
-        public static void OnInitializeOnLoadMethod()
-        {
-            
-        }
-
-        /// <summary>
         /// Get the default configuration.
         /// 获取默认配置。
         /// </summary>
