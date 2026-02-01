@@ -1,3 +1,20 @@
 {
-	"name": "Debugx"
+    "name": "Debugx",
+    "rootNamespace": "",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [
+        {
+            "name": "com.blurfeng.debugx",
+            "expression": "",
+            "define": "DEBUGX_IN_UPM"
+        }
+    ],
+    "noEngineReferences": false
 }
