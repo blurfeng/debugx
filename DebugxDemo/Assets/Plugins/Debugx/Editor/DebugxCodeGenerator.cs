@@ -39,9 +39,10 @@ namespace DebugxLog.Editor
             sb.AppendLine("// 此文件由 DebugxCodeGenerator 自动生成，请勿手动修改。");
             sb.AppendLine();
             sb.AppendLine("#if !DEBUGX_IN_UPM");
+            sb.AppendLine("using System.Diagnostics;");
             sb.AppendLine("using DebugxLog;");
             sb.AppendLine();
-            sb.AppendLine("public class Debugx : DebugxBase");
+            sb.AppendLine("public class Debugx : DebugxBaseAgent");
             sb.AppendLine("{");
 
             // Generate methods for default members
@@ -111,6 +112,7 @@ namespace DebugxLog.Editor
             sb.AppendLine($"    /// Log for member [{member.signature}] (Key: {key}).");
             sb.AppendLine($"    /// 成员 [{member.signature}] 的 Log 方法 (Key: {key})。");
             sb.AppendLine($"    /// </summary>");
+            sb.AppendLine($"    [Conditional(\"DEBUG_X\")]");
             sb.AppendLine($"    public static void Log{methodSuffix}(object message, bool showTime = false, bool showNetTag = false)");
             sb.AppendLine($"    {{");
             sb.AppendLine($"        Log({key}, message, showTime, showNetTag);");
@@ -122,6 +124,7 @@ namespace DebugxLog.Editor
             sb.AppendLine($"    /// LogWarning for member [{member.signature}] (Key: {key}).");
             sb.AppendLine($"    /// 成员 [{member.signature}] 的 LogWarning 方法 (Key: {key})。");
             sb.AppendLine($"    /// </summary>");
+            sb.AppendLine($"    [Conditional(\"DEBUG_X\")]");
             sb.AppendLine($"    public static void LogWarning{methodSuffix}(object message, bool showTime = false, bool showNetTag = false)");
             sb.AppendLine($"    {{");
             sb.AppendLine($"        LogWarning({key}, message, showTime, showNetTag);");
@@ -133,6 +136,7 @@ namespace DebugxLog.Editor
             sb.AppendLine($"    /// LogError for member [{member.signature}] (Key: {key}).");
             sb.AppendLine($"    /// 成员 [{member.signature}] 的 LogError 方法 (Key: {key})。");
             sb.AppendLine($"    /// </summary>");
+            sb.AppendLine($"    [Conditional(\"DEBUG_X\")]");
             sb.AppendLine($"    public static void LogError{methodSuffix}(object message, bool showTime = false, bool showNetTag = false)");
             sb.AppendLine($"    {{");
             sb.AppendLine($"        LogError({key}, message, showTime, showNetTag);");

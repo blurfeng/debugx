@@ -2,14 +2,16 @@
 // 此文件由 DebugxCodeGenerator 自动生成，请勿手动修改。
 
 #if !DEBUGX_IN_UPM
+using System.Diagnostics;
 using DebugxLog;
 
-public class Debugx : DebugxBase
+public class Debugx : DebugxBaseAgent
 {
     /// <summary>
     /// Log for member [Normal] (Key: -1).
     /// 成员 [Normal] 的 Log 方法 (Key: -1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogNormal(object message, bool showTime = false, bool showNetTag = false)
     {
         Log(-1, message, showTime, showNetTag);
@@ -19,6 +21,7 @@ public class Debugx : DebugxBase
     /// LogWarning for member [Normal] (Key: -1).
     /// 成员 [Normal] 的 LogWarning 方法 (Key: -1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogWarningNormal(object message, bool showTime = false, bool showNetTag = false)
     {
         LogWarning(-1, message, showTime, showNetTag);
@@ -28,6 +31,7 @@ public class Debugx : DebugxBase
     /// LogError for member [Normal] (Key: -1).
     /// 成员 [Normal] 的 LogError 方法 (Key: -1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogErrorNormal(object message, bool showTime = false, bool showNetTag = false)
     {
         LogError(-1, message, showTime, showNetTag);
@@ -37,6 +41,7 @@ public class Debugx : DebugxBase
     /// Log for member [Master] (Key: -2).
     /// 成员 [Master] 的 Log 方法 (Key: -2)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogMaster(object message, bool showTime = false, bool showNetTag = false)
     {
         Log(-2, message, showTime, showNetTag);
@@ -46,6 +51,7 @@ public class Debugx : DebugxBase
     /// LogWarning for member [Master] (Key: -2).
     /// 成员 [Master] 的 LogWarning 方法 (Key: -2)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogWarningMaster(object message, bool showTime = false, bool showNetTag = false)
     {
         LogWarning(-2, message, showTime, showNetTag);
@@ -55,6 +61,7 @@ public class Debugx : DebugxBase
     /// LogError for member [Master] (Key: -2).
     /// 成员 [Master] 的 LogError 方法 (Key: -2)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogErrorMaster(object message, bool showTime = false, bool showNetTag = false)
     {
         LogError(-2, message, showTime, showNetTag);
@@ -64,6 +71,7 @@ public class Debugx : DebugxBase
     /// Log for member [Blur] (Key: 1).
     /// 成员 [Blur] 的 Log 方法 (Key: 1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogBlur(object message, bool showTime = false, bool showNetTag = false)
     {
         Log(1, message, showTime, showNetTag);
@@ -73,6 +81,7 @@ public class Debugx : DebugxBase
     /// LogWarning for member [Blur] (Key: 1).
     /// 成员 [Blur] 的 LogWarning 方法 (Key: 1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogWarningBlur(object message, bool showTime = false, bool showNetTag = false)
     {
         LogWarning(1, message, showTime, showNetTag);
@@ -82,6 +91,7 @@ public class Debugx : DebugxBase
     /// LogError for member [Blur] (Key: 1).
     /// 成员 [Blur] 的 LogError 方法 (Key: 1)。
     /// </summary>
+    [Conditional("DEBUG_X")]
     public static void LogErrorBlur(object message, bool showTime = false, bool showNetTag = false)
     {
         LogError(1, message, showTime, showNetTag);
