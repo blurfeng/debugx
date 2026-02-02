@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.2] - 2026-02-02
+### Changed
+- Removed classes that need to be hidden in the Unity layer and rebuilt them into DebugxLog.dll to prevent exposure in the Console window stack. We need the stack to stop at the specific call location of Log.
+- Updated the DebugxLoggerCodeGenerator class to generate DebugxLogger classes and member-specific Log methods. Using Logger as the class name allows direct navigation to the Log call location when double-clicking logs in the Console window, instead of navigating to the DebugxLogger class.
+### Notice
+- If you encounter errors related to duplicate definitions of the Debugx class, please delete the previously auto-generated Assets/Plugins/Debugx/Runtime/Debugx.cs and use DebugxLogger instead.
+
 ## [2.3.1] - 2026-02-01
 ### Fixed
 - Addressed a potential editor freeze/hang caused by InitializeOnLoadMethod when loading the plugin via UPM.
@@ -24,5 +31,5 @@
 ### Changed
 - Automatically generate dedicated Log methods for each member based on configuration.
 - Updated the Project Settings interface layout.
-### Warning
+### Notice
 - Removed LogNom and LogMst series methods; use member-specific methods in the auto-generated Debugx script instead.
