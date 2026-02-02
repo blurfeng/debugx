@@ -31,7 +31,7 @@ namespace DebugxLog
         [Conditional("DEBUG_X"), BurstDiscard]
         public static void Log(int key, object message, bool showTime = false, bool showNetTag = true)
         {
-            DebugxBase.Log(key, message, showTime, showNetTag);
+            Debugx.Log(key, message, showTime, showNetTag);
         }
 
         /// <summary>
@@ -45,7 +45,7 @@ namespace DebugxLog
         [Conditional("DEBUG_X"), BurstDiscard]
         public static void LogWarning(int key, object message, bool showTime = false, bool showNetTag = true)
         {
-            DebugxBase.LogWarning(key, message, showTime, showNetTag);
+            Debugx.LogWarning(key, message, showTime, showNetTag);
         }
 
         /// <summary>
@@ -59,7 +59,7 @@ namespace DebugxLog
         [Conditional("DEBUG_X"), BurstDiscard]
         public static void LogError(int key, object message, bool showTime = false, bool showNetTag = true)
         {
-            DebugxBase.LogError(key, message, showTime, showNetTag);
+            Debugx.LogError(key, message, showTime, showNetTag);
         }
     }
 }

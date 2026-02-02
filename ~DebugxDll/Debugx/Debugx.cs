@@ -3,18 +3,20 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Author: Blur Feng
 // Time: 20230109
-// Version: 2.1.1.0
+// Version: 2.3.0.0
 // Description:
 // The debug log is managed according to its members.use macro "DEBUG_X" open the functional.
 // 此插件用于以成员的方式管理调试日志。使用宏"DEBUG_X"来开启功能。
+// ** 为了 Unity 使用 Debugx 类的 Log 方法时堆栈能在 Debugx.Log 为止阻断，必须构建封装的 DebugxLog.dll **
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // 版本号使用规范：大版本前后不兼容.新功能.小功能或功能更新.bug修复
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Update log:
-// 1.0.0.0 20220829
+// **** Update log ****
+////////////////////
+// Version: 1.0.0.0 20220829
 // 1.创建插件。成员数据的配置功能，打印Log功能。
 ////////////////////
-// 1.1.0.0 20220830
+// Version: 1.1.0.0 20220830
 // 1.新增类LogOutput，用于到处Log数据到本地txt文件。
 // 2.新增AdminInfo成员用于管理者打印，此成员不受开关影响。
 // 3.默认成员配置文件中增加 Blur 成员。
@@ -27,13 +29,13 @@
 // 10.新增DebugxTools类，提供一些可用的工具方法。
 // 11.修复一些Bug。
 ////////////////////
-// 1.1.1.0 20220903
+// Version: 1.1.1.0 20220903
 // 1.新增功能，在Editor编辑器启动时，初始化调试成员配置到Debux，保证在编辑器非游玩时也能使用Debux.Log()。
 // 2.DebugxMemberWindow改名为DebugxSettingWindow，调整窗口内容，优化代码。
 // 3.Debugx.dll中修改Dictionary为List。为了DOTS等某些情况下，不支持Dictionary的情况。
 // 4.LogOutput类，新增绘制Log到屏幕功能，在DebugxManager上设置是否绘制。
 ////////////////////
-// 2.0.0.0 20220911
+// Version: 2.0.0.0 20220911
 // 1.DebugxMemberConfig类改名为DebugxProjectSettings，增加更多成员字段；创建对应配置用类DebugxProjectSettingsAsset，用于生成.asset文件在编辑器中配置。
 // 2.设置界面从EditorWindow改为SettingsProvider，在Editor->ProjectSetting->Debugx中设置。设置内容调整。
 // 3.新增界面 PreferencesDebugx 在 Editor->Preferences->Debugx 目录下。可以让不同用户配置本地化的内容，比如一些成员在自己设备的项目中仅想看到自己打印的Log。
@@ -43,7 +45,7 @@
 // 7.编辑器配置界面，适应Dark和Light编辑器皮肤。
 // 8.文件夹整理，类重命名，代码整理优化。
 ////////////////////
-// 2.0.1.0 20220920
+// Version: 2.0.1.0 20220920
 // 1.GUI界面更新，颜色调整。
 // 2.移除DebugxEditorConfig类。
 // FixBug
@@ -53,13 +55,13 @@
 // 4.修复DebugxProjectSettings自动创建流程相关的Bug。
 // 5.修复ProjectSettings界面中数组越界Bug。
 ////////////////////
-// 2.0.2.0 20221031
+// Version: 2.0.2.0 20221031
 // 1.未注册成员进行打印功能，新增allowUnregisteredMember字段，用于配置是否允许没有注册者打印内容。
 // FixBug
 // 1.修复某些情况下DebugxProjectSettings初始化时无法通过Resources.Load加载，导致的各类问题。
 // 2.DebugxProjectSettingsAsset配置资源加载和创建流程更新，尝试修复配置被重置为空的问题。
 ////////////////////
-// 2.1.0.0 20230103
+// Version: 2.1.0.0 20230103
 // 1.菜单栏新增CreateDebugxProjectSettingsAsset方法用于创建配置资源文件。
 // 2.DebugxProjectSettingsProvider项目设置界面优化。
 // 3.Log方法扩展，可以输入Signature签名来代替Key作为成员参数。
@@ -69,14 +71,18 @@
 //   复现流程为在Editor启动方法中或代码编译时，新创建了DebugxProjectSettings.asset资源并保存后，直接调用Resources.Load方法加载此资源。
 // 2.修复每次代码重编译时DebugxProjectSettingsAsset资源都被重新创建的默认资源覆盖的bug。
 ////////////////////
-// 2.1.1.0 20250528
+// Version: 2.1.1.0 20250528
 // 1.注释添加英文，README更新。界面根据系统语言切换中英文。
 // 2.默认关闭测试打印和输出Log文件。修复两处单词拼写错误。
-// 3.代码整理。////////////////////
-// 2.2.0.0 20260131
+// 3.代码整理。
+////////////////////
+// Version: 2.2.0.0 20260131
 // 1.Debugx 改名为 DebugxBase，在 Unity 中根据当前成员自动生成子类 Debugx 和每个成员的快速调用方法。
 // 2.ActionHandler 和 DebugxTools 类转移到 Unity 中，因为和 dll 无关。
 // 3.整体代码整理，规范化。命名空间整理。
+////////////////////
+// Version: 2.2.1.0 20260202
+// 1.整理项目代码，拆分类到不同脚本。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -94,7 +100,7 @@ namespace DebugxLog
     /// Debugx核心工具类。
     /// Unity 中会继承此类自动创建 Debugx 类，根据当前成员配置生成快速调用方法，比如 LogJack()。
     /// </summary>
-    public class DebugxBase
+    public static class Debugx
     {
         // Debugx, debug extension utility class.
         // Debugx，调试扩展工具类。
@@ -107,7 +113,7 @@ namespace DebugxLog
         private static readonly DebugxMemberInfo _adminInfoDefault = new DebugxMemberInfo(0, "Admin");
 
         private static Func<bool> _serverCheckDelegate;
-        private static readonly StringBuilder _logxSb = new StringBuilder();
+        private static readonly StringBuilder _logSb = new StringBuilder();
 
         private static readonly Dictionary<int, bool> _memberEnables = new Dictionary<int, bool>();
 
@@ -196,7 +202,7 @@ namespace DebugxLog
 
             if (!_memberEnables.ContainsKey(key))
             {
-                DebugxBase.LogAdmWarning($"Debugx.SetMemberEnable: cant find memberInfo by key:{key}. 无法找到Key为{key}的成员信息。");
+                Debugx.LogAdmWarning($"Debugx.SetMemberEnable: cant find memberInfo by key:{key}. 无法找到Key为{key}的成员信息。");
                 return;
             }
 
@@ -509,35 +515,35 @@ namespace DebugxLog
         private static void LogCreator(LogType type, DebugxMemberInfo info, object message, bool showTime = false,
             bool showNetTag = true)
         {
-            _logxSb.Append(DebugxProjectSettings.DebugxTag);
+            _logSb.Append(DebugxProjectSettings.DebugxTag);
 
             if (showNetTag && _serverCheckDelegate != null)
-                _logxSb.Append(_serverCheckDelegate.Invoke() ? "Server: " : "Client: ");
+                _logSb.Append(_serverCheckDelegate.Invoke() ? "Server: " : "Client: ");
 
             if (showTime)
             {
-                _logxSb.Append($" [{DateTime.Now:HH:mm:ss}] ");
+                _logSb.Append($" [{DateTime.Now:HH:mm:ss}] ");
             }
 
             if (info != null)
             {
                 if (info.LogSignature)
-                    _logxSb.Append($"[Sig: {info.signature}]");
+                    _logSb.Append($"[Sig: {info.signature}]");
 
                 if (!string.IsNullOrEmpty(info.color))
-                    _logxSb.Append(info.haveHeader
+                    _logSb.Append(info.haveHeader
                         ? $" <color=#{info.color}>{info.header} : {message}</color>"
                         : $" <color=#{info.color}>{message}</color>");
                 else
-                    _logxSb.Append(info.haveHeader ? $" {info.header} : {message}" : $" {message}");
+                    _logSb.Append(info.haveHeader ? $" {info.header} : {message}" : $" {message}");
             }
             else
             {
-                _logxSb.Append($" UnregisteredMember : {message}");
+                _logSb.Append($" UnregisteredMember : {message}");
             }
 
-            UnityEngine.Debug.unityLogger.Log(type, _logxSb.ToString());
-            _logxSb.Length = 0;
+            UnityEngine.Debug.unityLogger.Log(type, _logSb.ToString());
+            _logSb.Length = 0;
         }
         
         #region LogAdm
