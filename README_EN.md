@@ -22,7 +22,8 @@ You can read the [User Manual](Documents/UserManual_en.md) for more information.
 # Notes
 > [!TIP]
 > 1. You must add the macro "DEBUG_X" to your project to enable Debugx functionality.
-> 2. Due to changes in folder structure and UPM links, versions prior to 2.3.0 cannot be updated normally and require removal of the old version before reinstallation.
+> 2. After updating the plugin, if the DebugxLogger class is not generated, use the menu Tools > Debugx > Regenerate DebugxLogger Class to force regeneration.
+> 3. Due to changes in folder structure and UPM links, versions prior to 2.3.0 cannot be updated normally and require removal of the old version before reinstallation.
 
 ## Unity Version Requirement
 Unity 2021.3 and above.
