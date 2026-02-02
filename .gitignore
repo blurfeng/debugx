@@ -115,8 +115,8 @@ InitTestScene*.unity*
 
 # --- Debugx DLL Project Specific ---
 # 1. 忽略编译输出（绝对不能上传，否则会产生文件冲突）
-**/~DebugxDll/bin/
-**/~DebugxDll/obj/
+**/~DebugxDll/Debugx/bin/
+**/~DebugxDll/Debugx/obj/
 
 # 2. 忽略个人本地设置
 **/~DebugxDll/*.csproj.user

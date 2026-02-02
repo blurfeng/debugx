@@ -80,7 +80,7 @@ namespace DebugxLog.Tools
             }
             catch (Exception ex)
             {
-                DebugxBase.LogAdmError("error can not open." + ex.StackTrace.ToString() + ex.Message);
+                Debugx.LogAdmError("error can not open." + ex.StackTrace.ToString() + ex.Message);
             }
 
             Application.logMessageReceived += LogCallBack;
@@ -104,7 +104,7 @@ namespace DebugxLog.Tools
                 // Rename the printed file.
                 // 将打印的文件重命名。
                 string filePath = $"{_directoryPath}\\{FileName}-{DateTime.Now.ToString("yyyy.MM.dd-HH.mm.ss")}{FileType}";
-                DebugxBase.LogAdmWarning($"logOutput over, file path : {filePath}");
+                Debugx.LogAdmWarning($"logOutput over, file path : {filePath}");
                 File.Move(_savePath, filePath);
             }
 

@@ -196,17 +196,17 @@ namespace DebugxLog.Editor
             {
                 EditorGUILayout.BeginHorizontal();
                 EndChangeCheck(); // 将生成代码按钮操作排除在外。 // Exclude the generate code button operation.
-                if (GUILayout.Button(new GUIContent("Generate Debugx Code",
+                if (GUILayout.Button(new GUIContent("Generate DebugxLogger Code",
                         DebugxStaticData.IsChineseSimplified 
                             ? "根据当前成员配置生成Debugx类代码，会覆盖原有代码文件。保存时也会自动生成代码，只有当成员和代码不匹配时才需要手动生成代码。"
-                            : "Generate Debugx class code based on the current member configuration, which will overwrite the existing code file.\nCode generation also occurs upon saving; manual generation is only necessary when members and code do not match."
+                            : "Generate DebugxLogger class code based on the current member configuration, which will overwrite the existing code file.\nCode generation also occurs upon saving; manual generation is only necessary when members and code do not match."
                         ), EditorStyles.miniButtonLeft, GUILayout.Width(ButtonWidth3)))
                 {
                     // 保存成功时也会重新生成代码。没成功保存时主动调用生成代码。
                     // Code will be regenerated when saved successfully. If saving fails, code generation is called proactively.
                     if (!Apply())
                     {
-                        DebugxCodeGenerator.GenerateDebugxClass();
+                        DebugxLoggerCodeGenerator.GenerateDebugxLoggerClass();
                         AssetDatabase.Refresh();
                     }
                 }
@@ -633,9 +633,9 @@ namespace DebugxLog.Editor
                 AssetDatabase.SaveAssetIfDirty(SettingsAsset);
                 SettingsAsset.ApplyTo(DebugxProjectSettings.Instance);
                 
-                // Generate Debugx class with member-specific Log methods.
+                // Generate DebugxLogger class with member-specific Log methods.
                 // 生成包含成员专用 Log 方法的 Debugx 类。
-                DebugxCodeGenerator.GenerateDebugxClass();
+                DebugxLoggerCodeGenerator.GenerateDebugxLoggerClass();
             }
             
             return true;

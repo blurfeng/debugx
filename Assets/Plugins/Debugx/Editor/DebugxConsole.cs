@@ -40,15 +40,15 @@ namespace DebugxLog.Editor
                 MessageType.Info);
             EditorGUI.BeginDisabledGroup(!Application.isPlaying);
             EditorGUILayout.LabelField("Toggle", GUIStyleEx.TitleStyle3);
-            DebugxBase.enableLog = GUILayoutEx.Toggle("EnableLog", 
-                DebugxStaticData.IsChineseSimplified ? "Log总开关" : "Master switch for logging", DebugxBase.enableLog);
-            DebugxBase.enableLogMember = GUILayoutEx.Toggle("EnableLogMember", 
-                DebugxStaticData.IsChineseSimplified ? "成员Log总开关" : "Master logging switch for members", DebugxBase.enableLogMember);
-            DebugxBase.logThisKeyMemberOnly = GUILayoutEx.IntField("LogThisKeyMemberOnly", 
+            Debugx.enableLog = GUILayoutEx.Toggle("EnableLog", 
+                DebugxStaticData.IsChineseSimplified ? "Log总开关" : "Master switch for logging", Debugx.enableLog);
+            Debugx.enableLogMember = GUILayoutEx.Toggle("EnableLogMember", 
+                DebugxStaticData.IsChineseSimplified ? "成员Log总开关" : "Master logging switch for members", Debugx.enableLogMember);
+            Debugx.logThisKeyMemberOnly = GUILayoutEx.IntField("LogThisKeyMemberOnly", 
                 DebugxStaticData.IsChineseSimplified ? 
                     "仅打印此Key的成员Log。0为关闭，设置时Key必须是存在于配置的成员。必须关闭LogMasterOnly后才能设置此值。" 
                     : "Only print member logs for this specific Key. Set to 0 to disable. When setting, the Key must exist in the configured members. This value can only be set after disabling LogMasterOnly.",
-                DebugxBase.logThisKeyMemberOnly);
+                Debugx.logThisKeyMemberOnly);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Members", GUIStyleEx.TitleStyle3);
@@ -58,10 +58,10 @@ namespace DebugxLog.Editor
                 {
                     var info = Settings.members[i];
                     EditorGUILayout.BeginHorizontal();
-                    bool enable = DebugxBase.MemberIsEnable(info.key);
+                    bool enable = Debugx.MemberIsEnable(info.key);
                     EditorGUI.BeginChangeCheck();
                     enable = GUILayoutEx.Toggle($" [{info.key}] {(string.IsNullOrEmpty(info.signature) ? "Member" : info.signature)}", "", enable);
-                    if (EditorGUI.EndChangeCheck()) DebugxBase.SetMemberEnable(info.key, enable);
+                    if (EditorGUI.EndChangeCheck()) Debugx.SetMemberEnable(info.key, enable);
                     EditorGUILayout.EndHorizontal();
                 }
             }

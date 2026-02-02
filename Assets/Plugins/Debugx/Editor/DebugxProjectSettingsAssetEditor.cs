@@ -92,7 +92,7 @@ namespace DebugxLog.Editor
             
             // Generate Debugx class with member-specific Log methods.
             // 生成包含成员专用 Log 方法的 Debugx 类。
-            DebugxCodeGenerator.GenerateDebugxClass();
+            DebugxLoggerCodeGenerator.GenerateDebugxLoggerClass();
         }
     }
 }

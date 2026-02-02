@@ -51,7 +51,7 @@ namespace DebugxLog
         private void Awake()
         {
             DontDestroyOnLoad(this);
-            DebugxBase.OnAwake();
+            Debugx.OnAwake();
 
 #if UNITY_EDITOR
             // The editor rewrites the Log output path to the "Logs" folder of the project.
@@ -69,11 +69,11 @@ namespace DebugxLog
 
             LogOutput.RecordStart();
 
-            DebugxBase.LogAdm("DebugxManager --- Awake");
+            Debugx.LogAdm("DebugxManager --- Awake");
 
             // 在 菜单>Edit>Preferences>Debugx 界面的 LogOutput>EnableLogOutput 开关是否输出本地log。
             if (DebugxProjectSettings.Instance.logOutput)
-                DebugxBase.LogAdm($"DebugxManager --- Log output to {LogOutput.DirectoryPath}");
+                Debugx.LogAdm($"DebugxManager --- Log output to {LogOutput.DirectoryPath}");
 
 #if UNITY_EDITOR
             // test case.Open the console via Menu > Window > Debugx > DebugxConsole, and toggle the setting at Test > EnableAwakeTestLog to enable or disable it.
@@ -82,9 +82,9 @@ namespace DebugxLog
             {
                 // Try to print. It can be annotated. The member information with the corresponding key will be printed.
                 // 试打印，可注释。有对应key的成员信息时才会被打印。
-                DebugxBase.Log(1, "Key 1 Print Test");
-                DebugxBase.Log(2, "Key 2 Print Test");
-                DebugxBase.Log(999, "Key 999 Print Test");
+                Debugx.Log(1, "Key 1 Print Test");
+                Debugx.Log(2, "Key 2 Print Test");
+                Debugx.Log(999, "Key 999 Print Test");
             }
 #endif
         }
@@ -97,14 +97,14 @@ namespace DebugxLog
             {
                 // Test print, with comments. It will only be printed when there is corresponding key for the member information.
                 // 测试打印，可注释。有对应key的成员信息时才会被打印。
-                DebugxBase.Log(1, "MemberKey 1 Update");
+                Debugx.Log(1, "MemberKey 1 Update");
             }
 #endif
         }
 
         private void OnDestroy()
         {
-            DebugxBase.OnDestroy();
+            Debugx.OnDestroy();
             LogOutput.RecordOver();
         }
 
@@ -122,7 +122,7 @@ namespace DebugxLog
         [Conditional("DEBUG_X")]
         public void SetMemberEnable(int key, bool enable)
         {
-            DebugxBase.SetMemberEnable(key, enable);
+            Debugx.SetMemberEnable(key, enable);
         }
     }
 }
