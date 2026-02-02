@@ -1,6 +1,6 @@
 # Debugx 用户手册
 ## 简介
-Github：https://github.com/BlurFeng/Debugx
+Github：https://github.com/blurfeng/debugx
 
 Debugx 是一个专为 Unity 引擎开发的调试插件。  
 该插件可以按调试成员分类管理 DebugLog，并将日志文件输出到本地。通过宏 "DEBUG_X" 来启用功能。
@@ -20,7 +20,7 @@ DebugxConsole 用于在项目运行时管理打印开关等功能。
 
 或者通过 UPM (Unity Package Manager) 方式安装插件。
 ```
-https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 ```
 
 ### 添加宏到项目
@@ -66,14 +66,12 @@ PC 平台通常在 C:\Users\UserName\AppData\LocalLow\DefaultCompany\ProjectName
 ![](Images/Debugx9.png)
 
 ### 打印方法
+**DebugxLogger.LogMemberName(msg)**  
+调用对应调试成员的 Log 方法来打印日志。成员名称即为在调试成员配置中设置的名称。
 **Debugx.Log(key, message)**  
 Log 系列方法是最常使用的方法，需要传入 Key 和打印内容。Key 是在调试成员配置中为成员分配的标识。每个成员需要记住并使用自己的 Key。  
-**Debugx.LogNom(message)**  
-LogNom 系列方法是 Normal 普通成员使用的日志打印方法。一般成员不应使用，否则容易造成混淆。也可以让所有成员在打印通用错误或警告时使用 LogNom，确保关键信息总是能够输出。  
-**Debugx.LogMst(message)**  
-LogMst 系列方法是 Master 高级成员使用的日志打印方法。除了主程序员，一般人员不应直接使用此系列方法。  
 **Debugx.LogAdm(message)**  
-LogAdm 系列方法是 Debugx 插件开发者专用的！任何人都不应使用此方法，因为通过此方法打印的日志无法通过 DebugxManager 进行开关控制，但仍受到宏 DEBUG_X 的影响。
+LogAdm 系列方法是 Debugx 插件开发者专用的！任何人都不应使用此方法，因为通过此方法打印的日志无法通过 DebugxManager 进行开关控制，但仍受到宏 DEBUG_X 的影响。   
 
 ## DebugxConsole 控制台
 Debugx 控制台主要用于在项目运行时对 Debugx 功能进行开关操作。通过 Window > Debugx > DebugxConsole 打开窗口。  

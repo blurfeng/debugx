@@ -1,6 +1,6 @@
 # Debugx User Manual
 ## Introduction
-Github：https://github.com/BlurFeng/Debugx
+Github：https://github.com/blurfeng/debugx
 
 Debugx is a debugging plugin specifically developed for the Unity engine.  
 This plugin allows you to manage DebugLog by debugging members and output log files locally. Use the macro "DEBUG_X" to enable functionality.
@@ -20,7 +20,7 @@ Download the release package from the Releases page, and install the Debugx plug
 
 Alternatively, install the plugin via UPM (Unity Package Manager).
 ```
-https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 ```
 
 ### Adding Macro to Project
@@ -66,14 +66,12 @@ Now you can start using log printing functionality. Directly call static methods
 ![](Images/Debugx9.png)
 
 ### Printing Methods
+**DebugxLogger.LogMemberName(msg)**  
+Call the Log method of the corresponding debugging member to print logs. The member name is the name set in the debugging member configuration.   
 **Debugx.Log(key, message)**  
-The Log series methods are the most commonly used methods, requiring you to pass in Key and print content. The Key is the identifier assigned to members in the debugging member configuration. Each member needs to remember and use their own Key.  
-**Debugx.LogNom(message)**  
-LogNom series methods are log printing methods for Normal ordinary members. General members should not use them, otherwise it's easy to cause confusion. All members can also use LogNom when printing common errors or warnings to ensure key information is always output.  
-**Debugx.LogMst(message)**  
-LogMst series methods are log printing methods for Master advanced members. Except for lead programmers, general personnel should not directly use this series of methods.  
+The Log series methods are the most commonly used methods, requiring you to pass in Key and print content. The Key is the identifier assigned to members in the debugging member configuration. Each member needs to remember and use their own Key.   
 **Debugx.LogAdm(message)**  
-LogAdm series methods are exclusively for Debugx plugin developers! No one should use this method because logs printed through this method cannot be controlled through DebugxManager switches, but are still affected by the DEBUG_X macro.
+LogAdm series methods are exclusively for Debugx plugin developers! No one should use this method because logs printed through this method cannot be controlled through DebugxManager switches, but are still affected by the DEBUG_X macro.   
 
 ## DebugxConsole Console
 The Debugx console is mainly used to perform switch operations on Debugx functionality while the project is running. Open the window via Window > Debugx > DebugxConsole.  

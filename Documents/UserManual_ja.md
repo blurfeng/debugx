@@ -1,6 +1,6 @@
 # Debugx ユーザーマニュアル
 ## はじめに
-Github：https://github.com/BlurFeng/Debugx
+Github：https://github.com/blurfeng/debugx
 
 Debugx は Unity エンジン専用に開発されたデバッグプラグインです。  
 このプラグインはデバッグメンバー別に DebugLog を分類管理し、ログファイルをローカルに出力できます。マクロ "DEBUG_X" を通じて機能を有効にします。
@@ -20,7 +20,7 @@ Releases ページからリリースパッケージをダウンロードし、.u
 
 または UPM (Unity Package Manager) 方式でプラグインをインストールします。
 ```
-https://github.com/BlurFeng/Debugx.git?path=DebugxDemo/Assets/Plugins/Debugx
+https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 ```
 
 ### プロジェクトへのマクロ追加
@@ -66,14 +66,12 @@ Editor > Preferences > Debugx を通じて Debugx ユーザー偏好設定イン
 ![](Images/Debugx9.png)
 
 ### 印刷メソッド
+**DebugxLogger.LogMemberName(msg)**  
+対応するデバッグメンバーの Log メソッドを呼び出してログを印刷します。メンバー名はデバッグメンバー設定で設定された名前です。
 **Debugx.Log(key, message)**  
-Log 系列メソッドは最も常用されるメソッドで、Key と印刷内容を渡す必要があります。Key はデバッグメンバー設定でメンバーに分配された標識です。各メンバーは自分の Key を記憶し使用する必要があります。  
-**Debugx.LogNom(message)**  
-LogNom 系列メソッドは Normal 普通メンバー使用のログ印刷メソッドです。一般メンバーは使用すべきではなく、そうしないと混乱を招きやすくなります。すべてのメンバーが通用エラーや警告を印刷する際に LogNom を使用し、重要情報が常に出力されることを確保することもできます。  
-**Debugx.LogMst(message)**  
-LogMst 系列メソッドは Master 高級メンバー使用のログ印刷メソッドです。主プログラマーを除いて、一般人員は直接この系列メソッドを使用すべきではありません。  
+Log 系列メソッドは最も常用されるメソッドで、Key と印刷内容を渡す必要があります。Key はデバッグメンバー設定でメンバーに分配された標識です。各メンバーは自分の Key を記憶し使用する必要があります。   
 **Debugx.LogAdm(message)**  
-LogAdm 系列メソッドは Debugx プラグイン開発者専用です！誰もこのメソッドを使用すべきではありません。このメソッドを通じて印刷されたログは DebugxManager でスイッチ制御できませんが、依然としてマクロ DEBUG_X の影響を受けます。
+LogAdm 系列メソッドは Debugx プラグイン開発者専用です！誰もこのメソッドを使用すべきではありません。このメソッドを通じて印刷されたログは DebugxManager でスイッチ制御できませんが、依然としてマクロ DEBUG_X の影響を受けます。   
 
 ## DebugxConsole コンソール
 Debugx コンソールは主にプロジェクト実行時に Debugx 機能のスイッチ操作を行うために使用されます。Window > Debugx > DebugxConsole を通じてウィンドウを開きます。  
