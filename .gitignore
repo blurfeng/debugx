@@ -111,3 +111,21 @@ InitTestScene*.unity*
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
 /[Aa]ssets/[Ss]treamingAssets/aa/*
+
+
+# --- Debugx DLL Project Specific ---
+# 1. 忽略编译输出（绝对不能上传，否则会产生文件冲突）
+**/~DebugxDll/bin/
+**/~DebugxDll/obj/
+
+# 2. 忽略个人本地设置
+**/~DebugxDll/*.csproj.user
+**/~DebugxDll/.vs/
+**/~DebugxDll/.vscode/
+**/~DebugxDll/.idea/
+**/~DebugxDll/*.suo
+**/~DebugxDll/*.user
+**/~DebugxDll/*.sln.docstates
+
+# 3. 忽略 OS 生成的临时文件
+**/~DebugxDll/.DS_Store
