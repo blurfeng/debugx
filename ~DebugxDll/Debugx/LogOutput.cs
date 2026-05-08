@@ -11,7 +11,7 @@ namespace DebugxLog.Tools
     /// Utility class for outputting logs to a local .txt file.
     /// 输出Log到本地txt文件工具类。
     /// </summary>
-    public class LogOutput
+    public static class LogOutput
     {
         private static DebugxProjectSettings Settings => DebugxProjectSettings.Instance;
         private static bool Enable => Settings.logOutput;

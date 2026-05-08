@@ -19,11 +19,11 @@ namespace DebugxLog
         {
             get
             {
-                if (_instance == null)
+                if (!_instance)
                 {
                     _instance = FindObjectOfType<DebugxManager>();
 
-                    if (_instance == null)
+                    if (!_instance)
                     {
                         _gameObject = new GameObject { name = typeof(DebugxManager).Name };
                         _instance = _gameObject.AddComponent<DebugxManager>();
@@ -39,9 +39,9 @@ namespace DebugxLog
         [RuntimeInitializeOnLoadMethod]
         private static void CheckInstance()
         {
-            if (_instance == null && Application.isPlaying)
+            if (!_instance && Application.isPlaying)
             {
-                DebugxManager.Instance.Create();
+                Instance.Create();
             }
         }
         
