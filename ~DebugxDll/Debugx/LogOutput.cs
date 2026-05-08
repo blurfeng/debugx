@@ -14,11 +14,11 @@ namespace DebugxLog.Tools
     public static class LogOutput
     {
         private static DebugxProjectSettings Settings => DebugxProjectSettings.Instance;
-        private static bool Enable => Settings.logOutput;
-        private static bool LogStackTrace => Settings.enableLogStackTrace;
-        private static bool WarningStackTrace => Settings.enableWarningStackTrace;
-        private static bool ErrorStackTrace => Settings.enableErrorStackTrace;
-        private static bool RecordAllNonDebugxLogs => Settings.recordAllNonDebugxLogs;
+        private static bool Enable => Settings != null && Settings.logOutput;
+        private static bool LogStackTrace => Settings != null && Settings.enableLogStackTrace;
+        private static bool WarningStackTrace => Settings != null && Settings.enableWarningStackTrace;
+        private static bool ErrorStackTrace => Settings != null && Settings.enableErrorStackTrace;
+        private static bool RecordAllNonDebugxLogs => Settings != null && Settings.recordAllNonDebugxLogs;
 
         private const string FileName = "DebugxLog";
         private const string FileNameFull = "DebugxLog.log";
@@ -32,11 +32,13 @@ namespace DebugxLog.Tools
         public static string DirectoryPath
         {
             get => _directoryPath;
-            set { if (value != string.Empty) _directoryPath = value; }
+            set { if (!string.IsNullOrEmpty(value)) _directoryPath = value; }
         }
         private static string _savePath;
         private static readonly System.Object _locker = new System.Object();
         private static readonly StringBuilder _logBuilder = new StringBuilder();
+        private static StreamWriter _writer;
+        private static bool _isSubscribed;
 
         // Regular expression used to trim color code.
         // 用于裁剪color代码的正则表达式。
@@ -56,7 +58,7 @@ namespace DebugxLog.Tools
                 _directoryPath = Application.persistentDataPath;
             }
 
-            _savePath = string.Format("{0}/{1}", DirectoryPath, FileNameFull);
+            _savePath = Path.Combine(DirectoryPath, FileNameFull);
 
             // PC directory: C:\Users\UserName\AppData\LocalLow\DefaultCompany\ProjectName
             // PC目录为：C:\Users\UserName\AppData\LocalLow\DefaultCompany\ProjectName
@@ -68,22 +70,35 @@ namespace DebugxLog.Tools
             // Create folder.
             // 创建文件夹。
             _directoryPath = fileInfo.DirectoryName;
-            if (!Directory.Exists(_directoryPath))
-                if (_directoryPath != null)
-                    Directory.CreateDirectory(_directoryPath);
+            if (!string.IsNullOrEmpty(_directoryPath) && !Directory.Exists(_directoryPath))
+            {
+                Directory.CreateDirectory(_directoryPath);
+            }
 
             try
             {
-                // Create a new file, write the specified string into it, and then close the file. If the target file already exists, overwrite it.
-                // 创建一个新文件，向其中写入指定的字符串，然后关闭文件。 如果目标文件已存在，则覆盖该文件。
-                File.WriteAllText(_savePath, string.Empty, Encoding.UTF8);
+                if (_writer != null)
+                {
+                    _writer.Dispose();
+                    _writer = null;
+                }
+
+                // 保持文件流常驻，减少每条日志的打开/关闭开销。
+                FileStream fs = new FileStream(_savePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+                _writer = new StreamWriter(fs, new UTF8Encoding(false));
+                _writer.AutoFlush = true;
             }
             catch (Exception ex)
             {
-                Debugx.LogAdmError("error can not open." + ex.StackTrace.ToString() + ex.Message);
+                UnityEngine.Debug.LogError("[Debugx] LogOutput.RecordStart 无法打开日志文件。" + ex.Message);
+                return;
             }
 
-            Application.logMessageReceived += LogCallBack;
+            if (!_isSubscribed)
+            {
+                Application.logMessageReceived += LogCallBack;
+                _isSubscribed = true;
+            }
         }
 
         /// <summary>
@@ -92,27 +107,62 @@ namespace DebugxLog.Tools
         /// </summary>
         public static void RecordOver()
         {
-            if (!Enable || string.IsNullOrEmpty(_savePath)) return;
-
-            FileInfo fileInfo = new FileInfo(_savePath);
-            if (fileInfo.Length == 0)
+            if (_isSubscribed)
             {
-                fileInfo.Delete();
-            }
-            else
-            {
-                // Rename the printed file.
-                // 将打印的文件重命名。
-                string filePath = $"{_directoryPath}\\{FileName}-{DateTime.Now.ToString("yyyy.MM.dd-HH.mm.ss")}{FileType}";
-                Debugx.LogAdmWarning($"logOutput over, file path : {filePath}");
-                File.Move(_savePath, filePath);
+                Application.logMessageReceived -= LogCallBack;
+                _isSubscribed = false;
             }
 
-            Application.logMessageReceived -= LogCallBack;
+            if (_writer != null)
+            {
+                _writer.Flush();
+                _writer.Dispose();
+                _writer = null;
+            }
+
+            if (string.IsNullOrEmpty(_savePath) || !File.Exists(_savePath))
+            {
+                _savePath = null;
+                return;
+            }
+
+            try
+            {
+                FileInfo fileInfo = new FileInfo(_savePath);
+                if (fileInfo.Length == 0)
+                {
+                    fileInfo.Delete();
+                }
+                else
+                {
+                    // Rename the printed file.
+                    // 将打印的文件重命名。
+                    string stamp = DateTime.Now.ToString("yyyy.MM.dd-HH.mm.ss");
+                    string filePath = Path.Combine(_directoryPath, $"{FileName}-{stamp}{FileType}");
+                    int suffix = 1;
+                    while (File.Exists(filePath))
+                    {
+                        filePath = Path.Combine(_directoryPath, $"{FileName}-{stamp}-{suffix}{FileType}");
+                        suffix++;
+                    }
+
+                    Debugx.LogAdmWarning($"logOutput over, file path : {filePath}");
+                    File.Move(_savePath, filePath);
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogError("[Debugx] LogOutput.RecordOver 执行失败。" + ex.Message);
+            }
+
+            _savePath = null;
         }
 
         private static void LogCallBack(string message, string stackTrace, LogType type)
         {
+            if (string.IsNullOrEmpty(_savePath)) return;
+
+            message = message ?? string.Empty;
             if (!RecordAllNonDebugxLogs && !_regexRecordMessageTag.IsMatch(message)) return;
 
             lock (_locker)
@@ -137,11 +187,23 @@ namespace DebugxLog.Tools
 
                 if (_logBuilder.Length > 0)
                 {
-                    // Create a StreamWriter that appends UTF-8 encoded text to an existing file or a new file if the specified file does not exist.
-                    // 创建一个 StreamWriter，它将 UTF-8 编码文本追加到现有文件或新文件（如果指定文件不存在）。
-                    using (StreamWriter sw = File.AppendText(_savePath))
+                    try
                     {
-                        sw.WriteLine(_logBuilder.ToString());
+                        if (_writer != null)
+                        {
+                            _writer.WriteLine(_logBuilder.ToString());
+                        }
+                        else
+                        {
+                            using (StreamWriter sw = File.AppendText(_savePath))
+                            {
+                                sw.WriteLine(_logBuilder.ToString());
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        UnityEngine.Debug.LogError("[Debugx] LogOutput 写入失败。" + ex.Message);
                     }
 
                     _logBuilder.Length = 0;
@@ -155,13 +217,13 @@ namespace DebugxLog.Tools
 
         private struct DrawLogInfo
         {
-            public string message;
-            public LogType type;
+            public string Message;
+            public LogType Type;
         }
 
-        private static bool DrawLogToScreen => Settings.drawLogToScreen;
-        private static bool RestrictDrawLogCount => Settings.restrictDrawLogCount;
-        private static int MaxDrawLogs => Settings.maxDrawLogs;
+        private static bool DrawLogToScreen => Settings != null && Settings.drawLogToScreen;
+        private static bool RestrictDrawLogCount => Settings != null && Settings.restrictDrawLogCount;
+        private static int MaxDrawLogs => Settings != null ? Mathf.Max(Settings.maxDrawLogs, 1) : 100;
 
 
         private static readonly List<DrawLogInfo> _drawLogs = new List<DrawLogInfo>();
@@ -240,16 +302,16 @@ namespace DebugxLog.Tools
                 // Combine identical messages if collapse option is chosen.
                 if (_collapseRepetition && i > 0)
                 {
-                    var previousMessage = _drawLogs[i - 1].message;
+                    var previousMessage = _drawLogs[i - 1].Message;
 
-                    if (log.message == previousMessage)
+                    if (log.Message == previousMessage)
                     {
                         continue;
                     }
                 }
 
-                GUI.contentColor = GetLogColor(log.type);
-                GUILayout.Label(log.message);
+                GUI.contentColor = GetLogColor(log.Type);
+                GUILayout.Label(log.Message);
             }
 
             GUILayout.EndScrollView();
@@ -288,10 +350,15 @@ namespace DebugxLog.Tools
         /// <param name="type">Type of message (error, exception, warning, assert).</param>
         private static void HandleDrawLogs(string message, LogType type)
         {
+            if (!DrawLogToScreen)
+            {
+                return;
+            }
+
             _drawLogs.Add(new DrawLogInfo
             {
-                message = message,
-                type = type,
+                Message = message,
+                Type = type,
             });
 
             TrimExcessLogs();

@@ -15,6 +15,7 @@ namespace DebugxLog
         /// </summary>
         public const string FileName = "DebugxProjectSettings";
         private static DebugxProjectSettings _instance;
+        private static bool _isLoading;
 
         /// <summary>
         /// Singleton instance.
@@ -24,9 +25,15 @@ namespace DebugxLog
         {
             get
             {
-                if (_instance == null)
+                if (_instance == null && !_isLoading)
                 {
                     LoadResources();
+                }
+
+                if (_instance == null)
+                {
+                    // 当资源缺失时，仍然创建默认实例，保证运行时调用安全。
+                    _instance = new DebugxProjectSettings();
                 }
 
                 return _instance;
@@ -145,18 +152,32 @@ namespace DebugxLog
         /// </summary>
         private static void LoadResources()
         {
-            // Resources.Load is not available in some lifecycle stages,
-            // for example, calling it in [InitializeOnLoadMethod] during editor startup causes stack overflow errors.
-            // Resources.Load在某些生命周期时不可用，比如[InitializeOnLoadMethod]特性方法在启动Editor时调用会导致Resources.Load报错堆栈溢出
+            if (_isLoading || _instance != null) return;
+
+            // Resources.Load 在某些生命周期时不可用，比如 [InitializeOnLoadMethod]
+            // 在启动 Editor 时调用可能导致 Resources.Load 报错堆栈溢出。
+            _isLoading = true;
             try
             {
-                IDebugxProjectSettingsAsset asset = Resources.Load<ScriptableObject>(FileName) as IDebugxProjectSettingsAsset;
-                if (asset != null) ApplyBy(asset);
-                else Debugx.LogAdmWarning("Failed to load the DebugxProjectSettings configuration resource file. 加载DebugxProjectSettings配置资源文件失败。");
+                UnityEngine.Object loaded = Resources.Load(FileName);
+                IDebugxProjectSettingsAsset asset = loaded as IDebugxProjectSettingsAsset;
+
+                if (asset != null)
+                {
+                    ApplyBy(asset);
+                }
+                else
+                {
+                    Debug.LogWarning("[Debugx] 加载 DebugxProjectSettings 资源失败，已使用运行时默认配置。");
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                Debugx.LogAdmWarning("Failed to load the DebugxProjectSettings configuration resource file. 加载DebugxProjectSettings配置资源文件失败。");
+                Debug.LogWarning("[Debugx] 加载 DebugxProjectSettings 资源失败，已使用运行时默认配置。" + ex.Message);
+            }
+            finally
+            {
+                _isLoading = false;
             }
         }
 

@@ -114,6 +114,9 @@ namespace DebugxLog
 
         private static Func<bool> _serverCheckDelegate;
         private static readonly StringBuilder _logSb = new StringBuilder();
+        // Protect shared StringBuilder in logging path.
+        // 保护日志路径中的共享 StringBuilder，避免并发污染。
+        private static readonly object _logSbLocker = new object();
 
         private static readonly Dictionary<int, bool> _memberEnables = new Dictionary<int, bool>();
 
@@ -147,7 +150,7 @@ namespace DebugxLog
 
         /// <summary>
         /// OnAwake lifecycle method.
-        /// OnAwake
+        /// Awake 生命周期方法。
         /// </summary>
         public static void OnAwake()
         {
@@ -155,17 +158,19 @@ namespace DebugxLog
 
             if (Settings != null && Settings.members != null)
             {
-                for (int i = 0; i < Settings.members.Length; i++)
+                foreach (var info in Settings.members)
                 {
-                    var info = Settings.members[i];
-                    _memberEnables.Add(info.key, info.enableDefault);
+                    if (info == null) continue;
+
+                    // 配置数据异常出现重复 key 时，后值覆盖前值，避免抛出重复 key 异常。
+                    _memberEnables[info.key] = info.enableDefault;
                 }
             }
         }
 
         /// <summary>
         /// OnDestroy lifecycle method.
-        /// OnDestroy
+        /// OnDestroy 生命周期方法。
         /// </summary>
         public static void OnDestroy()
         {
@@ -219,15 +224,14 @@ namespace DebugxLog
         {
             if (_memberEnables != null && _memberEnables.Count > 0)
             {
-                if (!_memberEnables.ContainsKey(key)) return false;
-                return _memberEnables[key];
+                if (!_memberEnables.TryGetValue(key, out var enable)) return false;
+                return enable;
             }
 
             if (Settings != null && Settings.members != null && Settings.members.Length > 0)
             {
-                for (int i = 0; i < Settings.members.Length; i++)
+                foreach (var info in Settings.members)
                 {
-                    var info = Settings.members[i];
                     if (info.key == key)
                     {
                         return info.enableDefault;
@@ -279,11 +283,11 @@ namespace DebugxLog
             memberInfo = null;
             if (Settings == null || Settings.members == null || Settings.members.Length == 0) return false;
 
-            for (int i = 0; i < Settings.members.Length; i++)
+            foreach (var t in Settings.members)
             {
-                if (Settings.members[i].key == key)
+                if (t.key == key)
                 {
-                    memberInfo = Settings.members[i];
+                    memberInfo = t;
                     return true;
                 }
             }
@@ -316,11 +320,11 @@ namespace DebugxLog
                 return false;
             }
 
-            for (int i = 0; i < Settings.members.Length; i++)
+            foreach (var t in Settings.members)
             {
-                if (Settings.members[i].signature == signature)
+                if (t.signature == signature)
                 {
-                    memberInfo = Settings.members[i];
+                    memberInfo = t;
                     return true;
                 }
             }
@@ -462,21 +466,26 @@ namespace DebugxLog
 
         /// <summary>
         /// Extended logging method.
+        /// 扩展日志打印方法。
         /// </summary>
-        /// <param name="type">Log type.</param>
-        /// <param name="key">Member key configured in DebugxMemberInfo.</param>
-        /// <param name="message">Content to log.</param>
-        /// <param name="showTime">Whether to show the timestamp.</param>
+        /// <param name="type">Log type. 日志类型。</param>
+        /// <param name="key">Member key configured in DebugxMemberInfo. DebugxMemberInfo 中配置的成员 Key。</param>
+        /// <param name="message">Content to log. 打印内容。</param>
+        /// <param name="showTime">Whether to show the timestamp. 是否显示时间戳。</param>
         /// <param name="showNetTag">
         /// Whether to show the network tag (Server or Client). 
         /// This feature depends on the project and requires setting via the SetServerCheck method.
+        /// 是否显示网络标记（Server 或 Client）。
+        /// 此功能依赖项目侧实现，需要通过 SetServerCheck 方法设置。
         /// </param>
         private static void LogCreator(LogType type, int key, object message, bool showTime = false,
             bool showNetTag = true)
         {
             if (GetMemberInfo(key, out DebugxMemberInfo memberInfo))
             {
-                if (!MemberIsEnable(key)) return; // 此成员未打开。This member is not enabled
+                // This member is not enabled.
+                // 此成员未开启。
+                if (!MemberIsEnable(key)) return;
             }
             else
             {
@@ -484,7 +493,8 @@ namespace DebugxLog
                 if (!allowUnregisteredMember) return;
             }
 
-            // 设置了仅打印某个Key成员Log。Set to print logs only for a specific member key.
+            // Set to print logs only for a specific member key.
+            // 设置为仅打印某个 Key 成员的日志。
             if (!CheckLogThisKeyMemberOnly(key)) return;
 
             LogCreator(type, memberInfo, message, showTime, showNetTag);
@@ -497,7 +507,9 @@ namespace DebugxLog
             if (GetMemberInfo(signature, out DebugxMemberInfo memberInfo))
             {
                 key = memberInfo.key;
-                if (!MemberIsEnable(key)) return; // 此成员未打开。This member is not enabled.
+                // This member is not enabled.
+                // 此成员未开启。
+                if (!MemberIsEnable(key)) return;
             }
             else
             {
@@ -506,7 +518,8 @@ namespace DebugxLog
                 if (!allowUnregisteredMember) return;
             }
 
-            // 设置了仅打印某个Key成员Log。Logging is restricted to a specific member key only.
+            // Logging is restricted to a specific member key only.
+            // 日志仅允许指定的 Key 成员打印。
             if (!CheckLogThisKeyMemberOnly(key)) return;
 
             LogCreator(type, memberInfo, message, showTime, showNetTag);
@@ -515,35 +528,44 @@ namespace DebugxLog
         private static void LogCreator(LogType type, DebugxMemberInfo info, object message, bool showTime = false,
             bool showNetTag = true)
         {
-            _logSb.Append(DebugxProjectSettings.DebugxTag);
-
-            if (showNetTag && _serverCheckDelegate != null)
-                _logSb.Append(_serverCheckDelegate.Invoke() ? "Server: " : "Client: ");
-
-            if (showTime)
+            lock (_logSbLocker)
             {
-                _logSb.Append($" [{DateTime.Now:HH:mm:ss}] ");
-            }
+                try
+                {
+                    _logSb.Append(DebugxProjectSettings.DebugxTag);
 
-            if (info != null)
-            {
-                if (info.LogSignature)
-                    _logSb.Append($"[Sig: {info.signature}]");
+                    if (showNetTag && _serverCheckDelegate != null)
+                        _logSb.Append(_serverCheckDelegate.Invoke() ? "Server: " : "Client: ");
 
-                if (!string.IsNullOrEmpty(info.color))
-                    _logSb.Append(info.haveHeader
-                        ? $" <color=#{info.color}>{info.header} : {message}</color>"
-                        : $" <color=#{info.color}>{message}</color>");
-                else
-                    _logSb.Append(info.haveHeader ? $" {info.header} : {message}" : $" {message}");
-            }
-            else
-            {
-                _logSb.Append($" UnregisteredMember : {message}");
-            }
+                    if (showTime)
+                    {
+                        _logSb.Append($" [{DateTime.Now:HH:mm:ss}] ");
+                    }
 
-            UnityEngine.Debug.unityLogger.Log(type, _logSb.ToString());
-            _logSb.Length = 0;
+                    if (info != null)
+                    {
+                        if (info.LogSignature)
+                            _logSb.Append($"[Sig: {info.signature}]");
+
+                        if (!string.IsNullOrEmpty(info.color))
+                            _logSb.Append(info.haveHeader
+                                ? $" <color=#{info.color}>{info.header} : {message}</color>"
+                                : $" <color=#{info.color}>{message}</color>");
+                        else
+                            _logSb.Append(info.haveHeader ? $" {info.header} : {message}" : $" {message}");
+                    }
+                    else
+                    {
+                        _logSb.Append($" UnregisteredMember : {message}");
+                    }
+
+                    UnityEngine.Debug.unityLogger.Log(type, _logSb.ToString());
+                }
+                finally
+                {
+                    _logSb.Length = 0;
+                }
+            }
         }
         
         #region LogAdm

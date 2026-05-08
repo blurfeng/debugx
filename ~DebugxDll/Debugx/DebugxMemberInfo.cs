@@ -79,9 +79,9 @@ namespace DebugxLog
             this.key = key;
             enableDefault = true;
             this.signature = signature;
-            this.logSignature = true;
+            logSignature = true;
             header = string.Empty;
-            this.color = String.Empty;
+            color = string.Empty;
             haveSignature = true;
             haveHeader = false;
         }

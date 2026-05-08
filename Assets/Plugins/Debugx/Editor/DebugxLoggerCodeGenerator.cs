@@ -26,7 +26,7 @@ namespace DebugxLog.Editor
         public static void GenerateDebugxLoggerClass()
         {
             var settingsAsset = DebugxProjectSettingsAsset.Instance;
-            if (settingsAsset == null)
+            if (!settingsAsset)
             {
                 Debug.LogWarning("[DebugxCodeGenerator] DebugxProjectSettingsAsset not found.");
                 return;
