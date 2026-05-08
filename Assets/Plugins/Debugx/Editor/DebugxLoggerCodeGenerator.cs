@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -33,6 +34,7 @@ namespace DebugxLog.Editor
             }
 
             StringBuilder sb = new StringBuilder();
+            HashSet<string> usedMethodSuffixes = new HashSet<string>();
             
             // File header
             sb.AppendLine("// 此文件由 DebugxCodeGenerator 自动生成，请勿手动修改。");
@@ -55,7 +57,7 @@ namespace DebugxLog.Editor
             {
                 foreach (var member in settingsAsset.defaultMemberAssets)
                 {
-                    GenerateMemberMethods(sb, member);
+                    GenerateMemberMethods(sb, member, usedMethodSuffixes);
                 }
             }
 
@@ -64,7 +66,7 @@ namespace DebugxLog.Editor
             {
                 foreach (var member in settingsAsset.customMemberAssets)
                 {
-                    GenerateMemberMethods(sb, member);
+                    GenerateMemberMethods(sb, member, usedMethodSuffixes);
                 }
             }
 
@@ -101,15 +103,16 @@ namespace DebugxLog.Editor
         /// Generate Log, LogWarning, LogError methods for a member.
         /// 为成员生成 Log、LogWarning、LogError 方法。
         /// </summary>
-        private static void GenerateMemberMethods(StringBuilder sb, DebugxMemberInfoAsset member)
+        private static void GenerateMemberMethods(StringBuilder sb, DebugxMemberInfoAsset member, HashSet<string> usedMethodSuffixes)
         {
             if (string.IsNullOrEmpty(member.signature))
                 return;
 
-            string methodSuffix = SanitizeMethodName(member.signature);
-            if (string.IsNullOrEmpty(methodSuffix))
+            string methodSuffixBase = SanitizeMethodName(member.signature);
+            if (string.IsNullOrEmpty(methodSuffixBase))
                 return;
 
+            string methodSuffix = GetUniqueMethodSuffix(methodSuffixBase, member.signature, usedMethodSuffixes);
             int key = member.key;
 
             // Log method
@@ -201,6 +204,24 @@ namespace DebugxLog.Editor
             return result;
         }
 
+        private static string GetUniqueMethodSuffix(string methodSuffixBase, string signature, HashSet<string> usedMethodSuffixes)
+        {
+            string methodSuffix = methodSuffixBase;
+            int counter = 2;
+            while (!usedMethodSuffixes.Add(methodSuffix))
+            {
+                methodSuffix = $"{methodSuffixBase}_{counter}";
+                counter++;
+            }
+
+            if (!string.Equals(methodSuffix, methodSuffixBase))
+            {
+                Debug.LogWarning($"[DebugxCodeGenerator] Signature '{signature}' generated duplicate method name. Renamed to '{methodSuffix}'.");
+            }
+
+            return methodSuffix;
+        }
+
         /// <summary>
         /// Menu item to manually regenerate Debugx.cs.
         /// 手动重新生成 Debugx.cs 的菜单项。
@@ -212,4 +233,3 @@ namespace DebugxLog.Editor
         }
     }
 }
-

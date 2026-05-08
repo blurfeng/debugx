@@ -174,11 +174,20 @@ namespace DebugxLog
                     string data = PlayerPrefs.GetString("DebugxStaticData.MemberEnableDefaultDic");
                     if (!string.IsNullOrEmpty(data))
                     {
-                        string[] datas = data.Split(';');
-                        for (int i = 0; i < datas.Length; i++)
+                        string[] dataArray = data.Split(';');
+                        for (int i = 0; i < dataArray.Length; i++)
                         {
-                            string[] item = datas[i].Split(',');
-                            _memberEnableDefaultDicPrefs.Add(int.Parse(item[0]), bool.Parse(item[1]));
+                            string itemRaw = dataArray[i];
+                            if (string.IsNullOrEmpty(itemRaw)) continue;
+
+                            string[] item = itemRaw.Split(',');
+                            if (item.Length != 2) continue;
+
+                            if (!int.TryParse(item[0], out int key)) continue;
+                            if (!bool.TryParse(item[1], out bool value)) continue;
+
+                            // Keep the last value if duplicated data appears in prefs.
+                            _memberEnableDefaultDicPrefs[key] = value;
                         }
                     }
                 }

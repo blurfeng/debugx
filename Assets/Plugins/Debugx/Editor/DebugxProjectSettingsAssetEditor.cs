@@ -7,6 +7,7 @@ namespace DebugxLog.Editor
     public static class DebugxMemberInfoAssetEditor
     {
         private static readonly Dictionary<int, bool> _fadeAreaOpenCached = new Dictionary<int, bool>();
+        private const string FadeAreaPrefsKeyPrefix = "DebugxMemberInfoAssetEditor.fadeAreaOpenCached.";
 
         public static bool GetFadeAreaOpenCached(int key)
         {
@@ -14,7 +15,7 @@ namespace DebugxLog.Editor
             {
                 _fadeAreaOpenCached.Add(
                     key,
-                    DebugxStaticData.PlayerPrefsGetBool($"DebugxMemberInfoAssetEditor.fadeAreaOpenCached.{key}", true));
+                    DebugxStaticData.PlayerPrefsGetBool($"{FadeAreaPrefsKeyPrefix}{key}", true));
             }
             
             return _fadeAreaOpenCached[key];
@@ -23,13 +24,14 @@ namespace DebugxLog.Editor
         public static bool SetFadeAreaOpenCached(int key, bool value)
         {
             _fadeAreaOpenCached[key] = value;
+            DebugxStaticData.PlayerPrefsSetBool($"{FadeAreaPrefsKeyPrefix}{key}", value);
             return _fadeAreaOpenCached[key];
         }
 
         public static void DeleteFadeAreaOpenCached(int key)
         {
             _fadeAreaOpenCached.Remove(key);
-            DebugxStaticData.PlayerPrefsDeleteKey(key.ToString());
+            DebugxStaticData.PlayerPrefsDeleteKey($"{FadeAreaPrefsKeyPrefix}{key}");
         }
     }
     

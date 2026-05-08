@@ -577,14 +577,20 @@ namespace DebugxLog.Editor
 
         private static void ResetProjectSettingsMembers()
         {
-            for (int i = 0; i < SettingsAsset.defaultMemberAssets.Length; i++)
+            if (SettingsAsset.defaultMemberAssets != null)
             {
-                SettingsAsset.defaultMemberAssets[i].ResetToDefaultPart();
+                for (int i = 0; i < SettingsAsset.defaultMemberAssets.Length; i++)
+                {
+                    SettingsAsset.defaultMemberAssets[i].ResetToDefaultPart();
+                }
             }
 
-            for (int i = 0; i < SettingsAsset.customMemberAssets.Length; i++)
+            if (SettingsAsset.customMemberAssets != null)
             {
-                SettingsAsset.customMemberAssets[i].ResetToDefaultPart();
+                for (int i = 0; i < SettingsAsset.customMemberAssets.Length; i++)
+                {
+                    SettingsAsset.customMemberAssets[i].ResetToDefaultPart();
+                }
             }
         }
         
@@ -669,8 +675,8 @@ namespace DebugxLog.Editor
             for (int i = 0; i < SettingsAsset.CustomMemberAssetsLength; i++)
             {
                 var m = SettingsAsset.customMemberAssets[i];
-                if (m.signature.Equals(withoutSignature)) continue;
-                if (m.signature.Equals(signature))
+                if (string.Equals(m.signature, withoutSignature)) continue;
+                if (string.Equals(m.signature, signature))
                 {
                     GetSignatureUnique(ref signature, withoutSignature);
                     return;
@@ -680,8 +686,8 @@ namespace DebugxLog.Editor
             for (int i = 0; i < SettingsAsset.DefaultMemberAssetsLength; i++)
             {
                 var m = SettingsAsset.defaultMemberAssets[i];
-                if (m.signature.Equals(withoutSignature)) continue;
-                if (m.signature.Equals(signature))
+                if (string.Equals(m.signature, withoutSignature)) continue;
+                if (string.Equals(m.signature, signature))
                 {
                     GetSignatureUnique(ref signature, withoutSignature);
                     return;
@@ -767,3 +773,4 @@ namespace DebugxLog.Editor
         #endregion
     }
 }
+

@@ -152,12 +152,14 @@ namespace DebugxLog
             {
                 settings.enableLogDefault = DebugxStaticData.EnableLogDefaultPrefs;
                 settings.enableLogMemberDefault = DebugxStaticData.EnableLogMemberDefaultPrefs;
+                settings.allowUnregisteredMember = DebugxStaticData.AllowUnregisteredMember;
                 settings.logThisKeyMemberOnlyDefault = DebugxStaticData.LogThisKeyMemberOnlyDefaultPrefs;
             }
             else
             {
                 settings.enableLogDefault = enableLogDefault;
                 settings.enableLogMemberDefault = enableLogMemberDefault;
+                settings.allowUnregisteredMember = allowUnregisteredMember;
                 settings.logThisKeyMemberOnlyDefault = logThisKeyMemberOnlyDefault;
             }
 
