@@ -1,5 +1,15 @@
 # Changelog
 
+## [2.3.3] - 2026-05-08
+### Fixed
+- Synced `allowUnregisteredMember` correctly when applying settings in both Editor and runtime.
+- Fixed member foldout cache key persistence to avoid stale/undeletable state entries.
+- Added null-safety guards in member settings/reset paths in Project Settings UI.
+- Prevented `DebugxLogger` auto-generated method name collisions for similar signatures.
+- Hardened member enable prefs parsing to tolerate malformed or duplicate cached data.
+- Optimized DLL project code with additional safety checks and fallback logic.
+- Removed duplicate `LogOutput` handling.
+
 ## [2.3.2] - 2026-02-02
 ### Changed
 - Removed classes that need to be hidden in the Unity layer and rebuilt them into DebugxLog.dll to prevent exposure in the Console window stack. We need the stack to stop at the specific call location of Log.
