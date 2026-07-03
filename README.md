@@ -1,4 +1,4 @@
-![](Documents/Images/Debugx.png)
+![](Documents/debugx.png)
 
 <p align="center">
   <img alt="GitHub Release" src="https://img.shields.io/github/v/release/blurfeng/debugx?color=blue">
@@ -14,32 +14,219 @@
   <a href="./README_JA.md">日本語</a>
 </p>
 
-# Debugx
-Unity 专用的调试功能扩展插件。通过配置可以按调试成员分类打印和管理 Debug Log，并将日志文件输出到本地。
+<p align="center">
+  📥
+  <a href="#使用-upm">安装</a> |
+  <a href="#下载安装包">下载</a>
+</p>
 
-你可以阅读 [用户手册](Documents/UserManual_cn.md) 来获得更多信息。
+# Debugx - Unity 调试日志管理插件
+Debugx 是一款面向 `Unity` 的调试日志扩展插件，开箱即用。它让你以**调试成员**（开发者 / 功能模块）为单位，对 `Debug.Log` 进行分类打印与管理，并可将日志输出到本地文件。  
+在多人协作的项目中，所有人都用 `UnityEngine.Debug.Log()` 会让日志难以区分和管理；测试自己的功能时，也不希望被别人的日志干扰。Debugx 通过**成员分类 + 多级开关**，让每个人只关注自己的日志，互不干扰。  
+所有打印方法都由宏 `DEBUG_X` 控制：添加宏即启用；发布时移除宏，即可让全部日志调用在**编译期**消失，做到 Release 零开销、零残留。  
+借助自动生成的成员专属方法（如 `DebugxLogger.LogBlur("...")`）与封装的 `DebugxLog.dll`，你可以在无需记忆 Key 的同时，双击控制台日志直达业务调用处，而非跳进插件内部。
 
-# 注意事项
-> [!TIP]
-> 1. 必须为项目添加宏 "DEBUG_X" 来启用 Debugx 功能。
-> 2. 在更新插件后如果 DebugxLogger 类没有生成，使用菜单栏 Tools > Debugx > Regenerate DebugxLogger Class 来强制重新生成。
-> 3. 插件在 2.3.0 之前的版本因为文件夹结构和 UPM 链接改变，无法正常更新，需要移除旧版本后重新安装。
+![](Documents/overview.png)
 
-## Unity 版本要求
-Unity 2021.3 及以上版本。
+## 📜 目录
+- [简介](#简介)
+  - [项目特性](#项目特性)
+- [💻 环境要求](#-环境要求)
+- [🌱 快速开始](#-快速开始)
+  - [1.安装插件](#1安装插件)
+  - [2.添加 DEBUG_X 宏](#2添加-debug_x-宏)
+  - [3.配置调试成员](#3配置调试成员)
+  - [4.在代码中打印日志](#4在代码中打印日志)
+- [⚙️ 配置指南](#-配置指南)
+  - [配置界面与 Tooltip](#配置界面与-tooltip)
+  - [ProjectSettings 项目设置](#projectsettings-项目设置)
+  - [Preferences 用户偏好设置](#preferences-用户偏好设置)
+- [✍️ 在代码中打印日志](#-在代码中打印日志)
+  - [打印方法](#打印方法)
+  - [预设成员与 Key](#预设成员与-key)
+  - [运行时开关](#运行时开关)
+- [🎛️ DebugxConsole 控制台](#-debugxconsole-控制台)
+  - [PlayingSettings 运行时设置](#playingsettings-运行时设置)
+  - [Test 测试](#test-测试)
+- [🧩 DebugxManager 管理器](#-debugxmanager-管理器)
+- [⚠️ 注意事项](#-注意事项)
 
-## UPM 安装
-使用 UPM（Unity Package Manager）方式安装插件。
+## 简介
+使用 Debugx，你可以在多人协作的项目中，以调试成员为单位对日志进行分类打印和统一管理，避免所有人的 `Debug.Log` 混在一起难以辨认。  
+Debugx 在 `ProjectSettings` 和 `Preferences` 中分别提供了配置界面：`ProjectSettings` 中的配置影响**整个项目**；`Preferences` 中的用户配置**仅影响你的本地环境**，不会波及项目和其他开发者。此外，`DebugxConsole` 用于在项目**运行时**管理打印开关等功能。  
+所有面向业务的打印方法均标记了 `[Conditional("DEBUG_X")]`，因此在没有 `DEBUG_X` 宏时，这些调用会在编译期被整体剔除，不会产生任何运行时开销。
+
+### 项目特性
+| 特性 | 描述 |
+| --- | --- |
+| 成员分类日志 | 以「调试成员」（开发者 / 模块）为单位分类打印，每个成员独立开关、签名、颜色，日志一目了然、互不干扰。 |
+| 三级开关控制 | 项目级（`ProjectSettings`）、用户本地级（`Preferences`）、运行时级（`DebugxConsole` / 代码）三层开关，灵活组合。 |
+| DEBUG_X 宏一键启停 | 所有打印方法均标记 `[Conditional("DEBUG_X")]`，移除宏即可让全部日志调用在编译期消失，Release 零开销、零残留。 |
+| 自动生成成员方法 | 根据成员配置自动生成 `DebugxLogger.LogXxx()` 等专属方法，调用时无需记忆 Key，直接 `LogBlur("...")`。 |
+| 精准堆栈定位 | 核心代码封装进 `DebugxLog.dll`，配合 `Logger` 命名与 `[HideInCallstack]`，双击控制台日志可直达业务调用处，而非插件内部。 |
+| 本地日志输出 | 运行时自动记录日志到本地文件：编辑器输出到项目 `Logs/`，各平台输出到对应目录；可配置堆栈跟踪、屏幕绘制等。 |
+| 丰富的打印选项 | 支持时间戳、网络标记（Server / Client）、颜色、签名、Header；提供 `Log` / `LogWarning` / `LogError` 三档。 |
+| 编辑器友好 | 集成到 `ProjectSettings` 与 `Preferences`，字段带 Tooltip；自适应 Dark / Light 皮肤；界面按系统语言中英切换。 |
+
+## 💻 环境要求
+- `Unity 2021.3` 或更新的版本（更旧的版本未经测试）。
+- 必须在项目中添加 `DEBUG_X` 宏以启用功能（见 [2.添加 DEBUG_X 宏](#2添加-debug_x-宏)）。
+- 无任何第三方依赖。
+
+## 🌱 快速开始
+按你喜欢的方式安装插件，然后就可以按下面的步骤把 Debugx 添加到你的项目中。
+
+### 1.安装插件
+#### 使用 UPM
+通过 UPM（Unity Package Manager）方式安装插件：
 ```
 https://github.com/BlurFeng/Debugx.git?path=Assets/Plugins/Debugx
 ```
-1. 复制上面的链接
-2. 打开 Unity 编辑器，进入 Window > Package Manager
-3. 点击窗口左上角的 + 按钮，选择 "Add package from git URL..."
-4. 粘贴链接，将插件安装到你的项目中
+1. 复制上面的链接。
+2. 打开 `Window -> Package Manager`。  
+3. 点击窗口左上角的 `+` 号，选择 `Add package from git URL...`。  
+4. 粘贴链接，点击 `Install` 将插件安装到你的项目中。  
 
-### 如何使用
-首先，为项目添加宏 "DEBUG_X" 来启用 Debugx 功能。   
-根据在 ProjectSettings > Debugx 中配置的调试成员，会自动生成对应的 DebugxLogger类和每个成员的 Log 方法。   
-在代码中使用 DebugxLogger.LogMemberName(msg) 或 Debugx.Log(key,msg) 等方法即可轻松打印日志。   
-![](Documents/Images/Debugx_Use.png)
+#### 下载安装包
+在 [Releases](https://github.com/blurfeng/debugx/releases) 页面下载最新的 `.unitypackage` 安装包，然后将其导入到你的项目中。  
+
+### 2.添加 DEBUG_X 宏
+必须在项目中添加宏 `DEBUG_X` 才能启用日志打印功能。在 `Project Settings -> Player -> Other Settings -> Scripting Define Symbols` 中添加 `DEBUG_X`。  
+在项目发布时，移除宏 `DEBUG_X` 即可快速禁用 Debugx 的全部功能（相关调用会在编译期被剔除）。  
+![](Documents/qs_macro_1.png)
+
+### 3.配置调试成员
+通过 `Editor -> Project Settings -> Debugx` 打开项目设置界面，在**调试成员**中配置成员。  
+每个成员拥有唯一的 `Key`、`Signature`（签名 / 名称）、颜色、开关等属性。**最重要的是成员的 `Key`**，它会在日志打印时用到，每个成员只需记住自己的 `Key` 即可。  
+保存配置后，Debugx 会**自动生成**每个成员的专属打印方法（详见 [4.在代码中打印日志](#4在代码中打印日志)）。  
+![](Documents/qs_member_1.png)
+
+### 4.在代码中打印日志
+现在你可以在代码中打印日志了。既可以使用**成员专属方法**（无需记忆 Key），也可以使用**通用方法**（需要传入 Key）：
+
+```csharp
+using DebugxLog;
+
+// 成员专属方法（推荐，无需记忆 Key）。方法名由成员的 Signature 自动生成。
+DebugxLogger.LogBlur("Hello from Blur.");
+DebugxLogger.LogWarningBlur("Something looks off.");
+DebugxLogger.LogErrorBlur("Something went wrong.");
+
+// 通用方法（需要传入成员 Key）。
+Debugx.Log(1, "Hello from key 1.");
+Debugx.LogWarning(1, "Warning from key 1.");
+Debugx.LogError(1, "Error from key 1.");
+```
+
+> [!TIP]
+> `DebugxLogger` 类由插件根据成员配置**自动生成**。如果更新插件后 `DebugxLogger` 没有生成，或新增成员后没有对应方法，使用菜单 `Tools -> Debugx -> Regenerate DebugxLogger Class` 强制重新生成。
+
+> [!TIP]
+> 到这里 Debugx 已经可以正常工作了。若想深入了解各项配置与更多用法，请继续阅读下面的[配置指南](#-配置指南)与[在代码中打印日志](#-在代码中打印日志)。
+
+## ⚙️ 配置指南
+Debugx 的配置分为两处：`ProjectSettings`（影响整个项目）和 `Preferences`（仅影响你的本地环境）。以下主要讲解重要选项，更详细的说明可将鼠标悬停在各字段上查看 Tooltip。
+
+### 配置界面与 Tooltip
+将鼠标悬停在字段上时会显示 Tooltip，这能更好地帮助你熟悉 Debugx。由于可以通过 Tooltip 查看详细说明，这里不再逐项赘述。  
+![](Documents/cfg_tooltip_1.png)
+
+### ProjectSettings 项目设置
+通过 `Editor -> Project Settings -> Debugx` 打开项目设置界面。项目设置会影响整个项目，当需要新增调试成员或调整全局默认行为时，在此处配置。  
+![](Documents/cfg_projectsettings_1.png)
+
+#### 开关设置 Toggle
+这里是各种全局开关的默认值。主开关在此显示，各调试成员也可以在成员信息中单独设置开关。主要包括：
+- `enableLogDefault`：日志总开关默认值。关闭后不打印任何成员日志。
+- `enableLogMemberDefault`：成员日志总开关默认值。
+- `allowUnregisteredMember`：是否允许未注册（找不到对应 Key / 签名）的成员进行打印。
+- `logThisKeyMemberOnlyDefault`：仅打印某个 Key 成员的日志，`0` 表示关闭该过滤。
+
+![](Documents/cfg_toggle_1.png)
+
+#### 调试成员设置 Member
+成员设置用于配置调试成员。这里有一些**预设成员**（见 [预设成员与 Key](#预设成员与-key)），它们不能被删除，只能有限地编辑。你可以在**自定义成员**中添加专属配置，按项目使用者区分。  
+每个成员可设置的主要属性：
+- `Key`：成员唯一标识，打印日志时使用。**每个成员记住自己的 Key 即可。**
+- `Signature`：签名 / 名称，同时用于生成 `DebugxLogger` 的方法名（如 `Blur` -> `LogBlur`）。
+- `Color`：日志颜色，便于在控制台中快速区分。
+- `Header`：可选的日志前缀标签。
+- `EnableDefault`：该成员日志的默认开关。
+
+![](Documents/cfg_member_1.png)
+
+#### 日志输出 LogOutput
+日志输出功能会在项目开始运行时启动记录，在项目停止运行时结束记录并输出到本地文件。主要选项：
+- `logOutput`：是否输出日志到本地文件。
+- `enableLogStackTrace` / `enableWarningStackTrace` / `enableErrorStackTrace`：分别控制 Log / Warning / Error 类型是否记录堆栈跟踪。
+- `recordAllNonDebugxLogs`：是否记录所有非 Debugx 打印的日志。
+- `drawLogToScreen` / `restrictDrawLogCount` / `maxDrawLogs`：是否将日志绘制到屏幕、是否限制绘制数量及上限。
+
+日志文件的输出位置：
+- **编辑器**：项目根目录的 `Logs` 文件夹。
+- **发布版本**：按平台存储到对应目录。PC 平台通常在 `C:\Users\用户名\AppData\LocalLow\公司名\项目名` 目录下；移动平台位于对应的持久化数据目录。
+
+![](Documents/cfg_logoutput_1.png)
+
+### Preferences 用户偏好设置
+通过 `Editor -> Preferences -> Debugx` 打开用户偏好设置界面。  
+用户偏好设置**仅影响你的本地项目环境**，不会影响其他开发者，也不会影响发布版本。它主要用于不同开发者在本地按个人需求配置——每个人通常只启用自己的调试成员开关，以避免被他人的调试输出干扰。  
+![](Documents/cfg_preferences_1.png)
+
+> [!NOTE]
+> 在编辑器中运行时，实际生效的是 `Preferences` 的本地配置；在发布版本中，生效的是 `ProjectSettings` 中提交的项目配置。
+
+## ✍️ 在代码中打印日志
+直接调用 `DebugxLogger` 或 `Debugx` 类的静态方法即可输出日志。所有打印方法都受宏 `DEBUG_X` 控制。  
+![](Documents/code_1.png)
+
+### 打印方法
+**`DebugxLogger.LogXxx(message, showTime, showNetTag)`**  
+调用对应调试成员的专属方法打印日志，`Xxx` 即成员的签名（Signature）。这是最推荐的方式，**无需记忆 Key**。同样提供 `LogWarningXxx` / `LogErrorXxx`。
+
+**`Debugx.Log(key, message, showTime, showNetTag)`**  
+最通用的方法，需要传入成员 `Key` 与打印内容。`Key` 是在成员配置中为成员分配的标识。同样提供 `Debugx.LogWarning` / `Debugx.LogError`；也支持用**签名**代替 Key：`Debugx.Log(signature, message, ...)`。
+
+常用参数说明：
+- `showTime`：是否在日志中显示时间戳。
+- `showNetTag`：是否显示网络标记（Server / Client）。该功能依赖项目侧实现，需要先通过 `Debugx.SetServerCheck(Func<bool>)` 设置判断当前是否为服务器的方法后才会生效。
+
+**`Debugx.LogAdm(message)`**  
+`LogAdm` 系列为 **Debugx 插件开发者专用**，其他人不应使用。通过它打印的日志不受 `DebugxManager` 的成员开关控制，但仍受宏 `DEBUG_X` 影响。
+
+### 预设成员与 Key
+Debugx 内置了几个固定的预设成员，它们的 Key 已保留，请勿用于自定义成员：
+- `Normal`（Key `-1`）：普通成员。
+- `Master`（Key `-2`）：高级成员。
+- `Admin`（Key `0`）：管理者成员，对应 `LogAdm` 通道。
+
+自定义成员请使用**正整数** Key（`Key > 0` 才视为合法的可自定义 Key）。
+
+### 运行时开关
+运行时可以通过代码动态控制打印：
+- `Debugx.SetMemberEnable(int key, bool enable)`：开关某个成员的日志（也可通过 `DebugxManager.Instance.SetMemberEnable(...)`）。
+- `Debugx.enableLog` / `Debugx.enableLogMember`：日志总开关 / 成员日志总开关。
+- `Debugx.logThisKeyMemberOnly`：设为某个 Key 后，仅打印该 Key 成员的日志（`0` 表示关闭该过滤）。
+
+也可以在运行时通过 [DebugxConsole 控制台](#-debugxconsole-控制台) 以可视化方式调整这些开关。
+
+## 🎛️ DebugxConsole 控制台
+`DebugxConsole` 主要用于在项目**运行时**对 Debugx 功能进行开关操作。通过 `Window -> Debugx -> DebugxConsole` 打开窗口。为方便使用，可以把它和 `Game` 标签页放在一起。  
+![](Documents/console_1.png)
+
+### PlayingSettings 运行时设置
+运行时设置的内容基本与 `ProjectSettings` 中相同，但允许在项目运行过程中实时调整，便于边跑边调。  
+![](Documents/console_playing_1.png)
+
+### Test 测试
+测试功能模块。提供了一些便于测试的功能开关，用于确认 Debugx 功能是否正常运行（如 `EnableAwakeTestLog` / `EnableUpdateTestLog` 等测试打印开关）。
+
+## 🧩 DebugxManager 管理器
+`DebugxManager` 在游戏运行时**自动创建**，通常无需手动管理。它的主要职责是处理 `LogOutput` 相关操作（启动 / 结束记录、设置输出路径、绘制到屏幕等）。  
+只有在项目中添加了 `DEBUG_X` 宏时，`DebugxManager` 才会通过 `[RuntimeInitializeOnLoadMethod]` 在运行时自动创建。其 `Create()` 方法为 `virtual`，可供项目派生扩展。
+
+## ⚠️ 注意事项
+> [!TIP]
+> 1. 必须为项目添加宏 `DEBUG_X` 来启用 Debugx 功能。
+> 2. 在更新插件后如果 `DebugxLogger` 类没有生成，使用菜单 `Tools -> Debugx -> Regenerate DebugxLogger Class` 强制重新生成。
+> 3. 插件在 `2.3.0` 之前的版本因为文件夹结构和 UPM 链接改变，无法正常更新，需要移除旧版本后重新安装。
