@@ -1,0 +1,10 @@
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\bin\Debug\DebugxLog.xml
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\bin\Debug\DebugxLog.dll
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\bin\Debug\DebugxLog.pdb
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\bin\Debug\UnityEngine.dll
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\bin\Debug\UnityEngine.xml
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Debug\Debugx.csproj.AssemblyReference.cache
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Debug\Debugx.csproj.CoreCompileInputs.cache
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Debug\Debugx.csproj.Up2Date
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Debug\DebugxLog.dll
+F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Debug\DebugxLog.pdb
