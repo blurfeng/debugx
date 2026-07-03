@@ -78,13 +78,13 @@
         <member name="M:DebugxLog.Debugx.OnAwake">
             <summary>
             OnAwake lifecycle method.
-            OnAwake
+            Awake 生命周期方法。
             </summary>
         </member>
         <member name="M:DebugxLog.Debugx.OnDestroy">
             <summary>
             OnDestroy lifecycle method.
-            OnDestroy
+            OnDestroy 生命周期方法。
             </summary>
         </member>
         <member name="M:DebugxLog.Debugx.ResetToDefault">
@@ -136,6 +136,13 @@
             Member log printing.
             成员打印Log。
             </summary>
+            <remarks>
+            Note: message is typed as object. Turning a member OFF (or the master switches off) still lets the caller's
+            string interpolation / boxing execute before this method decides to drop the log. Disabling a member is NOT
+            zero-cost while DEBUG_X is defined; for hot paths, guard with MemberIsEnable or compile out via DEBUG_X.
+            注意：message 为 object 类型。关闭某成员（或总开关关闭）时，调用方的字符串插值/装箱仍会在本方法丢弃日志前完成。
+            在定义了 DEBUG_X 的情况下，关闭成员并非零成本；高频路径请先用 MemberIsEnable 判断，或用 DEBUG_X 宏整体编译掉。
+            </remarks>
             <param name="key">Member key, configured in DebugxMemberInfo. 成员密钥，DebugxMemberInfo中配置的key。</param>
             <param name="message">Content to log. 打印内容。</param>
             <param name="showTime">Whether to show timestamp. 显示时间。</param>
@@ -226,14 +233,17 @@
         <member name="M:DebugxLog.Debugx.LogCreator(UnityEngine.LogType,System.Int32,System.Object,System.Boolean,System.Boolean)">
             <summary>
             Extended logging method.
+            扩展日志打印方法。
             </summary>
-            <param name="type">Log type.</param>
-            <param name="key">Member key configured in DebugxMemberInfo.</param>
-            <param name="message">Content to log.</param>
-            <param name="showTime">Whether to show the timestamp.</param>
+            <param name="type">Log type. 日志类型。</param>
+            <param name="key">Member key configured in DebugxMemberInfo. DebugxMemberInfo 中配置的成员 Key。</param>
+            <param name="message">Content to log. 打印内容。</param>
+            <param name="showTime">Whether to show the timestamp. 是否显示时间戳。</param>
             <param name="showNetTag">
             Whether to show the network tag (Server or Client). 
             This feature depends on the project and requires setting via the SetServerCheck method.
+            是否显示网络标记（Server 或 Client）。
+            此功能依赖项目侧实现，需要通过 SetServerCheck 方法设置。
             </param>
         </member>
         <member name="M:DebugxLog.Debugx.LogAdm(System.Object,System.Boolean,System.Boolean)">

@@ -17,8 +17,9 @@ namespace DebugxLog.Editor
     {
         private const string DebugxClassPath = "Assets/Plugins/Debugx/Runtime/DebugxLogger.cs";
         
-        // Regex to validate C# identifier (method name)
-        private static readonly Regex _validIdentifierRegex = new Regex(@"^[a-zA-Z_][a-zA-Z0-9_]*$");
+        // Regex to validate C# identifier (method name). Unicode-aware so non-ASCII signatures (e.g. 中文) also generate methods.
+        // 校验 C# 标识符（方法名）。支持 Unicode，使中文等非 ASCII 签名也能生成便捷方法。
+        private static readonly Regex _validIdentifierRegex = new Regex(@"^[\p{L}_][\p{L}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]*$");
 
         /// <summary>
         /// Generate Debugx.cs file with member-specific Log methods.

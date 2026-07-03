@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Author: Blur Feng
 // Time: 20230109
-// Version: 2.3.0.0
+// Version: 2.3.3.0
 // Description:
 // The debug log is managed according to its members.use macro "DEBUG_X" open the functional.
 // 此插件用于以成员的方式管理调试日志。使用宏"DEBUG_X"来开启功能。
@@ -83,6 +83,12 @@
 ////////////////////
 // Version: 2.2.1.0 20260202
 // 1.整理项目代码，拆分类到不同脚本。
+////////////////////
+// Version: 2.3.3.0
+// 1.修复应用配置后运行时成员开关失效、Preferences 批量开关不生效等编辑器交互问题。
+// 2.成员遍历补充空元素判空；SetMemberEnable 未初始化时补充告警。
+// 3.日志文件输出改为按需刷盘；正则由 DebugxTag 常量动态构造，避免不同步。
+// 4.代码整理，版本号同步。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -203,7 +209,13 @@ namespace DebugxLog
         [Conditional("DEBUG_X")]
         public static void SetMemberEnable(int key, bool enable)
         {
-            if (_memberEnables == null || _memberEnables.Count == 0) return;
+            // _memberEnables 仅在 OnAwake（游戏运行时）填充。未初始化时给出告警而非静默失败。
+            // _memberEnables is populated only in OnAwake (at runtime). Warn instead of failing silently when uninitialized.
+            if (_memberEnables.Count == 0)
+            {
+                LogAdmWarning("Debugx.SetMemberEnable: 运行时成员开关尚未初始化，设置被忽略。请在游戏运行时（OnAwake 之后）调用。 Member switches are not initialized yet; call at runtime after OnAwake.");
+                return;
+            }
 
             if (!_memberEnables.ContainsKey(key))
             {
@@ -232,6 +244,7 @@ namespace DebugxLog
             {
                 foreach (var info in Settings.members)
                 {
+                    if (info == null) continue;
                     if (info.key == key)
                     {
                         return info.enableDefault;
@@ -285,6 +298,7 @@ namespace DebugxLog
 
             foreach (var t in Settings.members)
             {
+                if (t == null) continue;
                 if (t.key == key)
                 {
                     memberInfo = t;
@@ -322,6 +336,7 @@ namespace DebugxLog
 
             foreach (var t in Settings.members)
             {
+                if (t == null) continue;
                 if (t.signature == signature)
                 {
                     memberInfo = t;
@@ -336,6 +351,13 @@ namespace DebugxLog
         /// Member log printing.
         /// 成员打印Log。
         /// </summary>
+        /// <remarks>
+        /// Note: message is typed as object. Turning a member OFF (or the master switches off) still lets the caller's
+        /// string interpolation / boxing execute before this method decides to drop the log. Disabling a member is NOT
+        /// zero-cost while DEBUG_X is defined; for hot paths, guard with MemberIsEnable or compile out via DEBUG_X.
+        /// 注意：message 为 object 类型。关闭某成员（或总开关关闭）时，调用方的字符串插值/装箱仍会在本方法丢弃日志前完成。
+        /// 在定义了 DEBUG_X 的情况下，关闭成员并非零成本；高频路径请先用 MemberIsEnable 判断，或用 DEBUG_X 宏整体编译掉。
+        /// </remarks>
         /// <param name="key">Member key, configured in DebugxMemberInfo. 成员密钥，DebugxMemberInfo中配置的key。</param>
         /// <param name="message">Content to log. 打印内容。</param>
         /// <param name="showTime">Whether to show timestamp. 显示时间。</param>
@@ -461,7 +483,9 @@ namespace DebugxLog
         /// </summary>
         private static bool CheckLogThisKeyMemberOnly(int key)
         {
-            return logThisKeyMemberOnly == 0 || !ContainsMemberKey(logThisKeyMemberOnly) || logThisKeyMemberOnly == key;
+            // 顺序敏感：先比对当前 key，命中即短路，避免开启过滤后每条日志都对 members 做一次线性扫描。
+            // Order matters: test the current key first so the common path short-circuits before the O(n) ContainsMemberKey scan.
+            return logThisKeyMemberOnly == 0 || logThisKeyMemberOnly == key || !ContainsMemberKey(logThisKeyMemberOnly);
         }
 
         /// <summary>

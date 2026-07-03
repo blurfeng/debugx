@@ -112,12 +112,10 @@ namespace DebugxLog.Editor
 
             if (GUILayoutEx.ButtonRed("Reset to Default", GUILayout.Width(ButtonWidth3)))
             {
-                if (EditorUtility.DisplayDialog(
+                if (ConfirmDialog(
                         "Reset To Default",
-                        DebugxStaticData.IsChineseSimplified
-                            ? "确认要重置到默认设置吗？\n重置并不会清空Member成员配置，仅将成员配置的部分字段重置。"
-                            : "Are you sure you want to reset to the default settings?\nResetting will not clear the Member configurations; it will only reset certain fields within the member configurations.",
-                        "Ok", "Cancel"))
+                        "确认要重置到默认设置吗？\n重置并不会清空Member成员配置，仅将成员配置的部分字段重置。",
+                        "Are you sure you want to reset to the default settings?\nResetting will not clear the Member configurations; it will only reset certain fields within the member configurations."))
                 {
                     Undo.RecordObject(SettingsAsset, "ResetToDefault");
                     ResetProjectSettings();
@@ -221,12 +219,10 @@ namespace DebugxLog.Editor
                             : "Reset member settings; only some member configurations will be reset to default values.\n(Reset contents: EnableDefault, LogSignature, fadeAreaOpen)"),
                         GUILayout.Width(ButtonWidth3)))
                 {
-                    if (EditorUtility.DisplayDialog(
+                    if (ConfirmDialog(
                             "Reset Members Part Config",
-                            DebugxStaticData.IsChineseSimplified
-                                ? "确认要重置所有成员的部分设置吗？"
-                                : "Are you sure you want to reset partial settings for all members?",
-                            "Ok", "Cancel"))
+                            "确认要重置所有成员的部分设置吗？",
+                            "Are you sure you want to reset partial settings for all members?"))
                     {
                         Undo.RecordObject(SettingsAsset, "ResetMembersPartConfig");
                         ResetProjectSettingsMembers();
@@ -240,12 +236,10 @@ namespace DebugxLog.Editor
                             : "Colors automatically adapt based on the editor skin. Log colors become brighter in Dark mode and darker in Light mode."),
                         GUILayout.Width(ButtonWidth3)))
                 {
-                    if (EditorUtility.DisplayDialog(
+                    if (ConfirmDialog(
                             "Adapt Color By Editor Skin",
-                            DebugxStaticData.IsChineseSimplified
-                                ? "确认要执行颜色根据编辑器皮肤自动适应吗？"
-                                : "Are you sure you want to apply color adaptation based on the editor skin?",
-                            "Ok", "Cancel"))
+                            "确认要执行颜色根据编辑器皮肤自动适应吗？",
+                            "Are you sure you want to apply color adaptation based on the editor skin?"))
                     {
                         Undo.RecordObject(SettingsAsset, "AdaptColorByEditorSkin");
 
@@ -269,12 +263,10 @@ namespace DebugxLog.Editor
                                 : "Reset the default members; this will reset all data of the default members.",
                             GUILayout.Width(ButtonWidth3)))
                     {
-                        if (EditorUtility.DisplayDialog(
+                        if (ConfirmDialog(
                                 "Reset Default Members",
-                                DebugxStaticData.IsChineseSimplified
-                                    ? "确认要重置所有默认成员吗？"
-                                    : "Are you sure you want to reset all default members?",
-                                "Ok", "Cancel"))
+                                "确认要重置所有默认成员吗？",
+                                "Are you sure you want to reset all default members?"))
                         {
                             Undo.RecordObject(SettingsAsset, "ResetDefaultMembers");
                             SettingsAsset.ResetMembers(true, false);
@@ -341,12 +333,10 @@ namespace DebugxLog.Editor
                             : "Automatically reassign colors for all custom members; colors will be evenly distributed based on the number of members.",
                         GUILayout.Width(ButtonWidth3)))
                 {
-                    if (EditorUtility.DisplayDialog(
+                    if (ConfirmDialog(
                             "Automatically Reassign Colors",
-                            DebugxStaticData.IsChineseSimplified
-                                ? "确认要重分配所有自定义成员的颜色吗？"
-                                : "Are you sure you want to reassign colors for all custom members?",
-                            "Ok", "Cancel"))
+                            "确认要重分配所有自定义成员的颜色吗？",
+                            "Are you sure you want to reassign colors for all custom members?"))
                     {
                         Undo.RecordObject(SettingsAsset, "AutomaticallyReassignColors");
                         ColorDispenser.AutomaticallyReassignColors();
@@ -549,7 +539,9 @@ namespace DebugxLog.Editor
         private static void OnRemoveMemberInfo(int index, DebugxMemberInfoAsset info)
         {
             DebugxMemberInfoAssetEditor.DeleteFadeAreaOpenCached(info.key);
-            _memberInfosFadeAreaPool.RemoveAt(index + 2); //前面两个时Normal和Master用的
+            // 池布局为 [默认成员..., 自定义成员...]，自定义索引需偏移默认成员数量；用 DefaultMemberAssetsLength 而非硬编码 2，与绘制循环保持一致。
+            // Pool layout is [defaults..., customs...]; offset by the default count. Use DefaultMemberAssetsLength (not a hardcoded 2) to match the draw loop.
+            _memberInfosFadeAreaPool.RemoveAt(index + SettingsAsset.DefaultMemberAssetsLength);
         }
 
         private static void ResetProjectSettings()
@@ -629,22 +621,38 @@ namespace DebugxLog.Editor
 
         private static bool Apply()
         {
-            if (!DebugxStaticDataEditor.AutoSave && !_assetIsDirty && !_fadeAreaHeaderIsDirty) return false;
+            // 仅折叠/展开（_fadeAreaHeaderIsDirty）只改变 UI 折叠态（存于 PlayerPrefs），不改 asset 数据，
+            // 因此不应触发落盘 + ApplyTo + 重生成代码。只有 asset 数据真正变更（_assetIsDirty）时才做重活。
+            // Fold/expand only changes UI state (stored in PlayerPrefs), not asset data, so it must not trigger
+            // a disk write + ApplyTo + codegen. Only do the heavy work when asset data actually changed.
+            bool assetChanged = _assetIsDirty;
             _assetIsDirty = false;
             _fadeAreaHeaderIsDirty = false;
+
+            if (!assetChanged) return false;
 
             if (SettingsAsset != null)
             {
                 EditorUtility.SetDirty(SettingsAsset);
                 AssetDatabase.SaveAssetIfDirty(SettingsAsset);
                 SettingsAsset.ApplyTo(DebugxProjectSettings.Instance);
-                
+
                 // Generate DebugxLogger class with member-specific Log methods.
                 // 生成包含成员专用 Log 方法的 Debugx 类。
                 DebugxLoggerCodeGenerator.GenerateDebugxLoggerClass();
             }
-            
+
             return true;
+        }
+
+        /// <summary>
+        /// Unified bilingual confirmation dialog (Ok/Cancel).
+        /// 统一的双语确认对话框（Ok/Cancel）。
+        /// </summary>
+        private static bool ConfirmDialog(string title, string cnMessage, string enMessage)
+        {
+            return EditorUtility.DisplayDialog(
+                title, DebugxStaticData.IsChineseSimplified ? cnMessage : enMessage, "Ok", "Cancel");
         }
 
         #region MemberInfo

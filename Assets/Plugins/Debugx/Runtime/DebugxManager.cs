@@ -23,7 +23,9 @@ namespace DebugxLog
                 {
                     _instance = FindObjectOfType<DebugxManager>();
 
-                    if (!_instance)
+                    // 仅在运行时创建管理器，避免编辑期（非 Play）访问 Instance 时在场景里留下常驻 GameObject。
+                    // Only create the manager at runtime, so accessing Instance in edit mode doesn't leave a stray GameObject in the scene.
+                    if (!_instance && Application.isPlaying)
                     {
                         _gameObject = new GameObject { name = typeof(DebugxManager).Name };
                         _instance = _gameObject.AddComponent<DebugxManager>();
@@ -64,6 +66,10 @@ namespace DebugxLog
 #elif UNITY_ANDROID
             LogOutput.DirectoryPath = $"{Application.persistentDataPath}/Log";
 #elif UNITY_IPHONE
+            LogOutput.DirectoryPath = Application.persistentDataPath;
+#else
+            // OSX/Linux/WebGL 等其余平台的兜底，避免 DirectoryPath 未设置。
+            // Fallback for OSX/Linux/WebGL and any other platform so DirectoryPath is never left unset.
             LogOutput.DirectoryPath = Application.persistentDataPath;
 #endif
 

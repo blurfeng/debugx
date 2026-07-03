@@ -42,8 +42,11 @@ namespace DebugxLog.Tools
 
         // Regular expression used to trim color code.
         // 用于裁剪color代码的正则表达式。
-        private static readonly Regex _regexMessageCut = new Regex(@"<color=#([\S.]{6})>|</color>|\[Debugx\]");
-        private static readonly Regex _regexRecordMessageTag = new Regex(@"\[Debugx\]");
+        // 标签正则由 DebugxProjectSettings.DebugxTag 常量动态构造，避免标签改动后与硬编码正则不同步。
+        // The tag regex is built from the DebugxProjectSettings.DebugxTag constant to stay in sync if the tag changes.
+        private static readonly string _tagEscaped = Regex.Escape(DebugxProjectSettings.DebugxTag);
+        private static readonly Regex _regexMessageCut = new Regex($@"<color=#([\S.]{{6}})>|</color>|{_tagEscaped}");
+        private static readonly Regex _regexRecordMessageTag = new Regex(_tagEscaped);
 
         /// <summary>
         /// Start of logging.
@@ -86,7 +89,9 @@ namespace DebugxLog.Tools
                 // 保持文件流常驻，减少每条日志的打开/关闭开销。
                 FileStream fs = new FileStream(_savePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
                 _writer = new StreamWriter(fs, new UTF8Encoding(false));
-                _writer.AutoFlush = true;
+                // 关闭自动刷盘，避免每条日志一次同步磁盘写；Log 级别缓冲，Warning/Error 及 RecordOver 时显式 Flush。
+                // Disable auto-flush to avoid a sync disk write per line; plain logs buffer, warnings/errors and RecordOver flush explicitly.
+                _writer.AutoFlush = false;
             }
             catch (Exception ex)
             {
@@ -192,6 +197,10 @@ namespace DebugxLog.Tools
                         if (_writer != null)
                         {
                             _writer.WriteLine(_logBuilder.ToString());
+                            // 重要日志（Warning/Error/Exception/Assert）立即刷盘，保证崩溃时不丢失。
+                            // Flush important logs (Warning/Error/Exception/Assert) immediately so they survive a crash.
+                            if (type != LogType.Log)
+                                _writer.Flush();
                         }
                         else
                         {

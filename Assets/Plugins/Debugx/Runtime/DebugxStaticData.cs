@@ -22,12 +22,13 @@ namespace DebugxLog
                 {
                     _resourcesPath = Application.dataPath + FolderPath;
                     Debugx.LogAdm($"ResourcesPath: {_resourcesPath}");
+
+                    //确认文件夹是否存在，否则创建（仅首次解析路径时检查，避免每次访问都做文件系统调用）
+                    //Ensure the folder exists (only on first resolve, to avoid a filesystem call on every access).
+                    if (!Directory.Exists(_resourcesPath))
+                        Directory.CreateDirectory(_resourcesPath);
                 }
-                
-                //确认文件夹是否存在，否则创建
-                if (!Directory.Exists(_resourcesPath))
-                    Directory.CreateDirectory(_resourcesPath);
-            
+
                 return _resourcesPath;
             }
         }
@@ -59,10 +60,22 @@ namespace DebugxLog
             set => PlayerPrefsSetBool("DebugxStaticData.EnableAwakeTestLog", value);
         }
 
+        // 0=未读取 1=true 2=false。缓存避免 DebugxManager.Update 每帧读取 PlayerPrefs；setter 同步缓存，保证运行时切换即时生效。
+        // 0=unread 1=true 2=false. Cached to avoid a per-frame PlayerPrefs read in DebugxManager.Update; the setter keeps the cache in sync.
+        private static byte _enableUpdateTestLog;
         public static bool EnableUpdateTestLog
         {
-            get => PlayerPrefsGetBool("DebugxStaticData.EnableUpdateTestLog", false);
-            set => PlayerPrefsSetBool("DebugxStaticData.EnableUpdateTestLog", value);
+            get
+            {
+                if (_enableUpdateTestLog == 0)
+                    _enableUpdateTestLog = (byte)(PlayerPrefsGetBool("DebugxStaticData.EnableUpdateTestLog", false) ? 1 : 2);
+                return _enableUpdateTestLog == 1;
+            }
+            set
+            {
+                PlayerPrefsSetBool("DebugxStaticData.EnableUpdateTestLog", value);
+                _enableUpdateTestLog = (byte)(value ? 1 : 2);
+            }
         }
 
         #region Text
@@ -136,6 +149,7 @@ namespace DebugxLog
         {
             MemberEnableDefaultDicPrefs.Clear();
             PlayerPrefs.DeleteKey("DebugxStaticData.MemberEnableDefaultDic");
+            PlayerPrefs.Save();
         }
 
         public static bool EnableLogDefaultPrefs
@@ -209,6 +223,9 @@ namespace DebugxLog
                     if (counter != _memberEnableDefaultDicPrefs.Count) sb.Append(";");
                 }
                 PlayerPrefs.SetString("DebugxStaticData.MemberEnableDefaultDic", sb.ToString());
+                // 显式落盘，避免编辑器异常退出丢失成员开关偏好。
+                // Persist to disk so member-switch prefs survive an abnormal editor exit.
+                PlayerPrefs.Save();
             }
         }
 

@@ -208,7 +208,11 @@ namespace DebugxLog
                 settings.maxDrawLogs = maxDrawLogs;
             }
 
-            Debugx.ResetToDefault();
+            // 用 OnAwake 而非 ResetToDefault：后者只清空 _memberEnables 不重建，会导致应用配置后运行时成员开关静默失效、
+            // 且 SetMemberEnable 因字典为空而无法再设置。OnAwake 会依据新的 members 重建开关字典。
+            // Use OnAwake instead of ResetToDefault: the latter only clears _memberEnables without rebuilding, which makes
+            // runtime member switches silently break after applying settings. OnAwake rebuilds the switch dictionary from members.
+            Debugx.OnAwake();
 
             OnApplyTo.Invoke();
         }

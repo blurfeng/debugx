@@ -229,7 +229,9 @@ namespace DebugxLog.Editor
 
         public static void PushTintBg(Color tint)
         {
-            _colorsBg.Push(GUI.color);
+            // 必须保存/恢复同一个属性 backgroundColor（原来误存了 GUI.color）。
+            // Must save/restore the same property, backgroundColor (previously it saved GUI.color by mistake).
+            _colorsBg.Push(GUI.backgroundColor);
             GUI.backgroundColor = tint;
         }
 

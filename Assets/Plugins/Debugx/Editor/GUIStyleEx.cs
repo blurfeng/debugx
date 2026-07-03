@@ -12,6 +12,11 @@ namespace DebugxLog.Editor
             get
             {
                 // 根据当前皮肤类型缓存样式实例。修改皮肤后会重新创建实例。
+                // 注意：这里不销毁旧实例的 _backgroundTex。已存活的 FadeArea 会缓存引用该纹理的 GUIStyle，
+                // 皮肤切换时 FadeArea 不会重建，若在此销毁纹理会导致其背景渲染破损。纹理数量恒定，泄漏可忽略。
+                // Note: do NOT destroy the previous instance's _backgroundTex here. Live FadeAreas cache a GUIStyle that
+                // references it and are not rebuilt on skin change; destroying it would corrupt their background rendering.
+                // The texture count is constant, so the leak is negligible.
                 if (_style == null || _editorSkinCached != (EditorGUIUtility.isProSkin ? 1 : 2))
                 {
                     _editorSkinCached = EditorGUIUtility.isProSkin ? 1 : 2;

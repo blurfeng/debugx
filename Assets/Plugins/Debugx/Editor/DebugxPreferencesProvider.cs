@@ -61,6 +61,12 @@ namespace DebugxLog.Editor
                     elementHeight = 20f,
                 };
             }
+            else if (_membersList != null && !ReferenceEquals(_membersList.list, Settings.members))
+            {
+                // Settings.members 在 ApplyTo 时会被替换为新数组，重新指向以避免列表显示陈旧数据/数量不一致。
+                // Settings.members is replaced with a new array on ApplyTo; resync so the list doesn't show stale data.
+                _membersList.list = Settings.members;
+            }
 
             string defineSymbols = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone);
             if (!defineSymbols.Contains("DEBUG_X"))
@@ -226,7 +232,6 @@ namespace DebugxLog.Editor
             bool enable = MemberEnableDefaultDic.ContainsKey(info.key)
                 ? MemberEnableDefaultDic[info.key]
                 : Debugx.MemberIsEnable(info.key);
-            EditorGUI.BeginChangeCheck();
 
             Rect idRect = rect;
             idRect.width = idWidth;
@@ -266,10 +271,17 @@ namespace DebugxLog.Editor
 
             DebugxStaticData.SaveMemberEnableDefaultDicPrefs();
             DebugxStaticData.CanResetPreferencesMembers = true;
+            // 与单项开关路径一致：批量修改后也需 Apply()，否则运行时成员开关不会生效。
+            // Match the per-item path: batch changes must Apply() too, otherwise runtime member switches won't take effect.
+            Apply();
         }
 
         private static void Apply()
         {
+            // 显式落盘用户偏好，避免编辑器异常退出丢失（PlayerPrefs 默认仅在正常退出时写入）。
+            // Persist user prefs so they survive an abnormal editor exit (PlayerPrefs otherwise only writes on graceful quit).
+            PlayerPrefs.Save();
+
             // In ApplyTo, it checks if running in the Editor to use user preferences instead of DebugxProjectSettingsAsset configuration.
             // ApplyTo中会判断如果在Editor就使用用户偏好设置，而不是使用DebugxProjectSettingsAsset配置。
             if (SettingsAsset != null)
