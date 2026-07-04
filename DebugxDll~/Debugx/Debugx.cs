@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Author: Blur Feng
 // Time: 20230109
-// Version: 2.3.3.0
+// Version: 2.4.0.0
 // Description:
 // The debug log is managed according to its members.use macro "DEBUG_X" open the functional.
 // 此插件用于以成员的方式管理调试日志。使用宏"DEBUG_X"来开启功能。
@@ -89,6 +89,11 @@
 // 2.成员遍历补充空元素判空；SetMemberEnable 未初始化时补充告警。
 // 3.日志文件输出改为按需刷盘；正则由 DebugxTag 常量动态构造，避免不同步。
 // 4.代码整理，版本号同步。
+////////////////////
+// Version: 2.4.0.0 20260704
+// 1.新增结构化日志事件 Debugx.OnRawLog，在唯一日志收口点 LogCreator 携带成员 key/签名/颜色/header/网络标签/LogType/原始 message/最终显示串，供 Debugx Console 等工具以完整成员元数据消费日志。无订阅者时不构造负载，开销近似为零。
+// 2.新增 Debugx.IsDebugxTagged 方法，将 [Debugx] 标签判定收敛一处，供外部（如 Console 双通道去重）复用，与 DebugxTag 常量保持同步。
+// 3.LogCreator 调整为锁内拼串、锁外派发事件并在 unityLogger.Log 之前触发，保证「事件→同线程紧邻的 logMessageReceived 回调」顺序；网络标签只求值一次。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -153,6 +158,36 @@ namespace DebugxLog
         /// 必须关闭logMasterOnly后才能设置此值
         /// </summary>
         public static int logThisKeyMemberOnly;
+
+        /// <summary>
+        /// Structured raw log event. Fired once at the single logging funnel (LogCreator), on the same thread and
+        /// immediately before UnityEngine.Debug.unityLogger.Log, carrying member metadata + the original message +
+        /// the final composed string. Intended for tooling such as the Debugx Console to consume logs with full
+        /// member metadata (instead of re-parsing the formatted text). Only meaningful while DEBUG_X is defined
+        /// (the whole logging path compiles out otherwise). When there is no subscriber the payload is not even
+        /// constructed, so the cost is near zero.
+        /// 结构化原始日志事件。在唯一日志收口点（LogCreator）中、于同一线程且紧邻 UnityEngine.Debug.unityLogger.Log
+        /// 之前触发一次，携带成员元数据 + 原始 message + 拼好的最终显示串。供 Debugx Console 等工具以完整成员元数据消费日志
+        /// （而非对格式化文本做正则反解）。仅在定义了 DEBUG_X 时有意义（否则整条日志路径被编译掉）。
+        /// 无订阅者时连负载都不会构造，开销近似为零。
+        /// </summary>
+        public static event Action<DebugxRawLog> OnRawLog;
+
+        /// <summary>
+        /// Whether a log message string was produced by Debugx (i.e. it contains the DebugxTag).
+        /// Lets consumers de-duplicate: a message captured from Application.logMessageReceived that is Debugx-tagged
+        /// has already been delivered via OnRawLog and should not be counted a second time. Centralizing the check
+        /// here keeps it in sync with DebugxTag (mirrors the tag regex in LogOutput).
+        /// 判断一条日志字符串是否由 Debugx 产生（即包含 DebugxTag）。
+        /// 供消费方去重：从 Application.logMessageReceived 捕获到、且带 Debugx 标签的消息，已经通过 OnRawLog 投递过，
+        /// 不应重复计入。判定收敛在此处，与 DebugxTag 保持同步（对应 LogOutput 中的标签正则）。
+        /// </summary>
+        /// <param name="message">The log message string to test. 待检测的日志字符串。</param>
+        /// <returns>True if the message carries the DebugxTag. 若消息带有 DebugxTag 则为 true。</returns>
+        public static bool IsDebugxTagged(string message)
+        {
+            return !string.IsNullOrEmpty(message) && message.Contains(DebugxProjectSettings.DebugxTag);
+        }
 
         /// <summary>
         /// OnAwake lifecycle method.
@@ -552,14 +587,21 @@ namespace DebugxLog
         private static void LogCreator(LogType type, DebugxMemberInfo info, object message, bool showTime = false,
             bool showNetTag = true)
         {
+            // Evaluate the net tag once, shared by string building and the structured event, so the project's
+            // server-check delegate is invoked only a single time per log.
+            // 网络标签只求值一次，供拼串与结构化事件共用，使项目的 server-check 委托每条日志只被调用一次。
+            bool hasNetTag = showNetTag && _serverCheckDelegate != null;
+            bool isServer = hasNetTag && _serverCheckDelegate.Invoke();
+
+            string finalText;
             lock (_logSbLocker)
             {
                 try
                 {
                     _logSb.Append(DebugxProjectSettings.DebugxTag);
 
-                    if (showNetTag && _serverCheckDelegate != null)
-                        _logSb.Append(_serverCheckDelegate.Invoke() ? "Server: " : "Client: ");
+                    if (hasNetTag)
+                        _logSb.Append(isServer ? "Server: " : "Client: ");
 
                     if (showTime)
                     {
@@ -583,15 +625,82 @@ namespace DebugxLog
                         _logSb.Append($" UnregisteredMember : {message}");
                     }
 
-                    UnityEngine.Debug.unityLogger.Log(type, _logSb.ToString());
+                    finalText = _logSb.ToString();
                 }
                 finally
                 {
                     _logSb.Length = 0;
                 }
             }
+
+            // Dispatch the structured event first (outside the lock, so a subscriber that logs again cannot re-enter
+            // and corrupt _logSb), then emit the Unity log. This preserves the "event -> the immediately-following
+            // same-thread logMessageReceived callback" ordering that backs the Console's per-thread FIFO de-dup pairing.
+            // 先派发结构化事件（在锁外，避免订阅者回调再打日志导致 _logSb 被重入破坏），再发 Unity 日志。
+            // 由此保证「事件 → 同线程紧邻的 logMessageReceived 回调」顺序，支撑 Console 的线程内 FIFO 去重配对。
+            if (OnRawLog != null)
+                DispatchRawLog(type, info, message, finalText, showTime, showNetTag, isServer);
+
+            UnityEngine.Debug.unityLogger.Log(type, finalText);
         }
-        
+
+        /// <summary>
+        /// Build and dispatch the structured raw log to <see cref="OnRawLog"/> subscribers. The payload struct is not
+        /// even constructed when there is no subscriber. Subscriber exceptions are isolated so one bad subscriber
+        /// cannot break the logging pipeline or the other subscribers.
+        /// 构造并向 <see cref="OnRawLog"/> 订阅者派发结构化原始日志。无订阅者时连负载结构都不构造。
+        /// 订阅者异常被隔离，避免单个坏订阅者破坏日志管线或其它订阅者。
+        /// </summary>
+        private static void DispatchRawLog(LogType type, DebugxMemberInfo info, object message, string finalText,
+            bool showTime, bool showNetTag, bool isServer)
+        {
+            // Local snapshot to avoid the race between the null check and the invocation if unsubscribed in between.
+            // 本地快照，规避判空与调用之间被取消订阅置空的竞态。
+            Action<DebugxRawLog> handler = OnRawLog;
+            if (handler == null) return;
+
+            int key;
+            string signature, colorHex, header;
+            bool logSignatureShown;
+            DebugxLogCategory category;
+
+            if (info == null)
+            {
+                key = DebugxRawLog.UnregisteredKey;
+                signature = null;
+                colorHex = null;
+                header = null;
+                logSignatureShown = false;
+                category = DebugxLogCategory.Unregistered;
+            }
+            else
+            {
+                key = info.key;
+                signature = info.signature;
+                colorHex = string.IsNullOrEmpty(info.color) ? null : info.color;
+                header = info.haveHeader ? info.header : null;
+                logSignatureShown = info.LogSignature;
+                // Admin channel (LogAdm) always uses AdminInfo whose key is 0; custom/preset members use their own key.
+                // 管理通道（LogAdm）始终使用 key 为 0 的 AdminInfo；自定义/预设成员使用各自的 key。
+                category = info.key == 0 ? DebugxLogCategory.Admin : DebugxLogCategory.Member;
+            }
+
+            DebugxRawLog rawLog = new DebugxRawLog(
+                key, signature, colorHex, header, logSignatureShown, category,
+                type, message, finalText, showNetTag, showTime, isServer, DateTime.Now);
+
+            try
+            {
+                handler.Invoke(rawLog);
+            }
+            catch (Exception ex)
+            {
+                // Must not route through Debugx logging here (would recurse); report via the raw Unity error log.
+                // 此处不能再走 Debugx 日志（会递归）；直接用 Unity 原生错误日志上报订阅者异常。
+                UnityEngine.Debug.LogError("[Debugx] OnRawLog subscriber threw: " + ex);
+            }
+        }
+
         #region LogAdm
 
         /// <summary>

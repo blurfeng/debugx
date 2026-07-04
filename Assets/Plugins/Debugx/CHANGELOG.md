@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.0] - 2026-07-04
+### Added
+- `Debugx.OnRawLog` structured log event, dispatched once at the single logging funnel (`LogCreator`) carrying full member metadata (key/signature/color/header/net tag/LogType/original message/final text). This lets the upcoming Debugx Console consume logs with full member context instead of re-parsing formatted text. Payload is a value type and is not even constructed when there is no subscriber, so the cost is near zero.
+- `Debugx.IsDebugxTagged(string)` helper that centralizes the `[Debugx]` tag check (kept in sync with `DebugxTag`) for de-duplication by external consumers such as the Console's dual-channel capture.
+### Changed
+- `LogCreator` now builds the log string under lock, then dispatches `OnRawLog` outside the lock and immediately before `unityLogger.Log`, preserving same-thread event/callback ordering; the network server-check delegate is now evaluated only once per log.
+
 ## [2.3.3] - 2026-05-08
 ### Fixed
 - Synced `allowUnregisteredMember` correctly when applying settings in both Editor and runtime.

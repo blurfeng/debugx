@@ -8,3 +8,13 @@ F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Release\Debugx.csproj.CoreCompileIn
 F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Release\Debugx.csproj.Up2Date
 F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Release\DebugxLog.dll
 F:\ProjectUnity\Debugx\~DebugxDll\Debugx\obj\Release\DebugxLog.pdb
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\bin\Release\DebugxLog.xml
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\bin\Release\DebugxLog.dll
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\bin\Release\DebugxLog.pdb
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\bin\Release\UnityEngine.dll
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\bin\Release\UnityEngine.xml
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\obj\Release\Debugx.csproj.AssemblyReference.cache
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\obj\Release\Debugx.csproj.CoreCompileInputs.cache
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\obj\Release\Debugx.csproj.Up2Date
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\obj\Release\DebugxLog.dll
+F:\ProjectUnity\Debugx\DebugxDll~\Debugx\obj\Release\DebugxLog.pdb
