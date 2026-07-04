@@ -44,7 +44,7 @@ namespace DebugxLog.Console.Runtime
         {
             var popup = new VisualElement();
             popup.style.position = Position.Absolute;
-            popup.style.left = 8; // fallback; repositioned under the Members button on open (PositionMemberPopupUnderButton). 兜底值；打开时定位到 Members 按钮下方。
+            popup.style.left = 8; // fallback; repositioned under the Members button on open (PositionPopupUnderButton). 兜底值；打开时定位到 Members 按钮下方。
             popup.style.top = 48;
             popup.style.width = MemberPopupWidth;
             popup.style.maxHeight = Length.Percent(70);
@@ -91,35 +91,12 @@ namespace DebugxLog.Console.Runtime
             _memberPopupOpen = open;
             if (open)
             {
+                SetSourcePopup(false); // only one popup at a time. 同时只开一个弹层。
                 RebuildMemberList();
-                PositionMemberPopupUnderButton();
+                PositionPopupUnderButton(_memberPopup, _memberButton, MemberPopupWidth);
             }
             if (_memberPopup != null)
                 _memberPopup.style.display = open ? DisplayStyle.Flex : DisplayStyle.None;
-        }
-
-        // Place the popup's top-left just under the Members button. worldBound and style.left share the panel's
-        // coordinate space (UIToolkit points, already scaled), so the delta needs no DPI conversion. Clamped to the
-        // panel's right edge so a button near the right doesn't push the popup off-panel.
-        // 把弹层左上角放到 Members 按钮正下方。worldBound 与 style.left 同属面板坐标系（UIToolkit 点，已缩放），故差值无需 DPI
-        // 换算。对面板右边缘做钳制，避免按钮靠右时弹层越出面板。
-        private void PositionMemberPopupUnderButton()
-        {
-            if (_memberButton == null || _panelRoot == null || _memberPopup == null) return;
-
-            Rect btn = _memberButton.worldBound;
-            Rect panel = _panelRoot.worldBound;
-            if (float.IsNaN(btn.x) || float.IsNaN(panel.x) || panel.width <= 0f) return; // layout not resolved yet. 布局尚未解析。
-
-            float left = btn.x - panel.x;
-            float top = btn.yMax - panel.y;
-
-            float maxLeft = panel.width - MemberPopupWidth - 4f;
-            if (left > maxLeft) left = maxLeft;
-            if (left < 4f) left = 4f;
-
-            _memberPopup.style.left = left;
-            _memberPopup.style.top = top;
         }
 
         // Rebuild the member rows from the distinct member keys currently present in the buffer (with a representative

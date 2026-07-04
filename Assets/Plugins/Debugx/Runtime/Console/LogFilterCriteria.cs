@@ -22,6 +22,19 @@ namespace DebugxLog.Console
     }
 
     /// <summary>
+    /// Net-tag filter mode for the Console. 控制台的网络标签过滤模式。
+    /// </summary>
+    public enum NetTagFilterMode
+    {
+        /// <summary>Show all entries regardless of net tag. 显示全部，忽略网络标签。</summary>
+        All,
+        /// <summary>Only entries tagged Server. 仅显示带 Server 标签的条目。</summary>
+        Server,
+        /// <summary>Only entries tagged Client. 仅显示带 Client 标签的条目。</summary>
+        Client,
+    }
+
+    /// <summary>
     /// The full set of Console filter conditions. A plain, UI-agnostic POCO: the Editor Console and the runtime Console
     /// both just fill it from their controls, then hand it to a <see cref="LogFilter"/>. All conditions combine with AND.
     /// Console 全部过滤条件的集合。一个与 UI 无关的纯 POCO：Editor 版与运行时版 Console 都只是用各自控件填充它，
@@ -53,5 +66,11 @@ namespace DebugxLog.Console
 
         /// <summary>The search query. 搜索查询。</summary>
         public SearchQuery Search;
+
+        /// <summary>
+        /// Net-tag filter. <see cref="NetTagFilterMode.All"/> disables it (the default, so consoles that never set it
+        /// are unaffected). 网络标签过滤。<see cref="NetTagFilterMode.All"/> 表示不过滤（默认值，故从不设置它的 Console 不受影响）。
+        /// </summary>
+        public NetTagFilterMode NetTagMode = NetTagFilterMode.All;
     }
 }

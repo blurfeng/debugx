@@ -16,5 +16,9 @@ public class DebugxTest : MonoBehaviour
         Debugx.Log(1, "Test Log Blur On Start via Debugx.");
         Debugx.LogWarning(1, "Test LogWarning Blur On Start via Debugx.");
         Debugx.LogError(1, "Test LogError Blur On Start via Debugx.");
+        
+        Debug.Log("Test Normal Log On Start.");
+        Debug.Log("Test Normal Log On Start.");
+        Debug.Log("Test Normal Log On Start.");
     }
 }

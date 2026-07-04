@@ -24,6 +24,7 @@ namespace DebugxLog.Console.Runtime
         private TextField _searchField;
 
         private Button _logButton, _warnButton, _errorButton;
+        private Button _netButton;
 
         private ScrollView _listScroll;
         private bool _stickToBottom = true; // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
@@ -101,9 +102,10 @@ namespace DebugxLog.Console.Runtime
             panel.Add(divider);
             panel.Add(detailPane);
 
-            // Member filter popup overlays the panel (added last = on top; hidden until the Members button opens it).
-            // 成员过滤弹层覆盖在面板上（最后添加 = 置顶；隐藏，直到 Members 按钮打开它）。
+            // Filter / source popups overlay the panel (hidden until their toolbar buttons open them).
+            // 过滤 / 源头弹层覆盖在面板上（隐藏，直到各自工具栏按钮打开）。
             panel.Add(BuildMemberPopup());
+            panel.Add(BuildSourcePopup());
 
             // Close (×) pinned to the panel's top-right corner, above everything.
             // 关闭（×）钉在面板右上角，置于所有内容之上。
@@ -159,6 +161,9 @@ namespace DebugxLog.Console.Runtime
             // Member (Debugx category) filter — opens a custom popup (BuildMemberPopup, added to the panel). 成员（Debugx 分类）过滤——打开自建弹层（BuildMemberPopup，挂在面板上）。
             bar.Add(BuildMemberButton());
 
+            // Runtime SOURCE switches (B8) — a separate popup; these change actual printing, not just the view. 运行时源头开关（B8）——独立弹层；改的是真实打印，非视图过滤。
+            bar.Add(BuildSourceButton());
+
             // No flex spacer here: with flexWrap the toolbar items simply flow left-to-right and wrap; a growing spacer
             // would shove the right-hand group onto its own line with a large gap. 不放弹性占位：换行布局下让条目自左向右排并换行；撑开占位会把右侧组挤到独立一行、留大空隙。
 
@@ -169,6 +174,11 @@ namespace DebugxLog.Console.Runtime
                 _showTimestamp = evt.newValue;
                 _listView.RefreshItems();
             }));
+
+            // Net-tag filter (B7): a compact cycle button All -> Server -> Client. netTag 过滤（B7）：紧凑的循环按钮 全部→Server→Client。
+            _netButton = new Button(CycleNetTag) { text = "Net: All" };
+            StyleToolbarButton(_netButton);
+            bar.Add(_netButton);
 
             _logButton = BuildCountButton(DebugxRuntimeConsoleStyle.LogColor, () =>
             {
@@ -486,16 +496,56 @@ namespace DebugxLog.Console.Runtime
             ForceRefresh();
         }
 
-        // Copy the selected entry's plain message + raw stack to the system clipboard (no-op when nothing is selected).
-        // 复制选中条目的纯文本消息 + 原始堆栈到系统剪贴板（未选中时不做事）。
+        // Copy to the system clipboard: the selected entry, or — when nothing is selected — ALL currently visible rows
+        // (A6.1 Copy / Copy All in one button). Each entry is plain message + raw stack. GUIUtility works at runtime.
+        // 复制到系统剪贴板：选中条目；未选中时复制当前全部可见行（A6.1 复制 / 复制全部合到一个按钮）。每条为纯文本消息 + 原始堆栈。
         private void CopySelected()
         {
-            if (_selectedIndex < 0 || _selectedIndex >= _rows.Count) return;
-            DebugxLogEntry e = _rows[_selectedIndex].Entry;
+            if (_selectedIndex >= 0 && _selectedIndex < _rows.Count)
+            {
+                GUIUtility.systemCopyBuffer = FormatEntryForCopy(_rows[_selectedIndex].Entry);
+                return;
+            }
+
+            if (_rows.Count == 0) return;
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(FormatEntryForCopy(_rows[i].Entry));
+            }
+            GUIUtility.systemCopyBuffer = sb.ToString();
+        }
+
+        private static string FormatEntryForCopy(DebugxLogEntry e)
+        {
             string text = e.PlainText ?? string.Empty;
             if (!string.IsNullOrEmpty(e.StackTrace))
                 text += "\n" + e.StackTrace;
-            GUIUtility.systemCopyBuffer = text;
+            return text;
+        }
+
+        private void CycleNetTag()
+        {
+            switch (_criteria.NetTagMode)
+            {
+                case NetTagFilterMode.All: _criteria.NetTagMode = NetTagFilterMode.Server; break;
+                case NetTagFilterMode.Server: _criteria.NetTagMode = NetTagFilterMode.Client; break;
+                default: _criteria.NetTagMode = NetTagFilterMode.All; break;
+            }
+            UpdateNetButtonText();
+            OnCriteriaChanged();
+        }
+
+        private void UpdateNetButtonText()
+        {
+            if (_netButton == null) return;
+            switch (_criteria.NetTagMode)
+            {
+                case NetTagFilterMode.Server: _netButton.text = "Net: S"; break;
+                case NetTagFilterMode.Client: _netButton.text = "Net: C"; break;
+                default: _netButton.text = "Net: All"; break;
+            }
         }
 
         // ---------- Helpers ----------
@@ -548,6 +598,30 @@ namespace DebugxLog.Console.Runtime
             el.style.borderBottomColor = color;
         }
 
+        // Place a popup's top-left just under its trigger button, clamped to the panel's right edge. Shared by the
+        // member-filter and runtime-source popups. worldBound and style.left share the panel coordinate space (UIToolkit
+        // points, already scaled), so the delta needs no DPI conversion.
+        // 把弹层左上角放到其触发按钮正下方，并对面板右边缘钳制。成员过滤与运行时源头两个弹层共用。worldBound 与 style.left
+        // 同属面板坐标系（UIToolkit 点，已缩放），差值无需 DPI 换算。
+        private void PositionPopupUnderButton(VisualElement popup, VisualElement button, float width)
+        {
+            if (popup == null || button == null || _panelRoot == null) return;
+
+            Rect btn = button.worldBound;
+            Rect panel = _panelRoot.worldBound;
+            if (float.IsNaN(btn.x) || float.IsNaN(panel.x) || panel.width <= 0f) return; // layout not resolved yet. 布局尚未解析。
+
+            float left = btn.x - panel.x;
+            float top = btn.yMax - panel.y;
+
+            float maxLeft = panel.width - width - 4f;
+            if (left > maxLeft) left = maxLeft;
+            if (left < 4f) left = 4f;
+
+            popup.style.left = left;
+            popup.style.top = top;
+        }
+
         private static void StyleToolbarButton(Button b)
         {
             b.style.marginLeft = 2;
@@ -587,21 +661,30 @@ namespace DebugxLog.Console.Runtime
             return group;
         }
 
-        // A red "×" close icon (used by the panel and the member popup), pinned by the caller to the top-right.
-        // 一个红色 “×” 关闭图标（面板与成员弹层共用），由调用方钉到右上角。
+        // A red "×" close icon (used by the panel and the popups). Shares StyleToolbarButton for matching margins/bg/font,
+        // then forces a SQUARE: horizontal padding is dropped and, once laid out, the width is set to the resolved height
+        // (so it matches the other buttons' natural height while being perfectly square).
+        // 一个红色 “×” 关闭图标（面板与弹层共用）。复用 StyleToolbarButton 以匹配外边距/底色/字体，再强制成正方形：去掉左右内边距，
+        // 并在布局完成后把宽度设为解析出的高度（既匹配其他按钮的自然高度，又是正方形）。
         private static Button BuildCloseButton(System.Action onClick)
         {
-            var b = new Button(onClick) { text = "×" }; // U+00D7 multiplication sign — present in default fonts. 乘号，默认字体都有。
-            b.style.color = new Color(1f, 0.42f, 0.38f);
-            b.style.backgroundColor = DebugxRuntimeConsoleStyle.ButtonBg;
+            var b = new Button(onClick) { text = "X" }; // U+00D7 multiplication sign — present in default fonts. 乘号，默认字体都有。
+            StyleToolbarButton(b);
+            b.style.color = new Color(1f, 0.42f, 0.38f); // red, overriding the toolbar text color. 红色，覆盖工具栏文字色。
             b.style.unityFontStyleAndWeight = FontStyle.Bold;
-            b.style.fontSize = 15;
-            b.style.paddingLeft = 6;
-            b.style.paddingRight = 6;
-            b.style.paddingTop = 0;
-            b.style.paddingBottom = 0;
-            b.style.marginLeft = 2;
-            b.style.marginRight = 2;
+            b.style.paddingLeft = 0;
+            b.style.paddingRight = 0;
+            b.style.unityTextAlign = TextAnchor.MiddleCenter;
+            b.RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                float h = b.resolvedStyle.height;
+                if (h > 0f && Mathf.Abs(b.resolvedStyle.width - h) > 0.5f)
+                {
+                    b.style.width = h;
+                    b.style.minWidth = h;
+                    b.style.maxWidth = h;
+                }
+            });
             return b;
         }
     }

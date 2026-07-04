@@ -89,6 +89,12 @@ namespace DebugxLog.Console
             HashSet<int> keys = _criteria.VisibleMemberKeys;
             if (keys != null && !keys.Contains(e.MemberKey)) return false;
 
+            switch (_criteria.NetTagMode)
+            {
+                case NetTagFilterMode.Server: if (e.NetTag != NetTag.Server) return false; break;
+                case NetTagFilterMode.Client: if (e.NetTag != NetTag.Client) return false; break;
+            }
+
             if (!_searchEmpty && !MatchesSearch(e)) return false;
 
             return true;
