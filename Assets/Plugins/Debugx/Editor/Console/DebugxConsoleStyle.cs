@@ -35,13 +35,24 @@ namespace DebugxLog.Console.Editor
 
         // ---- Toolbar item widths (English / Chinese) ----
         public static LangWidth ClearWidth = new LangWidth(40f, 34f);
+        /// <summary>Width of the Clear dropdown-arrow button (kept narrow so the caret tucks against the label). Clear 下拉箭头按钮的宽度（保持窄，让三角紧贴标签）。</summary>
+        public static readonly float ClearDropdownWidth = 16f;
+        /// <summary>Width (px) of the vertical divider line between Clear and its caret. Clear 与三角之间竖直分隔线的宽度（像素）。</summary>
+        public static readonly float ClearDividerWidth = 1f;
+        /// <summary>Height of that divider as a percent of the Clear button height (60 = 60% tall, 20% inset top &amp; bottom). 分隔线高度占 Clear 按钮高度的百分比（60 = 占 60% 高，上下各内缩 20%）。</summary>
+        public static readonly float ClearDividerHeightPercent = 60f;
+        /// <summary>Color of that divider line. Dark (e.g. black @0.5) reads as a hairline on both skins. 分隔线颜色。深色（如 黑@0.5）在深/浅皮肤上都呈细线。</summary>
+        public static Color ClearDividerColor = new Color(0f, 0f, 0f, 0.5f);
+        
+        /// <summary>Font size of the dropdown caret glyph ("▼") for Clear and Members. Clear 与 Members 下拉三角字形（“▼”）的字号。</summary>
+        public static readonly float CaretFontSize = 8f;
+        
         public static LangWidth CollapseWidth = new LangWidth(58f, 34f);
-        public static LangWidth ClearOnPlayWidth = new LangWidth(82f, 78f);
         public static LangWidth ErrorPauseWidth = new LangWidth(74f, 56f);
         public static LangWidth RuntimeWidth = new LangWidth(56f, 44f);
         public static LangWidth DebugxOnlyWidth = new LangWidth(80f, 64f);
-        public static LangWidth MembersWidth = new LangWidth(70f, 42f);
-        public static LangWidth LangButtonWidth = new LangWidth(24f, 24f);
+        public static LangWidth MembersWidth = new LangWidth(76f, 48f);
+        public static LangWidth LangButtonWidth = new LangWidth(28f, 28f);
         public static LangWidth CountWidth = new LangWidth(34f, 34f);
         /// <summary>Search field preferred (flex-basis) width. 搜索栏首选（flex-basis）宽度。</summary>
         public static readonly float SearchWidth = 160f;

@@ -120,6 +120,28 @@ namespace DebugxLog.Console
             }
         }
 
+        /// <summary>
+        /// Inject an externally-sourced, non-Debugx entry (e.g. compiler / asset-import messages mirrored from the
+        /// editor console, which never arrive via the log channels) into the same pipeline, so it is buffered,
+        /// filtered, collapsed and displayed like any other entry. Delivered on the next <see cref="Pump"/>. Intended
+        /// for main-thread editor use but thread-safe via the same backpressure-bounded queue.
+        /// 注入一条外部来源、非 Debugx 的条目（如从编辑器控制台镜像来的编译器/资源导入消息，它们从不经日志通道到达）进入
+        /// 同一管线，使其与其它条目一样被缓冲/过滤/折叠/显示。于下次 <see cref="Pump"/> 交付。面向主线程的编辑器用途，
+        /// 但经同一条背压受限队列而线程安全。
+        /// </summary>
+        public void InjectExternal(LogType type, string message, string stackTrace,
+            LogEntryCategory category = LogEntryCategory.Uncategorized, int memberKey = DebugxLogEntry.UncategorizedKey)
+        {
+            string msg = message ?? string.Empty;
+            string plain = ConsoleTextUtil.StripRichText(msg);
+            var entry = new DebugxLogEntry(
+                type, msg, plain, stackTrace ?? string.Empty,
+                memberKey, null, null, null, false,
+                NetTag.None, false, category,
+                DateTime.Now, _cachedFrame, NextSequence());
+            EnqueueIncoming(entry);
+        }
+
         // Channel A: Debugx structured event. Just stash the metadata for the immediately-following channel B.
         // 通道 A：Debugx 结构化事件。仅暂存元数据，交给紧随其后的通道 B。
         private void OnRawLog(DebugxRawLog raw)

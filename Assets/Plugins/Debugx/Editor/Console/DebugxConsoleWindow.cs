@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -39,7 +40,10 @@ namespace DebugxLog.Console.Editor
         private Toolbar _toolbar;
         private VisualElement _searchContainer; // flexible middle region that keeps the right group right-aligned. 弹性中部，使右侧分组保持靠右。
         private ToolbarButton _clearButton;
-        private ToolbarToggle _collapseToggle, _onlyDebugxToggle, _clearOnPlayToggle, _errorPauseToggle;
+        private VisualElement _clearDivider; // absolute-positioned line inside Clear's right edge (custom height %). 置于 Clear 右边缘的绝对定位竖线（可自定义高度占比）。
+        private ToolbarButton _clearDropdownButton;
+        private Label _memberNameLabel, _memberCaretLabel; // Members button split into text + independently-sized caret. Members 按钮拆成文字 + 可独立调大小的三角。
+        private ToolbarToggle _collapseToggle, _onlyDebugxToggle, _errorPauseToggle;
         private ToolbarSearchField _searchField;
         private ToolbarButton _langButton;
 
@@ -53,7 +57,9 @@ namespace DebugxLog.Console.Editor
         private Label _logCount, _warnCount, _errorCount;
 
         private int _selectedIndex = -1;
-        private bool _clearOnPlay;
+        private bool _clearOnPlay = true;
+        private bool _clearOnRecompile = true;
+        private bool _clearOnBuild = true;
         private bool _errorPause;
         private bool _chineseUi; // false = English (default). UI language, independent of system language. 默认英文，独立于系统语言。
 
@@ -71,7 +77,9 @@ namespace DebugxLog.Console.Editor
 
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
+            CompilationPipeline.compilationStarted += OnCompilationStarted;
             DebugxProjectSettingsAsset.OnApplyTo.Bind(OnSettingsApplied);
+            EnableCompileMirror();
         }
 
         private void OnDisable()
@@ -83,7 +91,9 @@ namespace DebugxLog.Console.Editor
             }
             EditorApplication.update -= OnEditorUpdate;
             EditorApplication.playModeStateChanged -= OnPlayModeChanged;
+            CompilationPipeline.compilationStarted -= OnCompilationStarted;
             DebugxProjectSettingsAsset.OnApplyTo.Unbind(OnSettingsApplied);
+            DisableCompileMirror();
             SavePrefs();
         }
 
@@ -120,7 +130,17 @@ namespace DebugxLog.Console.Editor
             toolbar.RegisterCallback<GeometryChangedEvent>(_ => UpdateResponsive());
 
             _clearButton = new ToolbarButton(OnClearClicked);
+            // Divider line lives inside the Clear button (right edge) so its % height resolves against a real,
+            // sized parent; styled in StyleClearSplit. 分隔线作为 Clear 按钮的子元素置于右边缘，其百分比高度可对
+            // 一个有确定尺寸的父级解析；样式见 StyleClearSplit。
+            _clearDivider = new VisualElement { pickingMode = PickingMode.Ignore };
+            _clearButton.Add(_clearDivider);
             toolbar.Add(_clearButton);
+
+            // Native-style: a dropdown arrow next to Clear with the "Clear on ..." options.
+            // 原生风格：Clear 旁的下拉三角，内含“清空时机”选项。
+            _clearDropdownButton = new ToolbarButton(ShowClearMenu) { text = "▼" };
+            toolbar.Add(_clearDropdownButton);
 
             _collapseToggle = MakeToggle(string.Empty, CollapseFromPrefs(), evt =>
             {
@@ -129,13 +149,6 @@ namespace DebugxLog.Console.Editor
                 ForceRefresh();
             });
             toolbar.Add(_collapseToggle);
-
-            _clearOnPlayToggle = MakeToggle(string.Empty, _clearOnPlay, evt =>
-            {
-                _clearOnPlay = evt.newValue;
-                SavePrefs();
-            });
-            toolbar.Add(_clearOnPlayToggle);
 
             _errorPauseToggle = MakeToggle(string.Empty, _errorPause, evt =>
             {
@@ -180,6 +193,12 @@ namespace DebugxLog.Console.Editor
             toolbar.Add(_onlyDebugxToggle);
 
             _memberButton = new ToolbarButton(ShowMemberMenu);
+            // Text + caret as separate children so the caret can be sized independently (a small native-style triangle).
+            // 文字与三角拆成两个子元素，让三角可独立设定大小（接近原生的小三角）。
+            _memberNameLabel = new Label { pickingMode = PickingMode.Ignore };
+            _memberCaretLabel = new Label("▼") { pickingMode = PickingMode.Ignore };
+            _memberButton.Add(_memberNameLabel);
+            _memberButton.Add(_memberCaretLabel);
             toolbar.Add(_memberButton);
 
             _logButton = MakeCountButton(_iconLog, out _logCount, () =>
@@ -381,7 +400,8 @@ namespace DebugxLog.Console.Editor
         private void OnEditorUpdate()
         {
             if (_store == null) return;
-            _store.Pump();
+            PumpCompileMirror();           // may inject compiler/import entries into the collector queue. 可能向采集队列注入编译器/导入条目。
+            _store.Pump();                 // drains them (and live-channel entries) into the buffer. 将它们（及 live 通道条目）排空进缓冲。
             if (_listView == null) return; // UI not built yet (OnEnable runs before CreateGUI). UI 尚未构建。
             if (_store.TryRebuildView())
                 RefreshView();
@@ -449,11 +469,11 @@ namespace DebugxLog.Console.Editor
         private void ApplyLanguage()
         {
             _clearButton.text = L("清空", "Clear");
+            _clearDropdownButton.tooltip = L("清空时机选项", "Clear-on options");
             _collapseToggle.text = L("折叠", "Collapse");
-            _clearOnPlayToggle.text = L("进入Play清空", "Clear on Play");
             _errorPauseToggle.text = L("错误暂停", "Error Pause");
             _onlyDebugxToggle.text = L("仅Debugx", "Debugx Only");
-            _memberButton.text = L("成员 ▾", "Members ▾");
+            _memberNameLabel.text = L("成员", "Members");
             _runtimeToggle.text = L("运行时", "Runtime");
             // Show the CURRENT language, not the target one.
             // 显示当前语言，而非切换目标语言。
@@ -475,8 +495,8 @@ namespace DebugxLog.Console.Editor
         private void ApplyToolbarLayout()
         {
             float clear = Wc(DebugxConsoleStyle.ClearWidth);
+            float clearDropdown = DebugxConsoleStyle.ClearDropdownWidth;
             float collapse = Wc(DebugxConsoleStyle.CollapseWidth);
-            float clearOnPlay = Wc(DebugxConsoleStyle.ClearOnPlayWidth);
             float errorPause = Wc(DebugxConsoleStyle.ErrorPauseWidth);
             float runtime = Wc(DebugxConsoleStyle.RuntimeWidth);
             float debugxOnly = Wc(DebugxConsoleStyle.DebugxOnlyWidth);
@@ -484,13 +504,14 @@ namespace DebugxLog.Console.Editor
             float lang = Wc(DebugxConsoleStyle.LangButtonWidth);
             float countMin = Wc(DebugxConsoleStyle.CountWidth);
 
-            StyleItem(_clearButton, clear);
+            // Clear + divider + dropdown arrow styled together to match the native Clear dropdown.
+            // Clear + 分隔线 + 下拉三角一起做成与原生 Clear 下拉一致的外观。
+            StyleClearSplit(_clearButton, _clearDivider, _clearDropdownButton, clear, clearDropdown);
             StyleItem(_collapseToggle, collapse);
-            StyleItem(_clearOnPlayToggle, clearOnPlay);
             StyleItem(_errorPauseToggle, errorPause);
             StyleItem(_runtimeToggle, runtime);
             StyleItem(_onlyDebugxToggle, debugxOnly);
-            StyleItem(_memberButton, members);
+            StyleMemberDropdown(_memberButton, _memberNameLabel, _memberCaretLabel, members);
             StyleItem(_langButton, lang);
 
             // Count buttons: width grows with the number, but never below CountWidth.
@@ -507,10 +528,10 @@ namespace DebugxLog.Console.Editor
             _searchField.style.minWidth = DebugxConsoleStyle.SearchMinWidth;
             _searchField.style.marginRight = DebugxConsoleStyle.SearchRightSpace;
 
-            _wBase = clear + collapse + countMin * 3f + lang;
+            _wBase = clear + clearDropdown + collapse + countMin * 3f + lang;
             _wSearch = DebugxConsoleStyle.SearchMinWidth + DebugxConsoleStyle.SearchRightSpace;
             _wFilters = debugxOnly + members;
-            _wRuntimeGroup = runtime + errorPause + clearOnPlay;
+            _wRuntimeGroup = runtime + errorPause;
 
             UpdateResponsive();
         }
@@ -562,9 +583,83 @@ namespace DebugxLog.Console.Editor
             });
         }
 
+        // Style the Clear button + hairline divider + dropdown caret to read like the native console's Clear
+        // dropdown: "Clear" and a "▼" caret each centered in their own zone, separated by a dark vertical
+        // hairline. Behaviour is unchanged (main = clear, caret = menu).
+        // 将 Clear 按钮 + 细分隔线 + 下拉三角做成原生 Console 的 Clear 下拉外观：“Clear” 与 “▼” 各自在自己
+        // 的区域内居中，中间用一条深色竖直细线分隔。行为不变（主体=清空，三角=菜单）。
+        private static void StyleClearSplit(ToolbarButton main, VisualElement divider, ToolbarButton arrow, float mainWidth, float arrowWidth)
+        {
+            if (main != null)
+            {
+                StyleItem(main, mainWidth);
+                main.style.marginRight = 0;
+                main.style.borderRightWidth = 0; // no full-height border; the divider child draws a custom-height line. 不用满高边框，改由 divider 子元素画可调高度的线。
+                main.style.paddingRight = 0;      // so the divider sits exactly on the right edge (boundary with the caret). 使分隔线正好落在右边缘（与三角的交界）。
+            }
+
+            if (divider != null)
+            {
+                // Absolute child pinned to the right edge; top/bottom percent insets set its height proportion.
+                // 绝对定位、贴右边缘；上下百分比内缩决定其高度占比。
+                float inset = (100f - DebugxConsoleStyle.ClearDividerHeightPercent) / 2f;
+                divider.style.position = Position.Absolute;
+                divider.style.right = 0;
+                divider.style.top = Length.Percent(inset);
+                divider.style.bottom = Length.Percent(inset);
+                divider.style.width = DebugxConsoleStyle.ClearDividerWidth;
+                divider.style.backgroundColor = DebugxConsoleStyle.ClearDividerColor;
+            }
+
+            if (arrow != null)
+            {
+                StyleItem(arrow, arrowWidth);
+                arrow.style.marginLeft = 0;
+                arrow.style.borderLeftWidth = 0;
+                arrow.style.fontSize = DebugxConsoleStyle.CaretFontSize;
+            }
+        }
+
+        // Style the Members dropdown: a name label + an independently-sized caret ("▼"), centered as one group.
+        // The caret shares CaretFontSize with the Clear caret so both triangles match in size.
+        // 设置 Members 下拉：文字标签 + 可独立设定大小的三角（“▼”），作为一个整体居中。三角与 Clear 的三角
+        // 共用 CaretFontSize，使两个三角大小一致。
+        private static void StyleMemberDropdown(ToolbarButton button, Label name, Label caret, float width)
+        {
+            if (button != null)
+            {
+                button.style.width = width;
+                button.style.minWidth = width;
+                button.style.maxWidth = width;
+                button.style.flexShrink = 0;
+                button.style.flexGrow = 0;
+                button.style.paddingLeft = DebugxConsoleStyle.ItemPadding;
+                button.style.paddingRight = DebugxConsoleStyle.ItemPadding;
+                button.style.flexDirection = FlexDirection.Row;
+                button.style.alignItems = Align.Center;
+                button.style.justifyContent = Justify.Center;
+            }
+
+            if (name != null)
+            {
+                name.style.flexGrow = 0;
+                name.style.flexShrink = 0;
+                name.style.unityTextAlign = TextAnchor.MiddleCenter;
+            }
+
+            if (caret != null)
+            {
+                caret.style.flexGrow = 0;
+                caret.style.flexShrink = 0;
+                caret.style.marginLeft = 3;
+                caret.style.fontSize = DebugxConsoleStyle.CaretFontSize;
+                caret.style.unityTextAlign = TextAnchor.MiddleCenter;
+            }
+        }
+
         // Progressively hide optional groups when the toolbar is too narrow:
-        // search -> (Debugx Only + Members) -> (Runtime + Error Pause + Clear on Play).
-        // 工具栏过窄时依次隐藏可选分组：搜索栏 -> (仅Debugx + 成员) -> (运行时 + 错误暂停 + 进入Play清空)。
+        // search -> (Debugx Only + Members) -> (Runtime + Error Pause).
+        // 工具栏过窄时依次隐藏可选分组：搜索栏 -> (仅Debugx + 成员) -> (运行时 + 错误暂停)。
         private void UpdateResponsive()
         {
             if (_toolbar == null) return;
@@ -590,7 +685,6 @@ namespace DebugxLog.Console.Editor
             SetVisible(_memberButton, showFilters);
             SetVisible(_runtimeToggle, showRuntime);
             SetVisible(_errorPauseToggle, showRuntime);
-            SetVisible(_clearOnPlayToggle, showRuntime);
         }
 
         private static void SetVisible(VisualElement el, bool visible)
@@ -608,13 +702,19 @@ namespace DebugxLog.Console.Editor
 
         // ---------- Events ----------
 
-        private void OnClearClicked()
+        private void OnClearClicked() => ClearConsole();
+
+        // Clear the buffer + selection + detail, then refresh. Safe to call from Clear / play-mode / recompile / build.
+        // 清空缓冲 + 选中 + 详情并刷新。可安全用于 清空 / 进入Play / 重编译 / 构建。
+        internal void ClearConsole()
         {
+            if (_store == null) return;
             _store.Clear();
+            ResetCompileMirrorDedup(); // so a later scan can re-mirror compile messages still in the console. 便于之后重扫再镜像仍在控制台里的编译消息。
             _selectedIndex = -1;
-            _listView.ClearSelection();
-            UpdateDetail(null);
-            ForceRefresh();
+            _listView?.ClearSelection();
+            if (_stackContainer != null) UpdateDetail(null);
+            if (_listView != null) ForceRefresh();
         }
 
         private void OnSelectionChanged(IEnumerable<object> _)
@@ -645,16 +745,23 @@ namespace DebugxLog.Console.Editor
         private void OnPlayModeChanged(PlayModeStateChange state)
         {
             if (state == PlayModeStateChange.EnteredPlayMode && _clearOnPlay)
-            {
-                _store.Clear();
-                _selectedIndex = -1;
-                UpdateDetail(null);
-                ForceRefresh();
-            }
+                ClearConsole();
 
             // Runtime source switches are only usable in Play mode; refresh their enabled state.
             // 运行时源头开关仅在 Play 模式可用；刷新其可用状态。
             if (_runtimeVisible) RefreshRuntimePanel();
+        }
+
+        private void OnCompilationStarted(object context)
+        {
+            if (_clearOnRecompile) ClearConsole();
+        }
+
+        // Called by the build pre-process hook (see DebugxConsoleBuildClearer).
+        // 由构建预处理钩子调用（见 DebugxConsoleBuildClearer）。
+        internal void ClearForBuildIfEnabled()
+        {
+            if (_clearOnBuild) ClearConsole();
         }
 
         // ---------- Helpers ----------
@@ -709,7 +816,9 @@ namespace DebugxLog.Console.Editor
             _criteria.ShowWarning = EditorPrefs.GetBool(PrefPrefix + "ShowWarning", true);
             _criteria.ShowError = EditorPrefs.GetBool(PrefPrefix + "ShowError", true);
             _criteria.OnlyDebugx = EditorPrefs.GetBool(PrefPrefix + "OnlyDebugx", false);
-            _clearOnPlay = EditorPrefs.GetBool(PrefPrefix + "ClearOnPlay", false);
+            _clearOnPlay = EditorPrefs.GetBool(PrefPrefix + "ClearOnPlay", true);
+            _clearOnRecompile = EditorPrefs.GetBool(PrefPrefix + "ClearOnRecompile", true);
+            _clearOnBuild = EditorPrefs.GetBool(PrefPrefix + "ClearOnBuild", true);
             _errorPause = EditorPrefs.GetBool(PrefPrefix + "ErrorPause", false);
             _chineseUi = EditorPrefs.GetBool(PrefPrefix + "LangChinese", false); // default English. 默认英文。
             _store.CollapseMode = CollapseFromPrefs() ? LogCollapser.Mode.ByMessage : LogCollapser.Mode.Off;
@@ -722,6 +831,8 @@ namespace DebugxLog.Console.Editor
             EditorPrefs.SetBool(PrefPrefix + "ShowError", _criteria.ShowError);
             EditorPrefs.SetBool(PrefPrefix + "OnlyDebugx", _criteria.OnlyDebugx);
             EditorPrefs.SetBool(PrefPrefix + "ClearOnPlay", _clearOnPlay);
+            EditorPrefs.SetBool(PrefPrefix + "ClearOnRecompile", _clearOnRecompile);
+            EditorPrefs.SetBool(PrefPrefix + "ClearOnBuild", _clearOnBuild);
             EditorPrefs.SetBool(PrefPrefix + "ErrorPause", _errorPause);
             EditorPrefs.SetBool(PrefPrefix + "LangChinese", _chineseUi);
             if (_store != null)

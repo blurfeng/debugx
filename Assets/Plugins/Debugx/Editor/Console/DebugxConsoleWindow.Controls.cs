@@ -80,6 +80,20 @@ namespace DebugxLog.Console.Editor
             return set;
         }
 
+        // ---------- Clear dropdown (native-style Clear-on options) ----------
+
+        private void ShowClearMenu()
+        {
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent(L("进入 Play 时清空", "Clear on Play")), _clearOnPlay,
+                () => { _clearOnPlay = !_clearOnPlay; SavePrefs(); });
+            menu.AddItem(new GUIContent(L("重编译时清空", "Clear on Recompile")), _clearOnRecompile,
+                () => { _clearOnRecompile = !_clearOnRecompile; SavePrefs(); });
+            menu.AddItem(new GUIContent(L("构建时清空", "Clear on Build")), _clearOnBuild,
+                () => { _clearOnBuild = !_clearOnBuild; SavePrefs(); });
+            menu.ShowAsContext();
+        }
+
         // ---------- Runtime source switches + Test (absorbed from the old DebugxConsole) ----------
 
         private VisualElement BuildRuntimePanel()
