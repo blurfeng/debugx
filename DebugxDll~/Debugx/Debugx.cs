@@ -96,6 +96,7 @@
 // 3.LogCreator 调整为锁内拼串、锁外派发事件并在 unityLogger.Log 之前触发，保证「事件→同线程紧邻的 logMessageReceived 回调」顺序；网络标签只求值一次。
 // 4.退役旧的屏幕 IMGUI 日志覆盖层（LogOutput.DrawGUI），由运行时 UIToolkit 版 Debugx Console 取代；LogOutput 移除整段 Draw Logs（含 message 路径里的 HandleDrawLogs 调用）。
 // 5.移除项目设置 drawLogToScreen / restrictDrawLogCount / maxDrawLogs 三字段（Unity 侧同步移除镜像/设置UI/Prefs/序列化键）。
+// 6.审查修复：LogCreator 日志文本内嵌时间戳与 OnRawLog.Timestamp 改为单次取值，避免跨秒边界不一致；运行时成员开关表 _memberEnables 的所有读写（OnAwake/ResetToDefault/SetMemberEnable/MemberIsEnable）加锁，防止后台线程产生日志读表时与主线程改开关并发访问 Dictionary。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -132,6 +133,12 @@ namespace DebugxLog
         private static readonly object _logSbLocker = new object();
 
         private static readonly Dictionary<int, bool> _memberEnables = new Dictionary<int, bool>();
+        // Guards _memberEnables: logs can be produced (and MemberIsEnable read) on background threads while the main
+        // thread mutates the map via OnAwake / SetMemberEnable / ResetToDefault. Dictionary is not thread-safe, so a
+        // concurrent read during a resize/clear could throw or read a torn value.
+        // 保护 _memberEnables：后台线程可能在产生日志（读 MemberIsEnable）的同时，主线程经 OnAwake / SetMemberEnable /
+        // ResetToDefault 修改此表。Dictionary 非线程安全，并发读遇到扩容/清空可能抛异常或读到撕裂值。
+        private static readonly object _memberEnablesLocker = new object();
 
         /// <summary>
         /// Master switch for logging.
@@ -201,12 +208,15 @@ namespace DebugxLog
 
             if (Settings != null && Settings.members != null)
             {
-                foreach (var info in Settings.members)
+                lock (_memberEnablesLocker)
                 {
-                    if (info == null) continue;
+                    foreach (var info in Settings.members)
+                    {
+                        if (info == null) continue;
 
-                    // 配置数据异常出现重复 key 时，后值覆盖前值，避免抛出重复 key 异常。
-                    _memberEnables[info.key] = info.enableDefault;
+                        // 配置数据异常出现重复 key 时，后值覆盖前值，避免抛出重复 key 异常。
+                        _memberEnables[info.key] = info.enableDefault;
+                    }
                 }
             }
         }
@@ -234,7 +244,10 @@ namespace DebugxLog
                 logThisKeyMemberOnly = Settings.logThisKeyMemberOnlyDefault;
             }
 
-            _memberEnables.Clear();
+            lock (_memberEnablesLocker)
+            {
+                _memberEnables.Clear();
+            }
         }
 
         /// <summary>
@@ -248,19 +261,28 @@ namespace DebugxLog
         {
             // _memberEnables 仅在 OnAwake（游戏运行时）填充。未初始化时给出告警而非静默失败。
             // _memberEnables is populated only in OnAwake (at runtime). Warn instead of failing silently when uninitialized.
-            if (_memberEnables.Count == 0)
+            bool uninitialized;
+            bool missingKey = false;
+            lock (_memberEnablesLocker)
             {
+                uninitialized = _memberEnables.Count == 0;
+                if (!uninitialized)
+                {
+                    if (_memberEnables.ContainsKey(key))
+                    {
+                        _memberEnables[key] = enable;
+                        return;
+                    }
+                    missingKey = true;
+                }
+            }
+
+            // Report outside the lock (logging must not run while holding the member lock).
+            // 在锁外告警（持有成员锁时不应再走日志路径）。
+            if (uninitialized)
                 LogAdmWarning("Debugx.SetMemberEnable: 运行时成员开关尚未初始化，设置被忽略。请在游戏运行时（OnAwake 之后）调用。 Member switches are not initialized yet; call at runtime after OnAwake.");
-                return;
-            }
-
-            if (!_memberEnables.ContainsKey(key))
-            {
+            else if (missingKey)
                 Debugx.LogAdmWarning($"Debugx.SetMemberEnable: cant find memberInfo by key:{key}. 无法找到Key为{key}的成员信息。");
-                return;
-            }
-
-            _memberEnables[key] = enable;
         }
 
         /// <summary>
@@ -271,10 +293,13 @@ namespace DebugxLog
         /// <returns>True if enabled, otherwise false. 是否启用。</returns>
         public static bool MemberIsEnable(int key)
         {
-            if (_memberEnables != null && _memberEnables.Count > 0)
+            lock (_memberEnablesLocker)
             {
-                if (!_memberEnables.TryGetValue(key, out var enable)) return false;
-                return enable;
+                if (_memberEnables.Count > 0)
+                {
+                    if (!_memberEnables.TryGetValue(key, out var enable)) return false;
+                    return enable;
+                }
             }
 
             if (Settings != null && Settings.members != null && Settings.members.Length > 0)
@@ -595,6 +620,11 @@ namespace DebugxLog
             bool hasNetTag = showNetTag && _serverCheckDelegate != null;
             bool isServer = hasNetTag && _serverCheckDelegate.Invoke();
 
+            // Capture the wall clock ONCE, shared by the embedded "[HH:mm:ss]" string and the structured event's
+            // Timestamp, so the displayed text and the event can never disagree across a second boundary.
+            // 只取一次墙钟时间，供内嵌 "[HH:mm:ss]" 串与结构化事件的 Timestamp 共用，使显示文本与事件不会在秒边界处不一致。
+            DateTime now = DateTime.Now;
+
             string finalText;
             lock (_logSbLocker)
             {
@@ -607,7 +637,7 @@ namespace DebugxLog
 
                     if (showTime)
                     {
-                        _logSb.Append($" [{DateTime.Now:HH:mm:ss}] ");
+                        _logSb.Append($" [{now:HH:mm:ss}] ");
                     }
 
                     if (info != null)
@@ -641,7 +671,7 @@ namespace DebugxLog
             // 先派发结构化事件（在锁外，避免订阅者回调再打日志导致 _logSb 被重入破坏），再发 Unity 日志。
             // 由此保证「事件 → 同线程紧邻的 logMessageReceived 回调」顺序，支撑 Console 的线程内 FIFO 去重配对。
             if (OnRawLog != null)
-                DispatchRawLog(type, info, message, finalText, showTime, hasNetTag, isServer);
+                DispatchRawLog(type, info, message, finalText, showTime, hasNetTag, isServer, now);
 
             UnityEngine.Debug.unityLogger.Log(type, finalText);
         }
@@ -654,7 +684,7 @@ namespace DebugxLog
         /// 订阅者异常被隔离，避免单个坏订阅者破坏日志管线或其它订阅者。
         /// </summary>
         private static void DispatchRawLog(LogType type, DebugxMemberInfo info, object message, string finalText,
-            bool showTime, bool netTagShown, bool isServer)
+            bool showTime, bool netTagShown, bool isServer, DateTime timestamp)
         {
             // Local snapshot to avoid the race between the null check and the invocation if unsubscribed in between.
             // 本地快照，规避判空与调用之间被取消订阅置空的竞态。
@@ -689,7 +719,7 @@ namespace DebugxLog
 
             DebugxRawLog rawLog = new DebugxRawLog(
                 key, signature, colorHex, header, logSignatureShown, category,
-                type, message, finalText, netTagShown, showTime, isServer, DateTime.Now);
+                type, message, finalText, netTagShown, showTime, isServer, timestamp);
 
             try
             {

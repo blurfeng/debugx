@@ -25,10 +25,18 @@ namespace DebugxLog.Console.Runtime
         // 用户显式取消勾选（隐藏）的 key。跨弹层重建保留，故重开时状态不丢。
         private readonly HashSet<int> _uncheckedMemberKeys = new HashSet<int>();
 
-        // Distinct-member count last applied to the criteria; used to re-apply the include set when a brand-new member
-        // appears while a partial filter is active (keeps newly-seen members visible instead of silently hidden).
-        // 上次应用到过滤条件时的去重成员数；用于在启用部分过滤时若出现全新成员则重算 include 集（让新成员保持可见而非被静默隐藏）。
-        private int _lastMemberUniverseCount = -1;
+        // Member-key universe last applied to the criteria. Drift is detected by MEMBERSHIP (a key present now that
+        // was not applied before), not by cardinality — an evicted-old + arrived-new pair leaves the distinct count
+        // unchanged yet still needs re-applying, or the new member would be silently hidden.
+        // 上次应用到过滤条件时的成员 key 全集。漂移按“成员是否新增”判定（现在存在某个此前未应用过的 key），而非按基数——
+        // 旧成员被淘汰 + 新成员到达会让去重计数不变，但仍需重算，否则新成员会被静默隐藏。
+        private readonly HashSet<int> _lastMemberUniverse = new HashSet<int>();
+
+        // True only after an explicit "None": newly-seen members must then stay hidden too (the user asked to hide
+        // everything), unlike an incidental partial filter where new members stay visible. Cleared by All / any single toggle.
+        // 仅在显式点击 None 后为 true：此后新出现的成员也应保持隐藏（用户要求隐藏全部），有别于“部分过滤”时新成员保持可见。
+        // All / 任一单项切换会清除此标志。
+        private bool _allExplicitlyOff;
         private bool _memberPopupOpen;
 
         private const float MemberPopupWidth = 230f;
@@ -182,6 +190,9 @@ namespace DebugxLog.Console.Runtime
 
         private void OnMemberToggle(int key, bool isChecked)
         {
+            // A single toggle turns the filter into a custom/partial one; it is no longer an explicit "None".
+            // 单项切换使过滤变为自定义/部分过滤，不再是显式 None。
+            _allExplicitlyOff = false;
             if (isChecked) _uncheckedMemberKeys.Remove(key);
             else _uncheckedMemberKeys.Add(key);
             RecomputeMemberInclude();
@@ -191,6 +202,7 @@ namespace DebugxLog.Console.Runtime
         private void SetAllMembers(bool check)
         {
             _uncheckedMemberKeys.Clear();
+            _allExplicitlyOff = !check; // None => remember the "hide everything" intent; All => clear it. None 记住“隐藏全部”意图；All 清除。
             if (!check)
             {
                 foreach (KeyValuePair<int, Toggle> kv in _memberToggles)
@@ -204,11 +216,20 @@ namespace DebugxLog.Console.Runtime
             OnCriteriaChanged();
         }
 
+        // Snapshot the current member-key universe (the keys present in the buffer) so drift can be detected by
+        // membership on the next refresh. 快照当前成员 key 全集（缓冲里存在的 key），供下次刷新按成员判定漂移。
+        private void RefreshMemberUniverse()
+        {
+            _lastMemberUniverse.Clear();
+            foreach (KeyValuePair<int, int> kv in _store.Statistics.MemberCounts)
+                _lastMemberUniverse.Add(kv.Key);
+        }
+
         // Set criteria.VisibleMemberKeys: null when nothing is unchecked (all visible), else the seen keys minus unchecked.
         // 设置 criteria.VisibleMemberKeys：无取消勾选时为 null（全部可见），否则为 已见 key 减去 取消勾选 的集合。
         private void RecomputeMemberInclude()
         {
-            _lastMemberUniverseCount = _store.Statistics.MemberCounts.Count;
+            RefreshMemberUniverse();
 
             if (_uncheckedMemberKeys.Count == 0)
             {
@@ -232,7 +253,29 @@ namespace DebugxLog.Console.Runtime
         private void ReapplyMemberFilterOnDrift()
         {
             if (_uncheckedMemberKeys.Count == 0) return;
-            if (_store.Statistics.MemberCounts.Count == _lastMemberUniverseCount) return;
+
+            // Drift = a member key is present now that was NOT in the universe last applied. Compare by membership,
+            // not cardinality, so an evicted-old + arrived-new pair (distinct count unchanged) is still handled.
+            // 漂移 = 现在存在某个上次应用时不在全集里的成员 key。按成员而非基数比较，故“旧成员淘汰 + 新成员到达”
+            //（去重计数不变）也能被处理。
+            bool drift = false;
+            foreach (KeyValuePair<int, int> kv in _store.Statistics.MemberCounts)
+            {
+                if (!_lastMemberUniverse.Contains(kv.Key)) { drift = true; break; }
+            }
+            if (!drift) return;
+
+            // After an explicit "None", fold newly-seen members into the unchecked set so they stay hidden (and their
+            // toggle renders unchecked on reopen). Under a partial filter this block is skipped, keeping new members visible.
+            // 显式 None 之后，把新出现的成员并入取消勾选集，使其保持隐藏（重开弹层时其开关也显示为未勾选）。
+            // 部分过滤时跳过此段，从而让新成员保持可见。
+            if (_allExplicitlyOff)
+            {
+                foreach (KeyValuePair<int, int> kv in _store.Statistics.MemberCounts)
+                    if (!_uncheckedMemberKeys.Contains(kv.Key))
+                        _uncheckedMemberKeys.Add(kv.Key);
+            }
+
             RecomputeMemberInclude();
             _store.SetFilterCriteria(_criteria);
         }

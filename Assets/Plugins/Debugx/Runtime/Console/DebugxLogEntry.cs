@@ -41,10 +41,11 @@ namespace DebugxLog.Console
     /// Produced by the collector from either a Debugx structured event or a non-Debugx Unity log, and consumed by
     /// buffering / collapsing / filtering / searching / statistics / display. Lives in the shared model layer and does
     /// NOT depend on UnityEditor, so both the Editor Console and the runtime Console reuse it unchanged.
-    /// Reference type (mostly immutable; only <see cref="CollapseCount"/> is mutable, written by the collapser).
+    /// Reference type, fully immutable; the collapse count is carried on <see cref="CollapsedRow"/>, never written
+    /// back onto the shared entry.
     /// Debugx Console 的唯一原子数据单元：一条捕获到的、带完整成员上下文的日志。由采集器从 Debugx 结构化事件或非 Debugx 的
     /// Unity 日志产出，供 缓冲 / 折叠 / 过滤 / 搜索 / 统计 / 显示 消费。位于共享模型层，不依赖 UnityEditor，
-    /// 故 Editor 版与运行时版 Console 原样复用。引用类型（基本不可变；仅 <see cref="CollapseCount"/> 可变，由折叠器写入）。
+    /// 故 Editor 版与运行时版 Console 原样复用。引用类型，完全不可变；折叠计数由 <see cref="CollapsedRow"/> 承载，绝不写回共享条目。
     /// </summary>
     public sealed class DebugxLogEntry
     {

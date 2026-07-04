@@ -273,7 +273,7 @@
             此功能依赖项目侧实现，需要通过 SetServerCheck 方法设置。
             </param>
         </member>
-        <member name="M:DebugxLog.Debugx.DispatchRawLog(UnityEngine.LogType,DebugxLog.DebugxMemberInfo,System.Object,System.String,System.Boolean,System.Boolean,System.Boolean)">
+        <member name="M:DebugxLog.Debugx.DispatchRawLog(UnityEngine.LogType,DebugxLog.DebugxMemberInfo,System.Object,System.String,System.Boolean,System.Boolean,System.Boolean,System.DateTime)">
             <summary>
             Build and dispatch the structured raw log to <see cref="E:DebugxLog.Debugx.OnRawLog"/> subscribers. The payload struct is not
             even constructed when there is no subscriber. Subscriber exceptions are isolated so one bad subscriber

@@ -430,6 +430,13 @@ namespace DebugxLog.Console.Runtime
 
         private void RefreshView()
         {
+            // Remember the selected entry by its stable id BEFORE the row list is rebuilt: eviction shifts positional
+            // indices, so a plain _selectedIndex would then point at a different entry. 重建行列表前按稳定 id 记住选中条目：
+            // 淘汰会让位置索引偏移，仅凭 _selectedIndex 之后会指向另一条目。
+            long selectedSeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+                ? _rows[_selectedIndex].Entry.SequenceId
+                : -1;
+
             _rows.Clear();
             IReadOnlyList<CollapsedRow> src = _store.Rows;
             for (int i = 0; i < src.Count; i++)
@@ -438,11 +445,45 @@ namespace DebugxLog.Console.Runtime
             _listView.RefreshItems();
             UpdateCounts();
             ReapplyMemberFilterOnDrift(); // keep a new member visible under an active partial filter. 让新成员在启用部分过滤时仍可见。
+            ReconcileSelection(selectedSeq);
 
             // Tail: auto-scroll to newest only while stuck to the bottom (scrolling up pauses it). 贴底时才自动滚到最新（上滚暂停）。
             EnsureListScrollHook();
             if (_stickToBottom && _rows.Count > 0)
                 _listView.ScrollToItem(_rows.Count - 1);
+        }
+
+        // Re-align the ListView selection with the entry it pointed at before the rebuild, keyed by SequenceId. Keeps the
+        // highlight, the detail pane and Copy all referring to the SAME entry after eviction/filtering shifts the rows;
+        // clears the selection when that entry is gone. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged
+        // (the detail already shows this entry, so no rebuild is needed).
+        // 按 SequenceId 把 ListView 选中项重新对齐到重建前所指的条目，使淘汰/过滤导致行偏移后，高亮、详情面板与 Copy 仍指向
+        // 同一条目；该条目已消失时清除选中。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged（详情已是此条目，无需重建）。
+        private void ReconcileSelection(long selectedSeq)
+        {
+            if (selectedSeq < 0) return; // nothing was selected. 原本无选中。
+
+            int newIndex = -1;
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                DebugxLogEntry e = _rows[i].Entry;
+                if (e != null && e.SequenceId == selectedSeq) { newIndex = i; break; }
+            }
+
+            if (newIndex == _selectedIndex) return; // still aligned. 仍对齐。
+
+            if (newIndex >= 0)
+            {
+                _selectedIndex = newIndex;
+                _listView.SetSelectionWithoutNotify(new[] { newIndex });
+            }
+            else
+            {
+                // The selected entry was evicted or filtered out. 选中条目已被淘汰或过滤掉。
+                _selectedIndex = -1;
+                _listView.ClearSelection();
+                UpdateDetail(null);
+            }
         }
 
         private void EnsureListScrollHook()
@@ -493,6 +534,7 @@ namespace DebugxLog.Console.Runtime
             _selectedIndex = -1;
             _listView?.ClearSelection();
             UpdateDetail(null);
+            _stickToBottom = true; // a just-cleared (empty) list should resume tail-following newest logs. 刚清空的（空）列表应恢复尾随最新日志。
             ForceRefresh();
         }
 

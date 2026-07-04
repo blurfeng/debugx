@@ -176,15 +176,36 @@ namespace DebugxLog.Console
             try
             {
                 Queue<DebugxRawLog> q = _pending.Value;
-                DebugxLogEntry entry;
+                DebugxLogEntry entry = null;
 
                 if (q.Count > 0 && Debugx.IsDebugxTagged(condition))
                 {
-                    // Paired: Debugx log. Metadata from channel A, stack trace from channel B.
-                    // 已配对：Debugx 日志。元数据取自通道 A，堆栈取自通道 B。
-                    entry = BuildDebugxEntry(q.Dequeue(), stackTrace);
+                    // Pair with the pending metadata whose final text matches this condition EXACTLY. Unity delivers the
+                    // channel-B condition verbatim as the string passed to unityLogger.Log (== raw.FinalText), so exact
+                    // equality is the reliable pairing key. Discard any older orphaned metadata ahead of the match (their
+                    // channel B never arrived, e.g. dropped by unityLogger.filterLogType) — this also rejects a foreign
+                    // non-Debugx log that merely CONTAINS the "[Debugx]" substring, so it can't steal a pending entry's
+                    // metadata (which previously mis-paired it with the wrong stack trace / member context).
+                    // 与队列中「最终显示串恰好等于此 condition」的待配对元数据配对。Unity 把通道 B 的 condition 原样作为传给
+                    // unityLogger.Log 的串投递（== raw.FinalText），故精确相等是可靠的配对键。丢弃匹配项之前的更旧孤儿元数据
+                    //（它们的通道 B 从未到达，如被 unityLogger.filterLogType 过滤）——这也排除了仅“包含” "[Debugx]" 子串的
+                    // 外部非 Debugx 日志，使其无法窃取待配对元数据（此前会导致堆栈/成员上下文错配）。
+                    while (q.Count > 0)
+                    {
+                        DebugxRawLog head = q.Dequeue();
+                        if (string.Equals(head.FinalText, condition, StringComparison.Ordinal))
+                        {
+                            // Paired: Debugx log. Metadata from channel A, stack trace from channel B.
+                            // 已配对：Debugx 日志。元数据取自通道 A，堆栈取自通道 B。
+                            entry = BuildDebugxEntry(head, stackTrace);
+                            break;
+                        }
+                        // Orphaned metadata (its channel B never arrived); drop it and keep looking.
+                        // 陈旧未配对元数据（其通道 B 从未到达）；丢弃后继续查找。
+                    }
                 }
-                else
+
+                if (entry == null)
                 {
                     // Drop live-channel logs an external mirror provides authoritatively (e.g. compile messages the
                     // editor mirrors from LogEntries), so they are not duplicated. Only for non-Debugx logs.
@@ -193,8 +214,8 @@ namespace DebugxLog.Console
                     if (filter != null && filter(condition, type))
                         return;
 
-                    // Non-Debugx (or a false-positive "[Debugx]" text with no pending metadata) -> Uncategorized.
-                    // 非 Debugx（或无待配对元数据、文本恰含 "[Debugx]" 的误判）-> 未分类。
+                    // Non-Debugx (or a "[Debugx]" text that matched no pending metadata) -> Uncategorized.
+                    // 非 Debugx（或含 "[Debugx]" 但未匹配到任何待配对元数据）-> 未分类。
                     entry = BuildUncategorizedEntry(condition, stackTrace, type);
                 }
 

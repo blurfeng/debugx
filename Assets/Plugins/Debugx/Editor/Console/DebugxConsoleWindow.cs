@@ -459,6 +459,13 @@ namespace DebugxLog.Console.Editor
 
         private void RefreshView()
         {
+            // Remember the selected entry by its stable id BEFORE rebuilding rows: eviction shifts positional indices,
+            // so a plain _selectedIndex would then point at a different entry (wrong detail / wrong Copy target).
+            // 重建行列表前按稳定 id 记住选中条目：淘汰会让位置索引偏移，仅凭 _selectedIndex 之后会指向另一条目（详情/Copy 目标错位）。
+            long selectedSeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+                ? _rows[_selectedIndex].Entry.SequenceId
+                : -1;
+
             _rows.Clear();
             IReadOnlyList<CollapsedRow> src = _store.Rows;
             for (int i = 0; i < src.Count; i++)
@@ -467,6 +474,7 @@ namespace DebugxLog.Console.Editor
             _listView.RefreshItems();
             HideListEmptyLabel();
             UpdateCounts();
+            ReconcileSelection(selectedSeq);
 
             // Tail: auto-scroll to the newest entry only while the list is stuck to the bottom (native behaviour).
             // Scrolling up pauses the tail; scrolling back to the bottom resumes it (see OnListScrolled).
@@ -474,6 +482,37 @@ namespace DebugxLog.Console.Editor
             EnsureListScrollHook();
             if (_stickToBottom && _rows.Count > 0)
                 _listView.ScrollToItem(_rows.Count - 1);
+        }
+
+        // Re-align the ListView selection with the entry it pointed at before the rebuild, keyed by SequenceId, so the
+        // highlight, the detail pane and Copy keep referring to the SAME entry after eviction/filtering shifts the rows;
+        // clears the selection when that entry is gone. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged.
+        // 按 SequenceId 把选中项重新对齐到重建前所指条目，使淘汰/过滤导致行偏移后，高亮、详情与 Copy 仍指向同一条目；
+        // 该条目消失时清除选中。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
+        private void ReconcileSelection(long selectedSeq)
+        {
+            if (selectedSeq < 0) return; // nothing was selected. 原本无选中。
+
+            int newIndex = -1;
+            for (int i = 0; i < _rows.Count; i++)
+            {
+                DebugxLogEntry e = _rows[i].Entry;
+                if (e != null && e.SequenceId == selectedSeq) { newIndex = i; break; }
+            }
+
+            if (newIndex == _selectedIndex) return; // still aligned. 仍对齐。
+
+            if (newIndex >= 0)
+            {
+                _selectedIndex = newIndex;
+                _listView.SetSelectionWithoutNotify(new[] { newIndex });
+            }
+            else
+            {
+                _selectedIndex = -1;
+                _listView.ClearSelection();
+                UpdateDetail(null);
+            }
         }
 
         // Lazily hook the ListView's internal scroll view to track whether it is at the bottom. Retried each refresh
@@ -769,6 +808,7 @@ namespace DebugxLog.Console.Editor
             _selectedIndex = -1;
             _listView?.ClearSelection();
             if (_stackContainer != null) UpdateDetail(null);
+            _stickToBottom = true; // a just-cleared (empty) list should resume tail-following newest logs. 刚清空的（空）列表应恢复尾随最新日志。
             if (_listView != null) ForceRefresh();
         }
 
