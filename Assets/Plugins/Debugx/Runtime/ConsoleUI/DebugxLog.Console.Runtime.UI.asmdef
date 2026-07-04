@@ -2,7 +2,8 @@
     "name": "DebugxLog.Console.Runtime.UI",
     "rootNamespace": "DebugxLog.Console.Runtime",
     "references": [
-        "DebugxLog.Console"
+        "DebugxLog.Console",
+        "Debugx"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

@@ -44,6 +44,11 @@ namespace DebugxLog.Console.Runtime
         {
             if (_instance != null || !Application.isPlaying) return;
 
+            // User opt-out (Editor Console > Runtime > "Enable in-game runtime Console"): skip self-creation when off.
+            // Read once here, so toggling it applies on the next entry to Play. 用户可在 Editor Console > Runtime >
+            // “启用游戏内运行时 Console” 关闭：关闭时不自建。此处读取一次，故改动在下次进入 Play 生效。
+            if (!DebugxStaticData.RuntimeConsoleEnabled) return;
+
             PanelSettings panelSettings = Resources.Load<PanelSettings>(PanelSettingsResource);
             if (panelSettings == null)
             {
@@ -77,6 +82,15 @@ namespace DebugxLog.Console.Runtime
 
         private bool _uiBuilt;
         private bool _visible;
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+        // Multi-finger tap debounce: fires once when the finger count first reaches the threshold, re-armed only after
+        // every finger lifts (so holding fingers down or adjusting them doesn't retoggle). Guarded with the same symbol
+        // as its only reader so it isn't an unused field (CS0414) under a new-Input-System-only project.
+        // 多指点击防抖：手指数首次达到阈值时触发一次，仅在全部手指抬起后重新武装（故按住或调整手指不会反复开合）。用与其唯一读取处
+        // 相同的符号守卫，避免在仅启用新输入系统的工程下成为未使用字段（CS0414）。
+        private bool _multiTouchArmed = true;
+#endif
 
         private void OnEnable()
         {
@@ -120,12 +134,26 @@ namespace DebugxLog.Console.Runtime
         private void HandleToggleInput()
         {
 #if ENABLE_LEGACY_INPUT_MANAGER
-            // Backquote toggles the console on desktop. Touch users use the floating button. Guarded so a project with
-            // the new Input System only (legacy input disabled) still compiles and does not throw on UnityEngine.Input.
-            // 反引号键在桌面端开合 Console。触屏用悬浮按钮。加守卫，使仅启用新输入系统（禁用旧输入）的工程仍能编译、
-            // 且不会在访问 UnityEngine.Input 时抛异常。
+            // Backquote toggles the console on desktop; a multi-finger tap toggles it on touch devices (plus the floating
+            // button). Both read UnityEngine.Input, so they are guarded: a project with the new Input System only (legacy
+            // input disabled) still compiles and does not throw. 反引号键在桌面端开合 Console；触屏端多指点击开合（外加悬浮按钮）。
+            // 二者都读 UnityEngine.Input，故加守卫：仅启用新输入系统（禁用旧输入）的工程仍能编译、且不会抛异常。
             if (Input.GetKeyDown(KeyCode.BackQuote))
                 SetVisible(!_visible);
+
+            int touchCount = Input.touchCount;
+            if (touchCount >= DebugxRuntimeConsoleStyle.SummonTouchCount)
+            {
+                if (_multiTouchArmed)
+                {
+                    _multiTouchArmed = false;
+                    SetVisible(!_visible);
+                }
+            }
+            else if (touchCount == 0)
+            {
+                _multiTouchArmed = true; // re-arm only once every finger has lifted. 仅在全部手指抬起后重新武装。
+            }
 #endif
         }
 

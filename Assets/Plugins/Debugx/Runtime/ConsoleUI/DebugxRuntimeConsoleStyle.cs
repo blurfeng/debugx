@@ -33,6 +33,12 @@ namespace DebugxLog.Console.Runtime
         public static readonly Color NetServerColor = new Color(0.45f, 0.75f, 1f);
         public static readonly Color NetClientColor = new Color(0.55f, 0.85f, 0.55f);
 
+        // Search-match highlight: a translucent amber background painted behind matched substrings via a rich-text
+        // <mark> tag. Stored as an RRGGBBAA hex string because <mark=#...> takes a hex color, not a UnityEngine.Color.
+        // 搜索命中高亮：半透明琥珀色底，通过富文本 <mark> 标签绘制在命中子串后。以 RRGGBBAA 十六进制字符串存储，
+        // 因为 <mark=#...> 接收的是十六进制颜色而非 UnityEngine.Color。
+        public const string SearchHighlightHex = "FFD54F66";
+
         // Sizing. 尺寸。
         public const float ListItemHeight = 22f;
         public const float DetailPaneHeight = 130f;
@@ -41,6 +47,10 @@ namespace DebugxLog.Console.Runtime
         public const int CountOverflowThreshold = 999;
         public const float InactiveOpacity = 0.4f;
         public const int FontSizeSmall = 11;
+
+        // Number of simultaneous fingers whose tap toggles the console on touch devices (a mobile alternative to the
+        // backquote key). 触屏端同时按下、点击即可开合 Console 的手指数（反引号键的移动端替代）。
+        public const int SummonTouchCount = 3;
 
         // Ring-buffer capacity for the runtime Console (mobile-friendly default; §8 suggests 500–1000 mobile / 2000–5000 desktop).
         // 运行时 Console 的环形缓冲容量（对移动端友好的默认值；§8 建议移动 500–1000 / 桌面 2000–5000）。

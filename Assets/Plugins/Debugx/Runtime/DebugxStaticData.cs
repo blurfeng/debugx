@@ -78,6 +78,19 @@ namespace DebugxLog
             }
         }
 
+        // Whether the in-game runtime overlay Console (DebugxRuntimeConsole) self-creates at play start. Default on.
+        // Read once by DebugxRuntimeConsole.Bootstrap, so a change applies on the NEXT entry to Play. Mainly used to switch
+        // it OFF in the Editor, where the docked Debugx Console window already fills the same role; a player build uses its
+        // own (initially empty) PlayerPrefs store so it defaults on, and game code may set this false to hide the overlay.
+        // 游戏内运行时覆盖层 Console（DebugxRuntimeConsole）是否在游戏启动时自建。默认开启。由 DebugxRuntimeConsole.Bootstrap
+        // 读取一次，故改动在下次进入 Play 时生效。主要用于在编辑器里将其关闭——编辑器已有停靠的 Debugx Console 窗口担同样角色；
+        // 实机构建用自身（初始为空）的 PlayerPrefs 存储，故默认开启，游戏代码也可置 false 以隐藏覆盖层。
+        public static bool RuntimeConsoleEnabled
+        {
+            get => PlayerPrefsGetBool("DebugxStaticData.RuntimeConsoleEnabled", false);
+            set => PlayerPrefsSetBool("DebugxStaticData.RuntimeConsoleEnabled", value);
+        }
+
         #region Text
         public const string ToolTipDefaultDebugxMemberAssets = "默认调试成员信息列表";
         public const string ToolTipCustomDebugxMemberAssets = "自定义调试成员信息列表";

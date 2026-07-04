@@ -346,7 +346,7 @@ namespace DebugxLog.Console.Runtime
                 net.style.display = DisplayStyle.None;
             }
 
-            element.Q<Label>("msg").text = SingleLine(e.RichText);
+            element.Q<Label>("msg").text = ApplySearchHighlight(SingleLine(e.RichText));
 
             var badge = element.Q<Label>("badge");
             if (row.Count > 1)
@@ -397,7 +397,7 @@ namespace DebugxLog.Console.Runtime
                 return;
             }
 
-            _detailMessage.text = e.RichText;
+            _detailMessage.text = ApplySearchHighlight(e.RichText);
 
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)
@@ -564,6 +564,78 @@ namespace DebugxLog.Console.Runtime
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
             return text.Replace('\r', ' ').Replace('\n', ' ');
+        }
+
+        // Wrap the active search's matches inside a rich-text string with a <mark> highlight, without disturbing the
+        // existing tags. The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich
+        // string once, skipping <...> tag spans, to build the visible text plus a visible->rich index map; find the
+        // matches in the visible text; then splice <mark>/</mark> at the mapped rich positions. <mark> only paints a
+        // background, so member <color> foregrounds survive. No-op when the search is empty or a regex (the runtime search
+        // box only ever sets plain substring text, so regex highlight is intentionally skipped).
+        // 给富文本里的当前搜索命中套上 <mark> 高亮，且不破坏已有标签。搜索匹配的是可见文本，无法直接按其偏移拼接：一次遍历
+        // 富文本、跳过 <...> 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置拼入
+        // <mark>/</mark>。<mark> 只画背景，故成员 <color> 前景色得以保留。搜索为空或为正则时不处理（运行时搜索框只设纯子串，
+        // 正则高亮有意跳过）。
+        private string ApplySearchHighlight(string richText)
+        {
+            if (string.IsNullOrEmpty(richText)) return richText;
+            SearchQuery q = _criteria.Search;
+            if (q.IsEmpty || q.UseRegex) return richText;
+
+            string needle = q.Text;
+            int n = richText.Length;
+
+            // Build the visible text + a map from each visible char (and an end sentinel) to its index in richText.
+            // 构建可见文本 + 每个可见字符（含末尾哨兵）到其在 richText 中下标的映射。
+            var visible = new System.Text.StringBuilder(n);
+            var richPos = new List<int>(n + 1);
+            int i = 0;
+            while (i < n)
+            {
+                char c = richText[i];
+                if (c == '<')
+                {
+                    int close = richText.IndexOf('>', i + 1);
+                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
+                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
+                    continue;
+                }
+                richPos.Add(i);
+                visible.Append(c);
+                i++;
+            }
+            richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。
+
+            string hay = visible.ToString();
+            if (hay.Length == 0 || needle.Length > hay.Length) return richText;
+
+            StringComparison cmp = q.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            string open = "<mark=#" + DebugxRuntimeConsoleStyle.SearchHighlightHex + ">";
+
+            var outSb = new System.Text.StringBuilder(n + 16);
+            int cursor = 0; // how far into richText we've copied. 已复制到 richText 的位置。
+            int from = 0;   // search start in the visible text. 可见文本里的搜索起点。
+            bool any = false;
+            while (true)
+            {
+                int idx = hay.IndexOf(needle, from, cmp);
+                if (idx < 0) break;
+                int ro = richPos[idx];
+                int rc = richPos[idx + needle.Length];
+                if (ro >= cursor)
+                {
+                    outSb.Append(richText, cursor, ro - cursor);
+                    outSb.Append(open);
+                    outSb.Append(richText, ro, rc - ro);
+                    outSb.Append("</mark>");
+                    cursor = rc;
+                    any = true;
+                }
+                from = idx + needle.Length;
+            }
+            if (!any) return richText;
+            outSb.Append(richText, cursor, n - cursor);
+            return outSb.ToString();
         }
 
         private static string CountText(int n) =>

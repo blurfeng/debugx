@@ -127,6 +127,23 @@ namespace DebugxLog.Console.Editor
 
             bool playing = Application.isPlaying;
 
+            // --- In-game runtime Console availability (always editable; decides the NEXT entry to Play) ---
+            // Off here keeps the on-device overlay Console from cluttering the Game view while this docked window is in use.
+            // --- 游戏内运行时 Console 是否可用（始终可编辑；决定下次进入 Play）---
+            // 在此关闭，可避免使用本停靠窗口时，设备端覆盖层 Console 干扰 Game 视图。
+            var runtimeConsoleToggle = new Toggle(L("启用游戏内运行时 Console", "Enable in-game runtime Console"))
+                { value = DebugxStaticData.RuntimeConsoleEnabled };
+            runtimeConsoleToggle.RegisterValueChangedCallback(evt => DebugxStaticData.RuntimeConsoleEnabled = evt.newValue);
+            _runtimePanel.Add(runtimeConsoleToggle);
+
+            var runtimeConsoleHint = new Label(L(
+                "控制游戏内覆盖层 Console 是否在进入 Play 时自建（下次 Play 生效）。编辑器里通常用不到——本窗口已够用；实机构建默认开启。",
+                "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Usually not needed in the Editor — this window covers it; a player build defaults on."));
+            runtimeConsoleHint.style.color = DebugxConsoleStyle.HintColor;
+            runtimeConsoleHint.style.whiteSpace = WhiteSpace.Normal;
+            runtimeConsoleHint.style.marginBottom = 6;
+            _runtimePanel.Add(runtimeConsoleHint);
+
             // --- Runtime source switches (only meaningful in Play mode) ---
             var runtimeGroup = new VisualElement();
             runtimeGroup.SetEnabled(playing);
