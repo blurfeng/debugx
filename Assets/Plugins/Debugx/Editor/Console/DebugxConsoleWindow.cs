@@ -24,7 +24,10 @@ namespace DebugxLog.Console.Editor
         public static void Open()
         {
             var window = GetWindow<DebugxConsoleWindow>();
-            window.titleContent = new GUIContent("Debugx Console");
+            // Reuse Unity's native Console tab icon so the window reads as a console at a glance (IconContent auto-picks the light/dark skin variant).
+            // 复用原生 Console 的标签页图标，让窗口一眼可辨为控制台（IconContent 会自动匹配明/暗皮肤变体）。
+            var icon = EditorGUIUtility.IconContent("UnityEditor.ConsoleWindow").image;
+            window.titleContent = new GUIContent("Debugx Console", icon);
             window.minSize = DebugxConsoleStyle.MinWindowSize;
         }
 
