@@ -111,6 +111,44 @@ namespace DebugxLog.Console
         }
 
         /// <summary>
+        /// Remove every entry matching <paramref name="predicate"/>, compacting the survivors in place while preserving
+        /// their order. Returns the number removed and bumps <see cref="Version"/> only when at least one was removed.
+        /// Unlike a capacity eviction this is an explicit removal, so it does NOT touch <see cref="DroppedCount"/>.
+        /// Main thread only. Used e.g. to drop stale compile-log entries before re-mirroring the current batch.
+        /// 移除所有满足 <paramref name="predicate"/> 的条目，其余就地压紧且保持顺序。返回移除数量；仅当至少移除一条时自增
+        /// <see cref="Version"/>。区别于容量淘汰，这是显式移除，故不影响 <see cref="DroppedCount"/>。仅主线程。
+        /// 例如用于在重新镜像当前批之前，移除滞留的旧编译日志条目。
+        /// </summary>
+        public int RemoveWhere(Predicate<DebugxLogEntry> predicate)
+        {
+            if (predicate == null || _count == 0) return 0;
+
+            // Stable in-place compaction over the ring: read every slot oldest->newest, copy kept entries down into the
+            // next write position (write <= read always, so we never clobber an unread entry).
+            // 环上的稳定就地压紧：自旧向新读每个槽，把保留的条目下移到下一个写位（write <= read 恒成立，绝不覆盖未读条目）。
+            int write = 0;
+            for (int read = 0; read < _count; read++)
+            {
+                DebugxLogEntry e = _items[(_start + read) % _capacity];
+                if (predicate(e)) continue; // remove. 移除。
+                if (write != read)
+                    _items[(_start + write) % _capacity] = e;
+                write++;
+            }
+
+            int removed = _count - write;
+            if (removed == 0) return 0;
+
+            // Null the freed tail slots so we don't pin references. 清空腾出的尾部槽，避免滞留引用。
+            for (int i = write; i < _count; i++)
+                _items[(_start + i) % _capacity] = null;
+
+            _count = write;
+            Version++;
+            return removed;
+        }
+
+        /// <summary>
         /// Remove all entries (does not reset <see cref="DroppedCount"/>).
         /// 清空所有条目（不重置 <see cref="DroppedCount"/>）。
         /// </summary>

@@ -137,8 +137,8 @@ namespace DebugxLog.Console.Editor
             _runtimePanel.Add(runtimeConsoleToggle);
 
             var runtimeConsoleHint = new Label(L(
-                "控制游戏内覆盖层 Console 是否在进入 Play 时自建（下次 Play 生效）。编辑器里通常用不到——本窗口已够用；实机构建默认开启。",
-                "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Usually not needed in the Editor — this window covers it; a player build defaults on."));
+                "控制游戏内覆盖层 Console 是否在进入 Play 时自建（下次 Play 生效）。默认关闭——编辑器里通常用不到（本窗口已够用）。此勾选只写编辑器的 PlayerPrefs，不影响构建；实机需在游戏代码中置 DebugxStaticData.RuntimeConsoleEnabled = true。",
+                "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Off by default — usually not needed in the Editor (this window covers it). This tick only writes Editor PlayerPrefs and does NOT affect a build; enable it in-build via DebugxStaticData.RuntimeConsoleEnabled = true in game code."));
             runtimeConsoleHint.style.color = DebugxConsoleStyle.HintColor;
             runtimeConsoleHint.style.whiteSpace = WhiteSpace.Normal;
             runtimeConsoleHint.style.marginBottom = 6;

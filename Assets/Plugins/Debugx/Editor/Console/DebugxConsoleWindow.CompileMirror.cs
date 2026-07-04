@@ -61,9 +61,32 @@ namespace DebugxLog.Console.Editor
             _needsCompileMirror = false;
 
             List<EditorLogEntriesMirror.Entry> entries = EditorLogEntriesMirror.ReadCompileEntries();
+
+            // Compute the current authoritative compile-key set. The editor console REPLACES its compile messages on
+            // every recompile (it only ever shows the latest batch), so we mirror that "replace" semantics rather than
+            // just appending: compile ERRORS don't trigger a domain reload, so without this, errors from earlier failed
+            // compiles linger in our buffer while the native console shows only the current batch.
+            // 计算当前权威的编译键集。编辑器控制台在每次重编译时“替换”其编译消息（只显示最新批），故我们对齐这种“替换”语义
+            // 而非只追加：编译“错误”不触发域重载，若不这样做，更早失败编译的错误会滞留在我们的缓冲里，而原生控制台只显示当前批。
+            var currentKeys = new HashSet<string>();
+            foreach (EditorLogEntriesMirror.Entry e in entries)
+                currentKeys.Add(e.Key);
+
+            // Unchanged since the last scan → leave the mirrored entries exactly where they are (no churn / no reorder).
+            // 自上次扫描无变化 → 保持已镜像条目原样（不刷新、不重排）。
+            if (currentKeys.SetEquals(_mirroredCompileKeys)) return;
+
+            // The compile set changed: drop every previously-mirrored compile entry, then re-mirror the current batch.
+            // RemoveWhere mutates the buffer immediately; InjectExternal queues into the collector, drained by the
+            // _store.Pump() that runs right after this in OnEditorUpdate — so the buffer ends the tick holding only the
+            // current batch. 编译集变化：移除此前镜像的全部编译条目，再重新镜像当前批。RemoveWhere 立即改动缓冲；InjectExternal
+            // 入采集队列，由紧随其后（OnEditorUpdate 里）的 _store.Pump() 排空——故本帧结束时缓冲只含当前批。
+            _store.Buffer.RemoveWhere(e => e.Category == LogEntryCategory.Compile);
+            _mirroredCompileKeys.Clear();
+
             foreach (EditorLogEntriesMirror.Entry e in entries)
             {
-                if (!_mirroredCompileKeys.Add(e.Key)) continue; // already mirrored this session. 本会话已镜像。
+                _mirroredCompileKeys.Add(e.Key);
                 string stack = (!string.IsNullOrEmpty(e.File) && e.Line > 0) ? $"(at {e.File}:{e.Line})" : null;
                 // Category=Compile marks it for persistence exclusion (re-sourced from LogEntries each reload).
                 // Category=Compile 标记它以便持久化时排除（每次重载由 LogEntries 重新拉取）。
