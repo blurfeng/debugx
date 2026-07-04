@@ -639,7 +639,7 @@ namespace DebugxLog
             // 先派发结构化事件（在锁外，避免订阅者回调再打日志导致 _logSb 被重入破坏），再发 Unity 日志。
             // 由此保证「事件 → 同线程紧邻的 logMessageReceived 回调」顺序，支撑 Console 的线程内 FIFO 去重配对。
             if (OnRawLog != null)
-                DispatchRawLog(type, info, message, finalText, showTime, showNetTag, isServer);
+                DispatchRawLog(type, info, message, finalText, showTime, hasNetTag, isServer);
 
             UnityEngine.Debug.unityLogger.Log(type, finalText);
         }
@@ -652,7 +652,7 @@ namespace DebugxLog
         /// 订阅者异常被隔离，避免单个坏订阅者破坏日志管线或其它订阅者。
         /// </summary>
         private static void DispatchRawLog(LogType type, DebugxMemberInfo info, object message, string finalText,
-            bool showTime, bool showNetTag, bool isServer)
+            bool showTime, bool netTagShown, bool isServer)
         {
             // Local snapshot to avoid the race between the null check and the invocation if unsubscribed in between.
             // 本地快照，规避判空与调用之间被取消订阅置空的竞态。
@@ -687,7 +687,7 @@ namespace DebugxLog
 
             DebugxRawLog rawLog = new DebugxRawLog(
                 key, signature, colorHex, header, logSignatureShown, category,
-                type, message, finalText, showNetTag, showTime, isServer, DateTime.Now);
+                type, message, finalText, netTagShown, showTime, isServer, DateTime.Now);
 
             try
             {

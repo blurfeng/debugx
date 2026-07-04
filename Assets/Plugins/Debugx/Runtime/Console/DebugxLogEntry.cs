@@ -104,13 +104,6 @@ namespace DebugxLog.Console
         public long SequenceId { get; }
 
         /// <summary>
-        /// Collapse count: how many duplicate lines this entry represents (1 when not collapsed). Mutable; written by
-        /// the collapser only.
-        /// 折叠计数：本条代表多少条重复日志（未折叠时为 1）。可变；仅由折叠器写入。
-        /// </summary>
-        public int CollapseCount { get; set; }
-
-        /// <summary>
         /// Sentinel member key for non-Debugx ("Uncategorized") logs.
         /// 非 Debugx（“未分类”）日志的哨兵成员 key。
         /// </summary>
@@ -137,7 +130,6 @@ namespace DebugxLog.Console
             Timestamp = timestamp;
             FrameCount = frameCount;
             SequenceId = sequenceId;
-            CollapseCount = 1;
         }
     }
 }

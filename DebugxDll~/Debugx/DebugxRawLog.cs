@@ -100,10 +100,12 @@ namespace DebugxLog
         public readonly string FinalText;
 
         /// <summary>
-        /// Whether a net tag was requested for this log.
-        /// 本条日志是否请求了网络标签。
+        /// Whether a Server/Client net tag was actually shown in <see cref="FinalText"/> (true only when a net tag was
+        /// requested AND a server-check delegate is registered). Combine with <see cref="IsServer"/> to get the tag.
+        /// 是否在 <see cref="FinalText"/> 中真正显示了 Server/Client 网络标签（仅当请求了网络标签且已注册 server-check 委托时为 true）。
+        /// 与 <see cref="IsServer"/> 组合即可得到具体标签。
         /// </summary>
-        public readonly bool ShowNetTag;
+        public readonly bool NetTagShown;
 
         /// <summary>
         /// Whether a timestamp was requested for this log.
@@ -130,7 +132,7 @@ namespace DebugxLog
         public DebugxRawLog(
             int key, string signature, string colorHex, string header, bool logSignatureShown,
             DebugxLogCategory category, LogType logType, object rawMessage, string finalText,
-            bool showNetTag, bool showTime, bool isServer, DateTime timestamp)
+            bool netTagShown, bool showTime, bool isServer, DateTime timestamp)
         {
             Key = key;
             Signature = signature;
@@ -141,7 +143,7 @@ namespace DebugxLog
             LogType = logType;
             RawMessage = rawMessage;
             FinalText = finalText;
-            ShowNetTag = showNetTag;
+            NetTagShown = netTagShown;
             ShowTime = showTime;
             IsServer = isServer;
             Timestamp = timestamp;
