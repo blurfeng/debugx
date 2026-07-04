@@ -1,0 +1,16 @@
+{
+    "name": "DebugxLog.Console.Runtime.UI",
+    "rootNamespace": "DebugxLog.Console.Runtime",
+    "references": [
+        "DebugxLog.Console"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
