@@ -18,6 +18,8 @@ namespace DebugxLog.Console
         Unregistered,
         /// <summary>Non-Debugx log (engine / third-party / raw Debug.Log). 非 Debugx 日志（引擎 / 第三方 / 裸 Debug.Log）。</summary>
         Uncategorized,
+        /// <summary>Compiler / asset-import message mirrored from the editor console. Re-sourced from LogEntries each reload, so it is deliberately NOT persisted. 从编辑器控制台镜像的编译器/资源导入消息。每次重载由 LogEntries 重新拉取，故刻意不持久化。</summary>
+        Compile,
     }
 
     /// <summary>

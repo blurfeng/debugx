@@ -35,6 +35,18 @@ namespace DebugxLog.Console
         /// </summary>
         public event Action<DebugxLogEntry> EntryProduced;
 
+        /// <summary>
+        /// Optional filter for non-Debugx ("Uncategorized") live-channel logs. When set and it returns true for a given
+        /// (condition, type), that log is dropped from the live channel. Used by the Editor Console to suppress compile
+        /// messages that its LogEntries mirror provides authoritatively (some compile errors DO arrive on the live
+        /// channel, so without this they would be duplicated). Never affects Debugx logs. May run on background threads,
+        /// so it must be a pure, thread-safe function.
+        /// 非 Debugx（“未分类”）live 通道日志的可选过滤器。设置且对某 (condition, type) 返回 true 时，该日志从 live 通道丢弃。
+        /// 供 Editor Console 抑制其 LogEntries 镜像已权威提供的编译消息（部分编译错误确实会经 live 通道到达，无此则会重复）。
+        /// 绝不影响 Debugx 日志。可能在后台线程运行，故必须是纯函数、线程安全。
+        /// </summary>
+        public Func<string, LogType, bool> LiveUncategorizedFilter { get; set; }
+
         // Per-thread pending Debugx metadata (channel A waiting for its channel B). ThreadLocal so it is per-instance
         // AND per-thread, which lets multiple collectors (e.g. an Editor Console and a runtime Console) coexist.
         // 每线程待配对的 Debugx 元数据（通道 A 等待其通道 B）。用 ThreadLocal 做到既按实例又按线程隔离，
@@ -174,6 +186,13 @@ namespace DebugxLog.Console
                 }
                 else
                 {
+                    // Drop live-channel logs an external mirror provides authoritatively (e.g. compile messages the
+                    // editor mirrors from LogEntries), so they are not duplicated. Only for non-Debugx logs.
+                    // 丢弃由外部镜像权威提供的 live 通道日志（如编辑器从 LogEntries 镜像的编译消息），避免重复。仅限非 Debugx 日志。
+                    Func<string, LogType, bool> filter = LiveUncategorizedFilter;
+                    if (filter != null && filter(condition, type))
+                        return;
+
                     // Non-Debugx (or a false-positive "[Debugx]" text with no pending metadata) -> Uncategorized.
                     // 非 Debugx（或无待配对元数据、文本恰含 "[Debugx]" 的误判）-> 未分类。
                     entry = BuildUncategorizedEntry(condition, stackTrace, type);

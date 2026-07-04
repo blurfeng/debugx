@@ -76,6 +76,7 @@ namespace DebugxLog.Console.Editor
             LoadPrefs();
             _store.Collector.EntryProduced += OnEntryForErrorPause;
             _store.Start();
+            RestorePersistedLogs(); // repopulate the fresh buffer with logs kept across the domain reload. 用跨域重载留存的日志重新填充新缓冲。
 
             EditorApplication.update += OnEditorUpdate;
             EditorApplication.playModeStateChanged += OnPlayModeChanged;
@@ -86,6 +87,7 @@ namespace DebugxLog.Console.Editor
 
         private void OnDisable()
         {
+            SavePersistedLogs(); // stash logs so they survive the coming domain reload / window close. 转存日志以熬过即将到来的域重载/关窗。
             if (_store != null)
             {
                 _store.Collector.EntryProduced -= OnEntryForErrorPause;

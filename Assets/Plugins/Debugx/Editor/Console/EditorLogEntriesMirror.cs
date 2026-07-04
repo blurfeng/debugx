@@ -1,16 +1,18 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using UnityEngine;
 
 namespace DebugxLog.Console.Editor
 {
     /// <summary>
-    /// Reads compiler / asset-import messages from Unity's internal editor console store
-    /// (<c>UnityEditor.LogEntries</c>) via reflection. Those messages are injected straight into the console and never
-    /// come through <c>Application.logMessageReceived(Threaded)</c>, so the Console's live capture channel misses them;
-    /// mirroring them here is how the Debugx Console reaches parity with the native console for compile warnings/errors.
-    /// They also survive domain reloads (unlike our in-memory buffer), so callers re-read on every window enable.
+    /// Reads script-compile messages from Unity's internal editor console store (<c>UnityEditor.LogEntries</c>) via
+    /// reflection. This is the authoritative source of compile warnings/errors for the Debugx Console: it matches the
+    /// native console exactly and survives domain reloads (unlike our in-memory buffer), so callers re-read on every
+    /// window enable. Note some compile errors ALSO arrive on <c>Application.logMessageReceived(Threaded)</c> (the live
+    /// channel); the live channel drops those (via <see cref="LooksLikeCompileMessage"/>) so they are not duplicated,
+    /// and historical messages (logged before the window opened, or already present after a reload) are re-sourced here.
     ///
     /// All reflection is resolved once and guarded: if any internal member is missing (the API changed across Unity
     /// versions), the mirror disables itself and returns an empty list rather than throwing. Must be used on the main
@@ -24,18 +26,22 @@ namespace DebugxLog.Console.Editor
     /// </summary>
     internal static class EditorLogEntriesMirror
     {
-        // Bit values of the internal UnityEditor.ConsoleWindow.Mode flags. Stable across 2019–2022. Only the
-        // compile/import bits below matter — those are exactly the entries the live log channel does not deliver.
-        // 内部 UnityEditor.ConsoleWindow.Mode 标志的位值。2019–2022 稳定。仅关注下列 编译/导入 位——正是 live 通道不会交付的条目。
-        private const int ModeError = 1 << 0;
-        private const int ModeAssetImportError = 1 << 6;
-        private const int ModeAssetImportWarning = 1 << 7;
+        // Bit values of the internal UnityEditor.ConsoleWindow.Mode flags. Stable across 2019–2022. We mirror ONLY
+        // script-compile messages: they are the case that matters, they survive domain reloads in LogEntries, and they
+        // have a stable, recognisable text format so the live channel can suppress its duplicate copy (some compile
+        // errors DO arrive on the live channel). Asset-import messages are left to the live channel.
+        // 内部 UnityEditor.ConsoleWindow.Mode 标志的位值。2019–2022 稳定。我们只镜像 脚本编译 消息：它是关键场景、在 LogEntries
+        // 里跨域重载存活、且文本格式稳定可识别，便于 live 通道抑制其重复副本（部分编译错误确实会经 live 通道到达）。资源导入消息交给 live 通道。
         private const int ModeScriptCompileError = 1 << 11;
         private const int ModeScriptCompileWarning = 1 << 12;
+        private const int CompileMask = ModeScriptCompileError | ModeScriptCompileWarning;
 
-        private const int CompileImportMask =
-            ModeAssetImportError | ModeAssetImportWarning | ModeScriptCompileError | ModeScriptCompileWarning;
-        private const int ErrorMask = ModeError | ModeAssetImportError | ModeScriptCompileError;
+        // Matches Unity's C# compile message format: "...(line,col): error CS0103: ..." / "...: warning CS0414: ...".
+        // Used by LooksLikeCompileMessage so the live channel can drop its duplicate of a mirrored compile message.
+        // 匹配 Unity 的 C# 编译消息格式："...(行,列): error CS0103: ..." / "...: warning CS0414: ..."。
+        // 供 LooksLikeCompileMessage 使用，让 live 通道丢弃与镜像重复的编译消息。
+        private static readonly Regex _compileMsgRegex = new Regex(
+            @"\(\d+,\d+\):\s*(error|warning)\s+\w+:", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>One mirrored compiler / asset-import entry. 一条镜像来的编译器/资源导入条目。</summary>
         internal struct Entry
@@ -98,10 +104,28 @@ namespace DebugxLog.Console.Editor
             }
         }
 
+        /// <summary>Whether the reflection into UnityEditor.LogEntries resolved successfully. 反射进 UnityEditor.LogEntries 是否解析成功。</summary>
+        internal static bool Available => _available;
+
+        /// <summary>Resolve (once) and report availability. Call on the main thread before relying on <see cref="Available"/>. 解析（一次）并返回可用性。依赖 <see cref="Available"/> 前在主线程调用。</summary>
+        internal static bool EnsureAvailable()
+        {
+            Resolve();
+            return _available;
+        }
+
         /// <summary>
-        /// Read all current compiler / asset-import entries from the editor console. Returns an empty list when the
-        /// internal API is unavailable. Balances Start/EndGettingEntries even on error. Main thread only.
-        /// 从编辑器控制台读取当前全部 编译器/资源导入 条目。内部 API 不可用时返回空列表。即使出错也保证 Start/EndGettingEntries 配平。仅主线程。
+        /// Whether a log condition looks like a Unity C# compile message. The live channel uses this to drop its
+        /// duplicate of a compile message that this mirror provides authoritatively. Thread-safe (pure).
+        /// 某条日志文本是否像 Unity C# 编译消息。live 通道用它丢弃与本镜像重复的编译消息。线程安全（纯函数）。
+        /// </summary>
+        internal static bool LooksLikeCompileMessage(string condition)
+            => !string.IsNullOrEmpty(condition) && _compileMsgRegex.IsMatch(condition);
+
+        /// <summary>
+        /// Read all current script-compile entries from the editor console. Returns an empty list when the internal API
+        /// is unavailable. Balances Start/EndGettingEntries even on error. Main thread only.
+        /// 从编辑器控制台读取当前全部 脚本编译 条目。内部 API 不可用时返回空列表。即使出错也保证 Start/EndGettingEntries 配平。仅主线程。
         /// </summary>
         internal static List<Entry> ReadCompileEntries()
         {
@@ -127,7 +151,7 @@ namespace DebugxLog.Console.Editor
                     _getEntry.Invoke(null, args);
 
                     int mode = Convert.ToInt32(_fMode.GetValue(logEntry));
-                    if ((mode & CompileImportMask) == 0) continue;
+                    if ((mode & CompileMask) == 0) continue;
 
                     result.Add(new Entry
                     {
@@ -135,7 +159,7 @@ namespace DebugxLog.Console.Editor
                         Message = _fMessage.GetValue(logEntry) as string ?? string.Empty,
                         File = _fFile != null ? _fFile.GetValue(logEntry) as string : null,
                         Line = _fLine != null ? Convert.ToInt32(_fLine.GetValue(logEntry)) : 0,
-                        Type = (mode & ErrorMask) != 0 ? LogType.Error : LogType.Warning,
+                        Type = (mode & ModeScriptCompileError) != 0 ? LogType.Error : LogType.Warning,
                     });
                 }
             }

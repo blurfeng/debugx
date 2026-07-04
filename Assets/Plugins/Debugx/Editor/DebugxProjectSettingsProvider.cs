@@ -20,20 +20,6 @@ namespace DebugxLog.Editor
         private const float ButtonWidth2 = 150f;
         private const float ButtonWidth3 = 200f;
 
-        private static bool FadeAreaHeaderIsDirty
-        {
-            set
-            {
-                // Dirty flag can only be set to true.
-                // 标脏只能设为true。
-                if (value)
-                {
-                    _fadeAreaHeaderIsDirty = true;
-                }
-            }
-        }
-        private static bool _fadeAreaHeaderIsDirty;
-
         [SettingsProvider]
         public static SettingsProvider DebugxProjectSettingsProviderCreate()
         {
@@ -187,7 +173,7 @@ namespace DebugxLog.Editor
             EditorGUILayout.LabelField("Member Settings", GUIStyleEx.TitleStyle2);
 
             _faMemberConfigSetting.Begin();
-            FadeAreaHeaderIsDirty = _faMemberConfigSetting.Header("Members");
+            _faMemberConfigSetting.Header("Members");
 
             DebugxStaticDataEditor.FaMemberConfigSettingOpen = _faMemberConfigSetting.BeginFade();
             if (DebugxStaticDataEditor.FaMemberConfigSettingOpen)
@@ -289,7 +275,7 @@ namespace DebugxLog.Editor
 
                         var faTemp = _memberInfosFadeAreaPool[i];
                         faTemp.Begin();
-                        FadeAreaHeaderIsDirty = faTemp.Header(string.IsNullOrEmpty(mInfo.signature)
+                        faTemp.Header(string.IsNullOrEmpty(mInfo.signature)
                             ? $"Member {mInfo.key}"
                             : mInfo.signature);
                         bool fadeAreaOpenCached = DebugxMemberInfoAssetEditor.SetFadeAreaOpenCached(SettingsAsset.defaultMemberAssets[i].key,faTemp.BeginFade());
@@ -365,9 +351,7 @@ namespace DebugxLog.Editor
 
                         faTemp.Begin();
                         GUILayout.BeginHorizontal();
-                        FadeAreaHeaderIsDirty =
-                            faTemp.Header(
-                                string.IsNullOrEmpty(mInfo.signature) ? $"Member {mInfo.key}" : mInfo.signature, 320);
+                        faTemp.Header(string.IsNullOrEmpty(mInfo.signature) ? $"Member {mInfo.key}" : mInfo.signature, 320);
                         GUILayout.FlexibleSpace(); // Push the button to the right side. // 将按钮推到右侧。
                         if (GUILayoutEx.ButtonRed("Delete Member", GUILayout.Width(ButtonWidth1)))
                         {
@@ -627,7 +611,6 @@ namespace DebugxLog.Editor
             // a disk write + ApplyTo + codegen. Only do the heavy work when asset data actually changed.
             bool assetChanged = _assetIsDirty;
             _assetIsDirty = false;
-            _fadeAreaHeaderIsDirty = false;
 
             if (!assetChanged) return false;
 
