@@ -36,6 +36,8 @@ namespace DebugxLog.Console.Editor
         private Label _detailMessage;
         private VisualElement _stackContainer;
         private ScrollView _detailScroll;
+        private ScrollView _listScroll;      // the ListView's internal scroll view, for tail (stick-to-bottom) detection. ListView 内部滚动视图，用于 tail(贴底)检测。
+        private bool _stickToBottom = true;  // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
 
         private Toolbar _toolbar;
         private VisualElement _searchContainer; // flexible middle region that keeps the right group right-aligned. 弹性中部，使右侧分组保持靠右。
@@ -223,6 +225,15 @@ namespace DebugxLog.Console.Editor
             toolbar.Add(_warnButton);
             toolbar.Add(_errorButton);
 
+            // View options dropdown (timestamp column, stack Script-Only/Full). Same text+caret layout as Members.
+            // 视图选项下拉（时间戳列、堆栈 仅脚本/完整）。与 Members 相同的 文字+三角 布局。
+            _viewButton = new ToolbarButton(ShowViewMenu);
+            _viewNameLabel = new Label { pickingMode = PickingMode.Ignore };
+            _viewCaretLabel = new Label("▼") { pickingMode = PickingMode.Ignore };
+            _viewButton.Add(_viewNameLabel);
+            _viewButton.Add(_viewCaretLabel);
+            toolbar.Add(_viewButton);
+
             _langButton = new ToolbarButton(ToggleLanguage);
             toolbar.Add(_langButton);
 
@@ -271,7 +282,7 @@ namespace DebugxLog.Console.Editor
             _listView = new ListView
             {
                 fixedItemHeight = DebugxConsoleStyle.ListItemHeight,
-                selectionType = SelectionType.Single,
+                selectionType = SelectionType.Multiple, // multi-select so Ctrl+C can copy several rows. 多选，便于 Ctrl+C 复制多行。
                 makeItem = MakeRow,
                 bindItem = BindRow,
                 itemsSource = _rows,
@@ -279,6 +290,7 @@ namespace DebugxLog.Console.Editor
             _listView.style.flexGrow = 1;
             _listView.selectionChanged += OnSelectionChanged;
             _listView.itemsChosen += OnItemsChosen;
+            _listView.RegisterCallback<KeyDownEvent>(OnListKeyDown); // Ctrl/Cmd+C copy. Ctrl/Cmd+C 复制。
             // Hide ListView's built-in "List is empty" placeholder on every layout pass.
             // 每次布局时隐藏 ListView 内置的“List is empty”占位。
             _listView.RegisterCallback<GeometryChangedEvent>(_ => HideListEmptyLabel());
@@ -299,6 +311,13 @@ namespace DebugxLog.Console.Editor
             icon.style.marginRight = DebugxConsoleStyle.RowIconMarginRight;
             icon.style.flexShrink = 0;
 
+            var time = new Label { name = "time" }; // optional timestamp column, toggled by BindRow. 可选时间戳列，由 BindRow 显隐。
+            time.style.width = DebugxConsoleStyle.TimestampWidth;
+            time.style.flexShrink = 0;
+            time.style.color = DebugxConsoleStyle.TimestampColor;
+            time.style.unityTextAlign = TextAnchor.MiddleLeft;
+            time.style.display = DisplayStyle.None;
+
             var msg = new Label { name = "msg", enableRichText = true };
             msg.style.flexGrow = 1;
             msg.style.overflow = Overflow.Hidden;
@@ -312,8 +331,10 @@ namespace DebugxLog.Console.Editor
             badge.style.unityFontStyleAndWeight = FontStyle.Bold;
 
             row.Add(icon);
+            row.Add(time);
             row.Add(msg);
             row.Add(badge);
+            row.AddManipulator(new ContextualMenuManipulator(evt => BuildRowContextMenu(evt, row))); // right-click copy. 右键复制。
             return row;
         }
 
@@ -323,7 +344,13 @@ namespace DebugxLog.Console.Editor
             CollapsedRow row = _rows[index];
             DebugxLogEntry e = row.Entry;
 
+            element.userData = index; // consumed by the row's context menu. 供该行右键菜单读取。
+
             element.Q<Image>("icon").image = IconFor(e.LogType);
+
+            var time = element.Q<Label>("time");
+            time.text = _showTimestamp ? TimestampText(e) : string.Empty;
+            time.style.display = _showTimestamp ? DisplayStyle.Flex : DisplayStyle.None;
 
             var msg = element.Q<Label>("msg");
             msg.text = SingleLine(e.RichText);
@@ -377,6 +404,8 @@ namespace DebugxLog.Console.Editor
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)
             {
+                if (!IsStackFrameVisible(frame)) continue; // Script-Only / Full toggle (View menu). 仅脚本/完整 切换（视图菜单）。
+
                 var line = new Label(frame.RawLine) { enableRichText = false };
                 line.style.whiteSpace = WhiteSpace.Normal;
                 line.style.paddingTop = 1;
@@ -437,10 +466,31 @@ namespace DebugxLog.Console.Editor
             HideListEmptyLabel();
             UpdateCounts();
 
-            // Auto-scroll to bottom while the user is not inspecting a specific entry.
-            // 用户未在查看某条时，自动滚到底。
-            if (_selectedIndex < 0 && _rows.Count > 0)
+            // Tail: auto-scroll to the newest entry only while the list is stuck to the bottom (native behaviour).
+            // Scrolling up pauses the tail; scrolling back to the bottom resumes it (see OnListScrolled).
+            // Tail：仅当列表贴底时自动滚到最新条目（对标原生）。上滚暂停 tail，回到底部恢复（见 OnListScrolled）。
+            EnsureListScrollHook();
+            if (_stickToBottom && _rows.Count > 0)
                 _listView.ScrollToItem(_rows.Count - 1);
+        }
+
+        // Lazily hook the ListView's internal scroll view to track whether it is at the bottom. Retried each refresh
+        // until the scroll view exists. If it never resolves, _stickToBottom stays true (always tails) — safe fallback.
+        // 惰性挂接 ListView 内部滚动视图以跟踪是否贴底。每次刷新重试直到滚动视图存在。若始终解析不到，_stickToBottom 保持 true
+        //（始终 tail）——安全降级。
+        private void EnsureListScrollHook()
+        {
+            if (_listScroll != null || _listView == null) return;
+            _listScroll = _listView.Q<ScrollView>();
+            if (_listScroll == null) return;
+            _listScroll.verticalScroller.valueChanged += OnListScrolled;
+        }
+
+        private void OnListScrolled(float value)
+        {
+            if (_listScroll == null) return;
+            Scroller s = _listScroll.verticalScroller;
+            _stickToBottom = value >= s.highValue - 1f; // at (or within 1px of) the bottom. 处于（或距）底部 1px 内。
         }
 
         private void UpdateCounts()
@@ -474,6 +524,7 @@ namespace DebugxLog.Console.Editor
             _errorPauseToggle.text = L("错误暂停", "Error Pause");
             _onlyDebugxToggle.text = L("仅Debugx", "Debugx Only");
             _memberNameLabel.text = L("成员", "Members");
+            _viewNameLabel.text = L("视图", "View");
             _runtimeToggle.text = L("运行时", "Runtime");
             // Show the CURRENT language, not the target one.
             // 显示当前语言，而非切换目标语言。
@@ -501,6 +552,7 @@ namespace DebugxLog.Console.Editor
             float runtime = Wc(DebugxConsoleStyle.RuntimeWidth);
             float debugxOnly = Wc(DebugxConsoleStyle.DebugxOnlyWidth);
             float members = Wc(DebugxConsoleStyle.MembersWidth);
+            float view = Wc(DebugxConsoleStyle.ViewWidth);
             float lang = Wc(DebugxConsoleStyle.LangButtonWidth);
             float countMin = Wc(DebugxConsoleStyle.CountWidth);
 
@@ -512,6 +564,7 @@ namespace DebugxLog.Console.Editor
             StyleItem(_runtimeToggle, runtime);
             StyleItem(_onlyDebugxToggle, debugxOnly);
             StyleMemberDropdown(_memberButton, _memberNameLabel, _memberCaretLabel, members);
+            StyleMemberDropdown(_viewButton, _viewNameLabel, _viewCaretLabel, view);
             StyleItem(_langButton, lang);
 
             // Count buttons: width grows with the number, but never below CountWidth.
@@ -528,7 +581,7 @@ namespace DebugxLog.Console.Editor
             _searchField.style.minWidth = DebugxConsoleStyle.SearchMinWidth;
             _searchField.style.marginRight = DebugxConsoleStyle.SearchRightSpace;
 
-            _wBase = clear + clearDropdown + collapse + countMin * 3f + lang;
+            _wBase = clear + clearDropdown + collapse + countMin * 3f + view + lang;
             _wSearch = DebugxConsoleStyle.SearchMinWidth + DebugxConsoleStyle.SearchRightSpace;
             _wFilters = debugxOnly + members;
             _wRuntimeGroup = runtime + errorPause;
@@ -821,6 +874,10 @@ namespace DebugxLog.Console.Editor
             _clearOnBuild = EditorPrefs.GetBool(PrefPrefix + "ClearOnBuild", true);
             _errorPause = EditorPrefs.GetBool(PrefPrefix + "ErrorPause", false);
             _chineseUi = EditorPrefs.GetBool(PrefPrefix + "LangChinese", false); // default English. 默认英文。
+            // Default to the field initializers (set in the ViewOptions partial) so changing those changes first-run defaults.
+            // 默认取字段初始值（在 ViewOptions partial 里设定），改字段即改首次运行默认值。
+            _showTimestamp = EditorPrefs.GetBool(PrefPrefix + "ShowTimestamp", _showTimestamp);
+            _stackScriptOnly = EditorPrefs.GetBool(PrefPrefix + "StackScriptOnly", _stackScriptOnly);
             _store.CollapseMode = CollapseFromPrefs() ? LogCollapser.Mode.ByMessage : LogCollapser.Mode.Off;
         }
 
@@ -835,6 +892,8 @@ namespace DebugxLog.Console.Editor
             EditorPrefs.SetBool(PrefPrefix + "ClearOnBuild", _clearOnBuild);
             EditorPrefs.SetBool(PrefPrefix + "ErrorPause", _errorPause);
             EditorPrefs.SetBool(PrefPrefix + "LangChinese", _chineseUi);
+            EditorPrefs.SetBool(PrefPrefix + "ShowTimestamp", _showTimestamp);
+            EditorPrefs.SetBool(PrefPrefix + "StackScriptOnly", _stackScriptOnly);
             if (_store != null)
                 EditorPrefs.SetBool(PrefPrefix + "Collapse", _store.CollapseMode != LogCollapser.Mode.Off);
         }

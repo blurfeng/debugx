@@ -52,6 +52,7 @@ namespace DebugxLog.Console.Editor
         public static LangWidth RuntimeWidth = new LangWidth(56f, 44f);
         public static LangWidth DebugxOnlyWidth = new LangWidth(80f, 64f);
         public static LangWidth MembersWidth = new LangWidth(76f, 48f);
+        public static LangWidth ViewWidth = new LangWidth(52f, 44f);
         public static LangWidth LangButtonWidth = new LangWidth(28f, 28f);
         public static LangWidth CountWidth = new LangWidth(34f, 34f);
         /// <summary>Search field preferred (flex-basis) width. 搜索栏首选（flex-basis）宽度。</summary>
@@ -71,6 +72,10 @@ namespace DebugxLog.Console.Editor
         public static readonly float ListItemHeight = 20f;
         public static readonly float RowIconSize = 16f;
         public static readonly float RowIconMarginRight = 4f;
+        /// <summary>Width of the optional timestamp column. 可选时间戳列的宽度。</summary>
+        public static readonly float TimestampWidth = 58f;
+        /// <summary>Muted color for the timestamp column. 时间戳列的柔和颜色。</summary>
+        public static Color TimestampColor = new Color(0.5f, 0.5f, 0.5f);
 
         // ---- Count buttons ----
         public static readonly float CountIconSize = 16f;
