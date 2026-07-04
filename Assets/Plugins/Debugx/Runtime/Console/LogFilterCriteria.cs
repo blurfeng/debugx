@@ -43,11 +43,11 @@ namespace DebugxLog.Console
         public bool ShowAdmin = true;
 
         /// <summary>
-        /// Visible member keys. Null or empty means "all members visible"; otherwise only entries whose
-        /// <see cref="DebugxLogEntry.MemberKey"/> is in this set are shown (include
-        /// <see cref="DebugxLogEntry.UncategorizedKey"/> to keep non-Debugx logs visible).
-        /// 可见成员 key。Null 或空表示“全部成员可见”；否则仅显示 <see cref="DebugxLogEntry.MemberKey"/> 在此集合中的条目
-        /// （加入 <see cref="DebugxLogEntry.UncategorizedKey"/> 可保留非 Debugx 日志可见）。
+        /// Visible member keys. Null means "no member filter, all visible". A non-null set (including an empty one)
+        /// shows only entries whose <see cref="DebugxLogEntry.MemberKey"/> is in the set (include
+        /// <see cref="DebugxLogEntry.UncategorizedKey"/> to keep non-Debugx logs visible; an empty set shows none).
+        /// 可见成员 key。Null 表示“无成员过滤，全部可见”。非 null 集合（含空集）仅显示 <see cref="DebugxLogEntry.MemberKey"/>
+        /// 在集合中的条目（加入 <see cref="DebugxLogEntry.UncategorizedKey"/> 可保留非 Debugx 日志；空集表示不显示任何条目）。
         /// </summary>
         public HashSet<int> VisibleMemberKeys;
 

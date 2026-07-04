@@ -87,7 +87,7 @@ namespace DebugxLog.Console
             if (!_criteria.ShowAdmin && e.Category == LogEntryCategory.Admin) return false;
 
             HashSet<int> keys = _criteria.VisibleMemberKeys;
-            if (keys != null && keys.Count > 0 && !keys.Contains(e.MemberKey)) return false;
+            if (keys != null && !keys.Contains(e.MemberKey)) return false;
 
             if (!_searchEmpty && !MatchesSearch(e)) return false;
 
