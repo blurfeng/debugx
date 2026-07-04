@@ -552,24 +552,6 @@
             记录所有非Debugx打印的Log。
             </summary>
         </member>
-        <member name="F:DebugxLog.DebugxProjectSettings.drawLogToScreen">
-            <summary>
-            Draw logs to screen.
-            绘制Log到屏幕。
-            </summary>
-        </member>
-        <member name="F:DebugxLog.DebugxProjectSettings.restrictDrawLogCount">
-            <summary>
-            Restrict the number of drawn logs.
-            限制绘制Log数量。
-            </summary>
-        </member>
-        <member name="F:DebugxLog.DebugxProjectSettings.maxDrawLogs">
-            <summary>
-            Maximum number of drawn logs.
-            绘制Log最大数量。
-            </summary>
-        </member>
         <member name="T:DebugxLog.DebugxLogCategory">
             <summary>
             Category of a structured raw log, distinguishing the member / admin / unregistered source.
@@ -733,45 +715,6 @@
             End of logging.
             记录结束。
             </summary>
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.DrawGUI">
-            <summary>
-            Render GUI.
-            绘制GUI。
-            </summary>
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.DrawConsoleWindow(System.Int32)">
-            <summary>  
-            Displays a window that lists the recorded logs.
-            显示一个窗口用于展示日志。
-            </summary>  
-            <param name="windowID">Window ID.</param>  
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.DrawLogsList">
-            <summary>  
-            Displays a scrollable list of logs.
-            显示可滚动的日志列表。
-            </summary>  
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.DrawToolbar">
-            <summary>  
-            Displays options for filtering and changing the logs list.
-            绘制工具栏。
-            </summary>  
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.HandleDrawLogs(System.String,UnityEngine.LogType)">
-            <summary>  
-            Records a log from the log callback.
-            回调，记录一条日志到绘制日志列表。
-            </summary>  
-            <param name="message">Message.</param>  
-            <param name="type">Type of message (error, exception, warning, assert).</param>
-        </member>
-        <member name="M:DebugxLog.Tools.LogOutput.TrimExcessLogs">
-            <summary>  
-            Removes old logs that exceed the maximum number allowed.
-            删除超出最大数量的旧日志。
-            </summary>  
         </member>
     </members>
 </doc>

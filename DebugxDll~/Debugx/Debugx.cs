@@ -94,6 +94,8 @@
 // 1.新增结构化日志事件 Debugx.OnRawLog，在唯一日志收口点 LogCreator 携带成员 key/签名/颜色/header/网络标签/LogType/原始 message/最终显示串，供 Debugx Console 等工具以完整成员元数据消费日志。无订阅者时不构造负载，开销近似为零。
 // 2.新增 Debugx.IsDebugxTagged 方法，将 [Debugx] 标签判定收敛一处，供外部（如 Console 双通道去重）复用，与 DebugxTag 常量保持同步。
 // 3.LogCreator 调整为锁内拼串、锁外派发事件并在 unityLogger.Log 之前触发，保证「事件→同线程紧邻的 logMessageReceived 回调」顺序；网络标签只求值一次。
+// 4.退役旧的屏幕 IMGUI 日志覆盖层（LogOutput.DrawGUI），由运行时 UIToolkit 版 Debugx Console 取代；LogOutput 移除整段 Draw Logs（含 message 路径里的 HandleDrawLogs 调用）。
+// 5.移除项目设置 drawLogToScreen / restrictDrawLogCount / maxDrawLogs 三字段（Unity 侧同步移除镜像/设置UI/Prefs/序列化键）。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion

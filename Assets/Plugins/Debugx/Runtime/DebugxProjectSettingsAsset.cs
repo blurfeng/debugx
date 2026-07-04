@@ -132,15 +132,6 @@ namespace DebugxLog
         [Tooltip("记录所有非Debugx打印的Log")]
         public bool recordAllNonDebugxLogs = DebugxStaticData.RecordAllNonDebugxLogsSet;
 
-        [Tooltip("绘制Log到屏幕")]
-        public bool drawLogToScreen = DebugxStaticData.DrawLogToScreenSet;
-
-        [Tooltip("限制绘制Log数量")]
-        public bool restrictDrawLogCount = DebugxStaticData.RestrictDrawLogCountSet;
-
-        [Tooltip("绘制Log最大数量")]
-        public int maxDrawLogs = DebugxStaticData.MaxDrawLogsSet;
-
         #endregion
 
         //保存配置数据资源到dll中的DebugxProjectSettings，这是实际使用的配置数据
@@ -191,9 +182,6 @@ namespace DebugxLog
                 settings.enableWarningStackTrace = DebugxStaticData.EnableWarningStackTracePrefs;
                 settings.enableErrorStackTrace = DebugxStaticData.EnableErrorStackTracePrefs;
                 settings.recordAllNonDebugxLogs = DebugxStaticData.RecordAllNonDebugxLogsPrefs;
-                settings.drawLogToScreen = DebugxStaticData.DrawLogToScreenPrefs;
-                settings.restrictDrawLogCount = DebugxStaticData.RestrictDrawLogCountPrefs;
-                settings.maxDrawLogs = DebugxStaticData.MaxDrawLogsPrefs;
             }
             else
             {
@@ -203,9 +191,6 @@ namespace DebugxLog
                 settings.enableWarningStackTrace = enableWarningStackTrace;
                 settings.enableErrorStackTrace = enableErrorStackTrace;
                 settings.recordAllNonDebugxLogs = recordAllNonDebugxLogs;
-                settings.drawLogToScreen = drawLogToScreen;
-                settings.restrictDrawLogCount = restrictDrawLogCount;
-                settings.maxDrawLogs = maxDrawLogs;
             }
 
             // 用 OnAwake 而非 ResetToDefault：后者只清空 _memberEnables 不重建，会导致应用配置后运行时成员开关静默失效、

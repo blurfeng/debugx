@@ -160,7 +160,6 @@ Log output starts recording when the project starts running, and stops and write
 - `logOutput`: whether to output logs to a local file.
 - `enableLogStackTrace` / `enableWarningStackTrace` / `enableErrorStackTrace`: whether to record stack traces for the Log / Warning / Error types respectively.
 - `recordAllNonDebugxLogs`: whether to record all logs not printed by Debugx.
-- `drawLogToScreen` / `restrictDrawLogCount` / `maxDrawLogs`: whether to draw logs on screen, whether to limit the count, and the max count.
 
 Where log files are written:
 - **Editor**: the `Logs` folder in the project root.

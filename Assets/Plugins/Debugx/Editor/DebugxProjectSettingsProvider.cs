@@ -152,14 +152,6 @@ namespace DebugxLog.Editor
                 DebugxStaticData.ToolTipEnableErrorStackTrace, SettingsAsset.enableErrorStackTrace);
             SettingsAsset.recordAllNonDebugxLogs = ToggleUndo("RecordAllNonDebugxLogs",
                 DebugxStaticData.ToolTipRecordAllNonDebugxLogs, SettingsAsset.recordAllNonDebugxLogs);
-            SettingsAsset.drawLogToScreen = ToggleUndo("DrawLogToScreen", DebugxStaticData.ToolTipDrawLogToScreen,
-                SettingsAsset.drawLogToScreen);
-            EditorGUI.BeginDisabledGroup(!SettingsAsset.drawLogToScreen);
-            SettingsAsset.restrictDrawLogCount = ToggleUndo("RestrictDrawLogCount",
-                DebugxStaticData.ToolTipRestrictDrawLogCount, SettingsAsset.restrictDrawLogCount);
-            SettingsAsset.maxDrawLogs = IntFieldUndo("MaxDrawLogs", DebugxStaticData.ToolTipMaxDrawLogs,
-                SettingsAsset.maxDrawLogs);
-            EditorGUI.EndDisabledGroup();
             EditorGUI.EndDisabledGroup();
 
             EndChangeCheck();
@@ -542,9 +534,6 @@ namespace DebugxLog.Editor
             SettingsAsset.enableWarningStackTrace = DebugxStaticData.EnableWarningStackTraceSet;
             SettingsAsset.enableErrorStackTrace = DebugxStaticData.EnableErrorStackTraceSet;
             SettingsAsset.recordAllNonDebugxLogs = DebugxStaticData.RecordAllNonDebugxLogsSet;
-            SettingsAsset.drawLogToScreen = DebugxStaticData.DrawLogToScreenSet;
-            SettingsAsset.restrictDrawLogCount = DebugxStaticData.RestrictDrawLogCountSet;
-            SettingsAsset.maxDrawLogs = DebugxStaticData.MaxDrawLogsSet;
 
             ResetProjectSettingsMembers();
 

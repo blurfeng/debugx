@@ -226,24 +226,6 @@ namespace DebugxLog
         /// </summary>
         public bool recordAllNonDebugxLogs = false;
 
-        /// <summary>
-        /// Draw logs to screen.
-        /// 绘制Log到屏幕。
-        /// </summary>
-        public bool drawLogToScreen = false;
-
-        /// <summary>
-        /// Restrict the number of drawn logs.
-        /// 限制绘制Log数量。
-        /// </summary>
-        public bool restrictDrawLogCount = false;
-
-        /// <summary>
-        /// Maximum number of drawn logs.
-        /// 绘制Log最大数量。
-        /// </summary>
-        public int maxDrawLogs = 100;
-
         #endregion
     }
 }

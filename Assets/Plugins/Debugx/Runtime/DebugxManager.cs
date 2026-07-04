@@ -114,11 +114,6 @@ namespace DebugxLog
             LogOutput.RecordOver();
         }
 
-        private void OnGUI()
-        {
-            LogOutput.DrawGUI();
-        }
-
         /// <summary>
         /// Set the member switch. This method can be used to set it during operation.
         /// 设置成员开关。运行时可通过此方法设置。

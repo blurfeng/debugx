@@ -156,14 +156,6 @@ namespace DebugxLog.Editor
                 DebugxStaticData.ToolTipEnableErrorStackTrace, DebugxStaticData.EnableErrorStackTracePrefs);
             DebugxStaticData.RecordAllNonDebugxLogsPrefs = GUILayoutEx.Toggle("RecordAllNonDebugxLogs",
                 DebugxStaticData.ToolTipRecordAllNonDebugxLogs, DebugxStaticData.RecordAllNonDebugxLogsPrefs);
-            DebugxStaticData.DrawLogToScreenPrefs = GUILayoutEx.Toggle("DrawLogToScreen",
-                DebugxStaticData.ToolTipDrawLogToScreen, DebugxStaticData.DrawLogToScreenPrefs);
-            EditorGUI.BeginDisabledGroup(!DebugxStaticData.DrawLogToScreenPrefs);
-            DebugxStaticData.RestrictDrawLogCountPrefs = GUILayoutEx.Toggle("RestrictDrawLogCount",
-                DebugxStaticData.ToolTipRestrictDrawLogCount, DebugxStaticData.RestrictDrawLogCountPrefs);
-            DebugxStaticData.MaxDrawLogsPrefs = GUILayoutEx.IntField("MaxDrawLogs", DebugxStaticData.ToolTipMaxDrawLogs,
-                DebugxStaticData.MaxDrawLogsPrefs);
-            EditorGUI.EndDisabledGroup();
             EditorGUI.EndDisabledGroup();
 
             // Still call the save method of DebugxProjectSettingsAsset, which will prioritize using Prefs when in UNITY_EDITOR.

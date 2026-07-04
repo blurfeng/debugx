@@ -160,7 +160,6 @@ Debugx 的配置分为两处：`ProjectSettings`（影响整个项目）和 `Pre
 - `logOutput`：是否输出日志到本地文件。
 - `enableLogStackTrace` / `enableWarningStackTrace` / `enableErrorStackTrace`：分别控制 Log / Warning / Error 类型是否记录堆栈跟踪。
 - `recordAllNonDebugxLogs`：是否记录所有非 Debugx 打印的日志。
-- `drawLogToScreen` / `restrictDrawLogCount` / `maxDrawLogs`：是否将日志绘制到屏幕、是否限制绘制数量及上限。
 
 日志文件的输出位置：
 - **编辑器**：项目根目录的 `Logs` 文件夹。

@@ -41,6 +41,3 @@ MonoBehaviour:
   enableWarningStackTrace: 0
   enableErrorStackTrace: 1
   recordAllNonDebugxLogs: 0
-  drawLogToScreen: 0
-  restrictDrawLogCount: 0
-  maxDrawLogs: 100

@@ -107,9 +107,6 @@ namespace DebugxLog
         public const string ToolTipEnableWarningStackTrace = "输出Warning类型的堆栈跟踪";
         public const string ToolTipEnableErrorStackTrace = "输出Error类型的堆栈跟踪";
         public const string ToolTipRecordAllNonDebugxLogs = "记录所有非Debugx打印的Log";
-        public const string ToolTipDrawLogToScreen = "绘制Log到屏幕";
-        public const string ToolTipRestrictDrawLogCount = "限制绘制Log数量";
-        public const string ToolTipMaxDrawLogs = "绘制Log最大数量";
 
         #endregion
 
@@ -129,9 +126,6 @@ namespace DebugxLog
         public const bool EnableWarningStackTraceSet = false;
         public const bool EnableErrorStackTraceSet = true;
         public const bool RecordAllNonDebugxLogsSet = false;
-        public const bool DrawLogToScreenSet = false;
-        public const bool RestrictDrawLogCountSet = false;
-        public const int MaxDrawLogsSet = 100;
 
         #endregion
 
@@ -153,9 +147,6 @@ namespace DebugxLog
             EnableWarningStackTracePrefs = DebugxStaticData.EnableWarningStackTraceSet;
             EnableErrorStackTracePrefs = DebugxStaticData.EnableErrorStackTraceSet;
             RecordAllNonDebugxLogsPrefs = DebugxStaticData.RecordAllNonDebugxLogsSet;
-            DrawLogToScreenPrefs = DebugxStaticData.DrawLogToScreenSet;
-            RestrictDrawLogCountPrefs = DebugxStaticData.RestrictDrawLogCountSet;
-            MaxDrawLogsPrefs = DebugxStaticData.MaxDrawLogsSet;
 
             ResetPreferencesMembers();
         }
@@ -272,24 +263,6 @@ namespace DebugxLog
         {
             get => PlayerPrefsGetBool("DebugxStaticData.RecordAllNonDebugxLogs", DebugxStaticData.RecordAllNonDebugxLogsSet);
             set => PlayerPrefsSetBool("DebugxStaticData.RecordAllNonDebugxLogs", value);
-        }
-
-        public static bool DrawLogToScreenPrefs
-        {
-            get => PlayerPrefsGetBool("DebugxStaticData.DrawLogToScreen", DebugxStaticData.DrawLogToScreenSet);
-            set => PlayerPrefsSetBool("DebugxStaticData.DrawLogToScreen", value);
-        }
-
-        public static bool RestrictDrawLogCountPrefs
-        {
-            get => PlayerPrefsGetBool("DebugxStaticData.RestrictDrawLogCount", DebugxStaticData.RestrictDrawLogCountSet);
-            set => PlayerPrefsSetBool("DebugxStaticData.RestrictDrawLogCount", value);
-        }
-
-        public static int MaxDrawLogsPrefs
-        {
-            get => PlayerPrefs.GetInt("DebugxStaticData.MaxDrawLogs", DebugxStaticData.MaxDrawLogsSet);
-            set => PlayerPrefs.SetInt("DebugxStaticData.MaxDrawLogs", value);
         }
 
         public static bool FaMemberEnableSettingOpen
