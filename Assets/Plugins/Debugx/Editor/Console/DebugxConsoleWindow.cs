@@ -36,9 +36,15 @@ namespace DebugxLog.Console.Editor
         private readonly List<CollapsedRow> _rows = new List<CollapsedRow>();
 
         private ListView _listView;
-        private Label _detailMessage;
-        private VisualElement _stackContainer;
-        private ScrollView _detailScroll;
+        // Detail pane: one IMGUIContainer draws message+stacktrace as a single selectable rich-text block (native Console
+        // style), uniform across Unity versions. 详情面板：一个 IMGUIContainer 将 消息+堆栈 渲染为单个可选中富文本块（原生 Console 风格），各版本一致。
+        private IMGUIContainer _detailImgui;
+        private DebugxLogEntry _detailEntry;               // current detail entry; cache key + right-click copy target. 当前详情条目；缓存键 + 右键复制目标。
+        private Vector2 _detailScrollPos;                  // cached scroll position for the detail block. 详情块缓存滚动位置。
+        private string _detailCombinedText = string.Empty; // cached combined rich text (message + hyperlinked stack). 缓存的合并富文本（消息 + 带超链接堆栈）。
+        private readonly GUIContent _detailContent = new GUIContent(string.Empty); // reused for CalcHeight/GetRect (no per-repaint alloc). 复用于 CalcHeight/GetRect（避免每帧分配）。
+        private bool _detailScriptOnlyCache;               // ScriptOnly state the cache was built under; rebuild when it flips. 构建缓存时的 仅脚本 状态；翻转时重建。
+        private GUIStyle _detailStyle;                     // lazily built "CN Message" (or fallback) clone. 惰性构建的 "CN Message"（或回退）克隆样式。
         private ScrollView _listScroll;      // the ListView's internal scroll view, for tail (stick-to-bottom) detection. ListView 内部滚动视图，用于 tail(贴底)检测。
         private bool _stickToBottom = true;  // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
 
@@ -119,7 +125,21 @@ namespace DebugxLog.Console.Editor
             var split = new TwoPaneSplitView(1, DebugxConsoleStyle.DetailPaneHeight, TwoPaneSplitViewOrientation.Vertical);
             split.style.flexGrow = 1;
             split.Add(BuildListPane());
-            split.Add(BuildDetailPane());
+
+            // The visible divider is the detail pane's TOP BORDER: it sits exactly on the list/detail boundary, moves with
+            // the splitter, and cleanly masks the seam so no list-row sliver bleeds below the line. The split view's own
+            // floating dragline is hidden in StyleDetailDivider; its anchor is kept only as an invisible drag grab-strip.
+            // 可见分隔线用详情面板的“上边框”绘制：正好落在列表/详情边界、随拖拽移动、干净遮住接缝，列表行残余不会漏到线下方。
+            // 拆分视图自带的浮动 dragline 在 StyleDetailDivider 里隐藏；其 anchor 仅作不可见的拖拽抓取条。
+            VisualElement detailPane = BuildDetailPane();
+            detailPane.style.borderTopWidth = DebugxConsoleStyle.DetailDividerThickness;
+            detailPane.style.borderTopColor = DebugxConsoleStyle.DetailDividerColor;
+            split.Add(detailPane);
+
+            // Neutralize the split view's floating dragline + size its grab-strip; (re)applied on geometry changes because
+            // those internal elements are only created on the split view's first layout pass.
+            // 中和拆分视图的浮动 dragline 并设置抓取条大小；这些内部元素首次布局才创建，故在几何变化时（重复）应用。
+            split.RegisterCallback<GeometryChangedEvent>(_ => StyleDetailDivider(split));
             root.Add(split);
 
             ApplyCriteriaToStore();
@@ -376,57 +396,163 @@ namespace DebugxLog.Console.Editor
 
         private VisualElement BuildDetailPane()
         {
-            _detailScroll = new ScrollView(ScrollViewMode.Vertical);
-            _detailScroll.style.flexGrow = 1;
-
-            _detailMessage = new Label { enableRichText = true };
-            _detailMessage.style.whiteSpace = WhiteSpace.Normal;
-            _detailMessage.style.paddingLeft = 6;
-            _detailMessage.style.paddingTop = 6;
-            _detailMessage.style.paddingRight = 6;
-
-            _stackContainer = new VisualElement();
-            _stackContainer.style.paddingLeft = 6;
-            _stackContainer.style.paddingTop = 6;
-            _stackContainer.style.paddingBottom = 6;
-
-            _detailScroll.Add(_detailMessage);
-            _detailScroll.Add(_stackContainer);
-            return _detailScroll;
+            // One IMGUIContainer renders message + stacktrace as a single selectable rich-text block, matching the native
+            // Console: cross-line drag-select + Ctrl/Cmd+C, member colors, and clickable <a href> source links
+            // (SelectableLabel routes clicks through EditorGUI.DoTextField -> hyperLinkClicked -> the global file-opener).
+            // Uniform on 2021.3 and 2022+, so no version split; right-click copy is handled inside the IMGUI handler.
+            // 一个 IMGUIContainer 将 消息+堆栈 渲染为单个可选中富文本块，对齐原生 Console：跨行拖选 + Ctrl/Cmd+C、成员着色、
+            // 可点击的 <a href> 源码链接（SelectableLabel 的点击经 EditorGUI.DoTextField -> hyperLinkClicked -> 全局打开文件）。
+            // 2021.3 与 2022+ 一致，无需版本分支；右键复制在 IMGUI 处理器内实现。
+            _detailImgui = new IMGUIContainer(OnDetailGUI);
+            _detailImgui.style.flexGrow = 1;  // fill the pane so the inner scroll view gets real height. 填满面板，使内部滚动视图获得实际高度。
+            _detailImgui.style.minHeight = 0; // allow shrinking inside the split pane. 允许在分栏内收缩。
+            return _detailImgui;
         }
 
+        // Entry point on selection change and ClearConsole. Stores the entry, rebuilds the combined rich text under the
+        // current ScriptOnly filter, resets scroll, and forces one repaint (data changed outside the IMGUI event loop).
+        // 选中变化与 ClearConsole 的入口。存条目、按当前 仅脚本 过滤重建合并富文本、重置滚动，并强制一次重绘（数据在 IMGUI 事件循环外变化）。
         private void UpdateDetail(DebugxLogEntry e)
         {
-            _stackContainer.Clear();
+            _detailEntry = e;
+            RebuildDetailText();
+            _detailScrollPos = Vector2.zero;
+            _detailImgui?.MarkDirtyRepaint();
+        }
+
+        // Build the cached combined rich text: message (RichText, member colors) + each visible stack frame, with source
+        // frames wrapped as <a href="path" line="n">raw</a> so the native hyperlink handler navigates on click. Respects
+        // the ScriptOnly (IsStackFrameVisible) filter and records the ScriptOnly state the cache was built under.
+        // 构建缓存的合并富文本：消息（RichText，成员色）+ 每个可见堆栈帧，源码帧包成 <a href="path" line="n">raw</a>，
+        // 使原生超链接处理器点击可跳转。遵循 仅脚本(IsStackFrameVisible) 过滤，并记录构建时的 仅脚本 状态。
+        private void RebuildDetailText()
+        {
+            _detailScriptOnlyCache = _stackScriptOnly;
+
+            DebugxLogEntry e = _detailEntry;
             if (e == null)
             {
-                _detailMessage.text = string.Empty;
+                _detailCombinedText = string.Empty;
+                _detailContent.text = string.Empty;
                 return;
             }
 
-            _detailMessage.text = e.RichText;
+            var sb = new System.Text.StringBuilder();
+            sb.Append(e.RichText);
 
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)
             {
                 if (!IsStackFrameVisible(frame)) continue; // Script-Only / Full toggle (View menu). 仅脚本/完整 切换（视图菜单）。
-
-                var line = new Label(frame.RawLine) { enableRichText = false };
-                line.style.whiteSpace = WhiteSpace.Normal;
-                line.style.paddingTop = 1;
-                line.style.paddingBottom = 1;
-
-                if (frame.HasSource)
-                {
-                    StackFrameInfo captured = frame;
-                    line.style.color = DebugxConsoleStyle.StackLinkColor;
-                    line.RegisterCallback<ClickEvent>(_ => OpenSource(captured.FilePath, captured.Line));
-                    line.RegisterCallback<MouseEnterEvent>(_ => line.style.unityFontStyleAndWeight = FontStyle.Bold);
-                    line.RegisterCallback<MouseLeaveEvent>(_ => line.style.unityFontStyleAndWeight = FontStyle.Normal);
-                }
-
-                _stackContainer.Add(line);
+                sb.Append('\n').Append(BuildStackFrameRichLine(frame));
             }
+            _detailCombinedText = sb.ToString();
+            _detailContent.text = _detailCombinedText;
+        }
+
+        // One stacktrace line as rich text. Source frames become <a href="FilePath" line="Line">RawLine</a> (native's exact
+        // template) so EditorGUI's global hyperlink handler opens the file at the line; the visible text stays the raw frame.
+        // FilePath is passed through verbatim (project-relative or absolute) — the handler resolves both. Only the attribute's
+        // own quote is escaped; the visible RawLine is left as-is (Unity renders any unknown angle-bracket token literally).
+        // 一行堆栈的富文本。源码帧变为 <a href="FilePath" line="Line">RawLine</a>（原生同款模板），使 EditorGUI 全局超链接处理器按行打开文件；
+        // 可见文本仍是原始帧。FilePath 原样传入（工程相对或绝对），处理器都能解析。仅转义属性内的引号；可见的 RawLine 不动（Unity 会把无法识别的尖括号按字面渲染）。
+        private static string BuildStackFrameRichLine(StackFrameInfo frame)
+        {
+            if (!frame.HasSource) return frame.RawLine;
+            string href = (frame.FilePath ?? string.Empty).Replace("\"", "&quot;");
+            return $"<a href=\"{href}\" line=\"{frame.Line}\">{frame.RawLine}</a>";
+        }
+
+        // IMGUI handler for the detail block. IMGUIContainer doesn't scroll, so we host a GUILayout scroll view; the
+        // SelectableLabel is sized to full content height via CalcHeight, renders selectable rich text (member colors +
+        // clickable <a href> source links), and a right-click Copy All / Copy Stack menu is offered.
+        // 详情块的 IMGUI 处理器。IMGUIContainer 不自滚，故内置一个 GUILayout 滚动视图；SelectableLabel 用 CalcHeight 撑到内容全高，
+        // 渲染可选中富文本（成员色 + 可点击的 <a href> 源码链接），并提供右键 复制全部 / 复制堆栈 菜单。
+        private void OnDetailGUI()
+        {
+            // Safety: if the ScriptOnly filter changed since the last rebuild, refresh the cache. 安全：仅脚本 过滤若已变则刷新缓存。
+            if (_detailScriptOnlyCache != _stackScriptOnly) RebuildDetailText();
+
+            GUIStyle style = DetailStyle;
+            string text = _detailCombinedText;
+
+            // Usable content width = container width - vertical scrollbar (~16) - style L/R padding; fall back to the view
+            // width before the first layout (width <= 1). 可用内容宽度 = 容器宽 - 竖直滚动条(~16) - 样式左右内边距；首次布局前(宽<=1)回退视图宽。
+            float w = _detailImgui != null ? _detailImgui.contentRect.width : 0f;
+            if (w <= 1f) w = EditorGUIUtility.currentViewWidth;
+            float wrapWidth = Mathf.Max(1f, w - 16f - style.padding.horizontal);
+            float h = style.CalcHeight(_detailContent, wrapWidth);
+
+            _detailScrollPos = GUILayout.BeginScrollView(_detailScrollPos);
+            Rect labelRect = GUILayoutUtility.GetRect(_detailContent, style, GUILayout.ExpandWidth(true), GUILayout.Height(h));
+
+            // Right-click => Copy All / Copy Stack. Handle before SelectableLabel so the event isn't swallowed. Built in
+            // IMGUI because a UIToolkit ContextualMenuManipulator on an IMGUIContainer is unreliable.
+            // 右键 => 复制全部 / 复制堆栈。须在 SelectableLabel 之前处理以免被吞。用 IMGUI，因 IMGUIContainer 上的 UIToolkit 右键菜单不可靠。
+            if (Event.current.type == EventType.ContextClick && labelRect.Contains(Event.current.mousePosition))
+            {
+                ShowDetailContextMenu();
+                Event.current.Use();
+            }
+
+            // SelectableLabel: cross-line drag-select + Ctrl/Cmd+C; richText keeps member colors; <a> clicks route through
+            // EditorGUI.DoTextField -> hyperLinkClicked -> the global file-opener (we do not subscribe -> no double-open).
+            // SelectableLabel：跨行拖选 + Ctrl/Cmd+C；richText 保留成员色；<a> 点击经 EditorGUI.DoTextField -> hyperLinkClicked -> 全局打开文件（我们不订阅 -> 不会重复打开）。
+            EditorGUI.SelectableLabel(labelRect, text, style);
+
+            GUILayout.EndScrollView();
+        }
+
+        // The detail text style: native Console's "CN Message" (already richText + wordWrap), cloned before mutating so we
+        // don't leak tweaks into the shared skin; falls back to a rich-text label clone if the style name is absent.
+        // 详情文本样式：原生 Console 的 "CN Message"（本就 richText + wordWrap），修改前克隆以免污染共享皮肤；样式缺失则回退到富文本 label 克隆。
+        private GUIStyle DetailStyle
+        {
+            get
+            {
+                if (_detailStyle == null)
+                {
+                    GUIStyle src = GUI.skin.FindStyle("CN Message");
+                    _detailStyle = src != null
+                        ? new GUIStyle(src) { richText = true, wordWrap = true }
+                        : new GUIStyle(EditorStyles.label) { richText = true, wordWrap = true, padding = new RectOffset(6, 6, 6, 6) };
+                }
+                return _detailStyle;
+            }
+        }
+
+        // Right-click Copy All / Copy Stack for the current detail entry (reuses CopyEntries + L). 当前详情条目的右键 复制全部 / 复制堆栈（复用 CopyEntries + L）。
+        private void ShowDetailContextMenu()
+        {
+            DebugxLogEntry e = _detailEntry;
+            if (e == null) return;
+            var menu = new GenericMenu();
+            menu.AddItem(new GUIContent(L("复制全部", "Copy All")), false,
+                () => CopyEntries(new List<DebugxLogEntry> { e }, withStack: true));
+            if (!string.IsNullOrEmpty(e.StackTrace))
+                menu.AddItem(new GUIContent(L("复制堆栈", "Copy Stack")), false,
+                    () => EditorGUIUtility.systemCopyBuffer = e.StackTrace);
+            menu.ShowAsContext();
+        }
+
+        // The visible divider is the detail pane's top border (set in CreateGUI), so here we only neutralize the split
+        // view's own floating dragline: make the anchor + line fully transparent (inline styles also kill the theme's
+        // :hover recolor) and shrink the anchor to a small drag grab-strip. This stops a list-row sliver from showing in
+        // the (previously themed) anchor band below the seam, while the splitter stays draggable.
+        // 可见分隔线改由详情面板的上边框绘制（见 CreateGUI），这里只中和拆分视图自带的浮动 dragline：把 anchor 与 line 全透明
+        // （内联样式同时消除主题的 :hover 变色），并把 anchor 收成小的拖拽抓取条。这样接缝下方那条（原本有主题底色的）anchor 带
+        // 不再露出列表行残余，同时分隔线仍可拖拽。
+        private static void StyleDetailDivider(TwoPaneSplitView split)
+        {
+            VisualElement anchor = split.Q(className: "unity-two-pane-split-view__dragline-anchor");
+            if (anchor != null)
+            {
+                anchor.style.backgroundColor = Color.clear;
+                anchor.style.height = DebugxConsoleStyle.DetailDividerGrabSize; // shrink the invisible grab/hover band. 收窄不可见的抓取/悬停带。
+            }
+
+            VisualElement line = split.Q(className: "unity-two-pane-split-view__dragline");
+            if (line != null) line.style.backgroundColor = Color.clear; // hidden; the detail pane's top border is the real line. 隐藏；真正的分隔线是详情面板的上边框。
         }
 
         // ---------- Refresh / update loop ----------
@@ -810,7 +936,7 @@ namespace DebugxLog.Console.Editor
             ResetCompileMirrorDedup(); // so a later scan can re-mirror compile messages still in the console. 便于之后重扫再镜像仍在控制台里的编译消息。
             _selectedIndex = -1;
             _listView?.ClearSelection();
-            if (_stackContainer != null) UpdateDetail(null);
+            if (_detailImgui != null) UpdateDetail(null);
             _stickToBottom = true; // a just-cleared (empty) list should resume tail-following newest logs. 刚清空的（空）列表应恢复尾随最新日志。
             if (_listView != null) ForceRefresh();
         }

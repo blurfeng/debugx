@@ -52,7 +52,7 @@ namespace DebugxLog.Console.Editor
         // 视图选项变化后，按当前主选中项重绘详情面板。
         private void RefreshSelectedDetail()
         {
-            if (_stackContainer == null) return;
+            if (_detailImgui == null) return;
             if (_selectedIndex >= 0 && _selectedIndex < _rows.Count)
                 UpdateDetail(_rows[_selectedIndex].Entry);
             else

@@ -92,5 +92,11 @@ namespace DebugxLog.Console.Editor
         public static Color RuntimePanelBorderColor = new Color(0f, 0f, 0f, 0.3f);
         /// <summary>Muted color for hint text. 提示文字的柔和颜色。</summary>
         public static Color HintColor = new Color(0.6f, 0.6f, 0.6f);
+        /// <summary>Color of the list/detail splitter hairline. Dark gray and static (no hover recolor), like the native Console. 列表/详情分隔线颜色。深灰、静态（悬停不变色），仿原生 Console。</summary>
+        public static Color DetailDividerColor = new Color(0.15f, 0.15f, 0.15f, 1f);
+        /// <summary>Thickness (px) of the list/detail splitter hairline. Lower = thinner. 列表/详情分隔线的粗细（像素）。越小越细。</summary>
+        public static readonly float DetailDividerThickness = 1f;
+        /// <summary>Height (px) of the splitter's invisible drag grab-strip. Larger = easier to grab; smaller = closer to the 1px line. 分隔线不可见拖拽抓取条的高度（像素）。越大越好抓，越小越贴近细线。</summary>
+        public static readonly float DetailDividerGrabSize = 5f;
     }
 }
