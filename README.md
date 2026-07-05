@@ -74,7 +74,7 @@ Debugx 在 `ProjectSettings` 和 `Preferences` 中分别提供了配置界面：
 | 编辑器友好 | 集成到 `ProjectSettings` 与 `Preferences`，字段带 Tooltip；自适应 Dark / Light 皮肤；界面按系统语言中英切换。 |
 
 ## 💻 环境要求
-- `Unity 2021.3` 或更新的版本（更旧的版本未经测试）。
+- `Unity 2022.3` 或更新的版本（更旧的版本未经测试）。
 - 必须在项目中添加 `DEBUG_X` 宏以启用功能（见 [2.添加 DEBUG_X 宏](#2添加-debug_x-宏)）。
 - 无任何第三方依赖。
 

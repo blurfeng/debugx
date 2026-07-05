@@ -74,7 +74,7 @@ All business-facing print methods are marked with `[Conditional("DEBUG_X")]`, so
 | Editor-friendly | Integrated into `ProjectSettings` and `Preferences` with Tooltips on fields; adapts to Dark / Light skins; the UI switches between Chinese and English by system language. |
 
 ## 💻 Requirements
-- `Unity 2021.3` or newer (older versions are untested).
+- `Unity 2022.3` or newer (older versions are untested).
 - You must add the `DEBUG_X` macro to your project to enable the features (see [2.Add the DEBUG_X Macro](#2add-the-debug_x-macro)).
 - No third-party dependencies.
 

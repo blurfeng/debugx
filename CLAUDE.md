@@ -76,4 +76,4 @@ A "member" is a log category with an `int key`, `signature` (name), color, heade
 
 ## Testing / running
 
-There is no automated test suite. Verification is manual: open the project in Unity (2021.3+, package targets `unity: 2022.3`), ensure `DEBUG_X` is in the project's scripting-define symbols, enter Play mode, and use `Assets/Source/DebugxTest.cs` and the **DebugxConsole > Test** toggles (`EnableAwakeTestLog`, `EnableUpdateTestLog`) to confirm output. Log files land in the project root `Logs/` folder in-editor.
+There is no automated test suite. Verification is manual: open the project in Unity (2022.3+, package targets `unity: 2022.3`), ensure `DEBUG_X` is in the project's scripting-define symbols, enter Play mode, and use `Assets/Source/DebugxTest.cs` and the **DebugxConsole > Test** toggles (`EnableAwakeTestLog`, `EnableUpdateTestLog`) to confirm output. Log files land in the project root `Logs/` folder in-editor.
