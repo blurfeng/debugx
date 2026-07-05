@@ -49,6 +49,14 @@ namespace DebugxLog.Console.Runtime
         public const float SeverityBarWidth = 4f;
         public const float TimestampWidth = 56f;
         public const int CountOverflowThreshold = 999;
+
+        // Collapse count badge: a rounded pill behind the duplicate count, matching the Editor Console. Slightly lighter
+        // than the panel so the count reads over dark game content.
+        // 折叠计数徽标：数字后的圆角药丸，与 Editor 版一致。比面板略浅，使计数叠在深色游戏画面上仍清晰。
+        public static readonly Color BadgeBgColor = new Color(0.32f, 0.32f, 0.35f, 0.95f);
+        public const float BadgeCornerRadius = 8f;
+        public const float BadgePaddingH = 6f;
+        public const float BadgePaddingV = 1f;
         public const float InactiveOpacity = 0.4f;
         public const int FontSizeSmall = 11;
 

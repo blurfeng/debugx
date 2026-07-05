@@ -60,6 +60,14 @@ namespace DebugxLog
             set => PlayerPrefsSetBool("DebugxStaticData.EnableAwakeTestLog", value);
         }
 
+        // Start runs once, so a plain PlayerPrefs read (like Awake) is enough — no per-frame cache needed.
+        // Start 只跑一次，故与 Awake 一样直接读 PlayerPrefs 即可——无需 Update 那样的逐帧缓存。
+        public static bool EnableStartTestLog
+        {
+            get => PlayerPrefsGetBool("DebugxStaticData.EnableStartTestLog", false);
+            set => PlayerPrefsSetBool("DebugxStaticData.EnableStartTestLog", value);
+        }
+
         // 0=未读取 1=true 2=false。缓存避免 DebugxManager.Update 每帧读取 PlayerPrefs；setter 同步缓存，保证运行时切换即时生效。
         // 0=unread 1=true 2=false. Cached to avoid a per-frame PlayerPrefs read in DebugxManager.Update; the setter keeps the cache in sync.
         private static byte _enableUpdateTestLog;

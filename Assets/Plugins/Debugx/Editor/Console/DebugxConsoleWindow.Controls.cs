@@ -243,6 +243,10 @@ namespace DebugxLog.Console.Editor
             awake.RegisterValueChangedCallback(evt => DebugxStaticData.EnableAwakeTestLog = evt.newValue);
             _editorPanel.Add(awake);
 
+            var start = new Toggle(L("Start 测试打印", "Start test log")) { value = DebugxStaticData.EnableStartTestLog };
+            start.RegisterValueChangedCallback(evt => DebugxStaticData.EnableStartTestLog = evt.newValue);
+            _editorPanel.Add(start);
+
             var update = new Toggle(L("Update 测试打印", "Update test log")) { value = DebugxStaticData.EnableUpdateTestLog };
             update.RegisterValueChangedCallback(evt => DebugxStaticData.EnableUpdateTestLog = evt.newValue);
             _editorPanel.Add(update);

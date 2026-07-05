@@ -41,7 +41,7 @@ namespace DebugxLog.Console.Runtime
 
         private ScrollView _listScroll;
         private bool _stickToBottom = true; // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
-        private bool _showTimestamp;         // optional timestamp column, toggled by the "Time" toolbar toggle. 可选时间戳列，由 “Time” 工具栏开关切换。
+        private bool _showTimestamp = true;  // optional timestamp column (default ON), toggled by the "Time" toolbar toggle. 可选时间戳列（默认开启），由 “Time” 工具栏开关切换。
         private int _selectedIndex = -1;
 
         // Hold-to-clear state: a quick tap on Clear does nothing (guards against accidental clears); holding for
@@ -186,17 +186,22 @@ namespace DebugxLog.Console.Runtime
             StyleToolbarButton(copy);
             bar.Add(copy);
 
-            bar.Add(BuildCheckToggle("Collapse", out _, evt =>
+            // Capture the toggle to sync its initial checkbox to the persisted/default state (see LoadViewPrefs); without
+            // this, BuildCheckToggle starts unchecked regardless of _store.CollapseMode. 捕获 Toggle 以把初始勾选同步到
+            // 持久化/默认状态（见 LoadViewPrefs）；否则 BuildCheckToggle 一律起始未勾，无视 _store.CollapseMode。
+            bar.Add(BuildCheckToggle("Collapse", out var collapseToggle, evt =>
             {
                 _store.CollapseMode = evt.newValue ? LogCollapser.Mode.ByMessage : LogCollapser.Mode.Off;
                 ForceRefresh();
             }));
+            collapseToggle.SetValueWithoutNotify(_store.CollapseMode != LogCollapser.Mode.Off);
 
-            bar.Add(BuildCheckToggle("Debugx Only", out _, evt =>
+            bar.Add(BuildCheckToggle("Debugx Only", out var debugxOnlyToggle, evt =>
             {
                 _criteria.OnlyDebugx = evt.newValue;
                 OnCriteriaChanged();
             }));
+            debugxOnlyToggle.SetValueWithoutNotify(_criteria.OnlyDebugx);
 
             // Member (Debugx category) filter — opens a custom popup (BuildMemberPopup, added to the panel). 成员（Debugx 分类）过滤——打开自建弹层（BuildMemberPopup，挂在面板上）。
             bar.Add(BuildMemberButton());
@@ -209,15 +214,19 @@ namespace DebugxLog.Console.Runtime
 
             // Optional timestamp column (display-only toggle; rebind the visible rows, no filter change).
             // 可选时间戳列（纯显示开关；重绑可见行，不改过滤）。
-            bar.Add(BuildCheckToggle("Time", out _, evt =>
+            // Initialize the checkbox to the field default (ON) without firing the callback, so the toggle state matches
+            // the already-shown timestamp column. 用字段默认值（开启）初始化勾选框且不触发回调，使勾选状态与已显示的时间戳列一致。
+            bar.Add(BuildCheckToggle("Time", out var timeToggle, evt =>
             {
                 _showTimestamp = evt.newValue;
                 _listView.RefreshItems();
             }));
+            timeToggle.SetValueWithoutNotify(_showTimestamp);
 
             // Net-tag filter (B7): a compact cycle button All -> Server -> Client. netTag 过滤（B7）：紧凑的循环按钮 全部→Server→Client。
             _netButton = new Button(CycleNetTag) { text = "Net: All" };
             StyleToolbarButton(_netButton);
+            UpdateNetButtonText(); // reflect the persisted/default net-tag mode. 反映持久化/默认的网络标签模式。
             bar.Add(_netButton);
 
             _logButton = BuildCountButton(_iconLog, DebugxRuntimeConsoleStyle.LogColor, out _logCount, () =>
@@ -362,6 +371,18 @@ namespace DebugxLog.Console.Runtime
             badge.style.unityTextAlign = TextAnchor.MiddleCenter;
             badge.style.unityFontStyleAndWeight = FontStyle.Bold;
             badge.style.color = DebugxRuntimeConsoleStyle.TextColor;
+            // Rounded pill background behind the collapse count, matching the Editor Console. The row is Center-aligned,
+            // so the badge hugs its text vertically and reads as a small pill rather than a full-height bar.
+            // 折叠计数后的圆角药丸背景，与 Editor 版一致。行是 Center 对齐，故徽标按文字高度收缩，呈小药丸而非撑满整行的竖条。
+            badge.style.backgroundColor = DebugxRuntimeConsoleStyle.BadgeBgColor;
+            badge.style.paddingLeft = DebugxRuntimeConsoleStyle.BadgePaddingH;
+            badge.style.paddingRight = DebugxRuntimeConsoleStyle.BadgePaddingH;
+            badge.style.paddingTop = DebugxRuntimeConsoleStyle.BadgePaddingV;
+            badge.style.paddingBottom = DebugxRuntimeConsoleStyle.BadgePaddingV;
+            badge.style.borderTopLeftRadius = DebugxRuntimeConsoleStyle.BadgeCornerRadius;
+            badge.style.borderTopRightRadius = DebugxRuntimeConsoleStyle.BadgeCornerRadius;
+            badge.style.borderBottomLeftRadius = DebugxRuntimeConsoleStyle.BadgeCornerRadius;
+            badge.style.borderBottomRightRadius = DebugxRuntimeConsoleStyle.BadgeCornerRadius;
 
             row.Add(sev);
             row.Add(sevIcon);

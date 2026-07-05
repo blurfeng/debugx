@@ -88,9 +88,28 @@ namespace DebugxLog
             {
                 // Try to print. It can be annotated. The member information with the corresponding key will be printed.
                 // 试打印，可注释。有对应key的成员信息时才会被打印。
-                Debugx.Log(1, "Key 1 Print Test");
-                Debugx.Log(2, "Key 2 Print Test");
-                Debugx.Log(999, "Key 999 Print Test");
+                Debugx.Log(1, "Key 1 Print Test (Awake)");
+                Debugx.Log(2, "Key 2 Print Test (Awake)");
+                Debugx.Log(999, "Key 999 Print Test (Awake)");
+            }
+#endif
+        }
+
+        private void Start()
+        {
+#if UNITY_EDITOR
+            // test case. Toggle at Menu > Window > Debugx > DebugxConsole, Test > EnableStartTestLog.
+            // Unlike the Awake test log, Start fires one frame later — after the runtime Console has subscribed to the
+            // log channels — so these lines also show up in the in-game runtime Console, not just the Editor one.
+            // 测试用。在 菜单>Window>Debugx>DebugxConsole 的 Test>EnableStartTestLog 开关。与 Awake 测试打印不同，Start 晚一帧
+            // 触发——此时运行时 Console 已订阅日志通道——故这些日志在游戏内运行时 Console 里也能看到，而不只是 Editor 版。
+            if (DebugxStaticData.EnableStartTestLog)
+            {
+                // Try to print. It can be annotated. The member information with the corresponding key will be printed.
+                // 试打印，可注释。有对应key的成员信息时才会被打印。
+                Debugx.Log(1, "Key 1 Print Test (Start)");
+                Debugx.Log(2, "Key 2 Print Test (Start)");
+                Debugx.Log(999, "Key 999 Print Test (Start)");
             }
 #endif
         }
@@ -103,7 +122,7 @@ namespace DebugxLog
             {
                 // Test print, with comments. It will only be printed when there is corresponding key for the member information.
                 // 测试打印，可注释。有对应key的成员信息时才会被打印。
-                Debugx.Log(1, "MemberKey 1 Update");
+                Debugx.Log(1, "MemberKey 1 Update (Update)");
             }
 #endif
         }

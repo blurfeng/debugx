@@ -395,6 +395,18 @@ namespace DebugxLog.Console.Editor
             badge.style.minWidth = 22;
             badge.style.unityTextAlign = TextAnchor.MiddleCenter;
             badge.style.unityFontStyleAndWeight = FontStyle.Bold;
+            // Rounded pill background behind the collapse count, like the native Console. The row is Center-aligned, so
+            // the badge hugs its text vertically and reads as a small pill rather than a full-height bar.
+            // 折叠计数后的圆角药丸背景，仿原生 Console。行是 Center 对齐，故徽标按文字高度收缩，呈小药丸而非撑满整行的竖条。
+            badge.style.backgroundColor = DebugxConsoleStyle.BadgeBgColor;
+            badge.style.paddingLeft = DebugxConsoleStyle.BadgePaddingH;
+            badge.style.paddingRight = DebugxConsoleStyle.BadgePaddingH;
+            badge.style.paddingTop = DebugxConsoleStyle.BadgePaddingV;
+            badge.style.paddingBottom = DebugxConsoleStyle.BadgePaddingV;
+            badge.style.borderTopLeftRadius = DebugxConsoleStyle.BadgeCornerRadius;
+            badge.style.borderTopRightRadius = DebugxConsoleStyle.BadgeCornerRadius;
+            badge.style.borderBottomLeftRadius = DebugxConsoleStyle.BadgeCornerRadius;
+            badge.style.borderBottomRightRadius = DebugxConsoleStyle.BadgeCornerRadius;
 
             row.Add(icon);
             row.Add(time);

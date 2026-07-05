@@ -82,9 +82,17 @@ namespace DebugxLog.Console.Editor
         /// <summary>Counts above this show as "N+". 超过此值的计数显示为 “N+”。</summary>
         public static readonly int CountOverflowThreshold = 999;
 
+        // ---- Collapse count badge ----
+        /// <summary>Background of the rounded pill drawn behind a collapsed row's duplicate count, like the native Console. A skin-agnostic translucent gray reads on both the dark and light editor skins. 折叠行重复计数后的圆角药丸背景，仿原生 Console。皮肤无关的半透明灰在深/浅皮肤上都清晰。</summary>
+        public static Color BadgeBgColor = new Color(0.5f, 0.5f, 0.5f, 0.35f);
+        /// <summary>Corner radius (px) of the count pill. 计数药丸的圆角半径（像素）。</summary>
+        public static readonly float BadgeCornerRadius = 8f;
+        /// <summary>Left/right padding (px) inside the count pill. 计数药丸的左右内边距（像素）。</summary>
+        public static readonly float BadgePaddingH = 6f;
+        /// <summary>Top/bottom padding (px) inside the count pill. 计数药丸的上下内边距（像素）。</summary>
+        public static readonly float BadgePaddingV = 1f;
+
         // ---- Colors ----
-        /// <summary>Color of clickable (navigable) stack-frame lines. 可点击（可跳转）堆栈帧行的颜色。</summary>
-        public static Color StackLinkColor = new Color(0.4f, 0.6f, 1f);
         /// <summary>Bottom border color of the editor panel. 编辑面板底部边框颜色。</summary>
         public static Color EditorPanelBorderColor = new Color(0f, 0f, 0f, 0.3f);
         /// <summary>Muted color for hint text. 提示文字的柔和颜色。</summary>

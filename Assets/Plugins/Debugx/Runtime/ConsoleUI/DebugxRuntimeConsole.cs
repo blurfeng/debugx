@@ -45,7 +45,35 @@ namespace DebugxLog.Console.Runtime
 
         private static DebugxRuntimeConsole _instance;
 
+        // Early-capture store, created at BeforeSceneLoad — i.e. BEFORE DebugxManager's AfterSceneLoad Awake — so logs
+        // emitted before this console's GameObject even exists (e.g. DebugxManager.Awake) are still captured. Only the
+        // collector subscription runs that early; entries queue in the collector until OnEnable hands this store to the
+        // instance and the first Update pumps them into the buffer. See EarlyCapture. Without this, the runtime console
+        // (unlike the Editor Console, whose collector is already subscribed / whose logs persist across domain reloads)
+        // would miss everything logged before AfterSceneLoad, because the Unity log channels have no history.
+        // 提前采集 store，在 BeforeSceneLoad 创建——即早于 DebugxManager 的 AfterSceneLoad Awake——使本 Console 的 GameObject
+        // 尚未存在时发出的日志（如 DebugxManager.Awake）也能被采集。此时只做采集器订阅；条目在采集器里排队，直到 OnEnable 把该
+        // store 交接给实例、首帧 Update 将其排入缓冲。见 EarlyCapture。没有它，运行时 Console（不同于 Editor 版——其采集器早已
+        // 订阅、日志还能跨域重载留存）会漏掉 AfterSceneLoad 之前的一切，因为 Unity 日志通道没有历史。
+        private static DebugxLogStore _earlyStore;
+
 #if DEBUG_X
+        // Subscribe to the log channels as early as possible (before scenes load, hence before DebugxManager.Awake's
+        // AfterSceneLoad callback), so early logs land in the collector's queue and are drained by the console's first
+        // Pump. Only the subscription happens here; the panel UI is still built later in Bootstrap. Gated by the same
+        // opt-out as Bootstrap so a disabled runtime console captures nothing.
+        // 尽早订阅日志通道（在场景加载前，故早于 DebugxManager.Awake 的 AfterSceneLoad 回调），使早期日志进入采集器队列，由
+        // Console 首帧 Pump 排空。此处仅订阅；面板 UI 仍在 Bootstrap 里稍后构建。与 Bootstrap 同一开关门控，关闭时不采集。
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void EarlyCapture()
+        {
+            if (_earlyStore != null || _instance != null || !Application.isPlaying) return;
+            if (!DebugxStaticData.RuntimeConsoleEnabled) return;
+
+            _earlyStore = new DebugxLogStore(DebugxRuntimeConsoleStyle.RuntimeBufferCapacity);
+            _earlyStore.Start();
+        }
+
         // Auto-created after the first scene loads, only in Play. Mirrors DebugxManager's [RuntimeInitializeOnLoadMethod]
         // bootstrap; no scene setup or prefab is required.
         // 首个场景加载后自动创建，仅 Play 期。对齐 DebugxManager 的 [RuntimeInitializeOnLoadMethod] 引导；无需场景配置或预制体。
@@ -62,6 +90,11 @@ namespace DebugxLog.Console.Runtime
             PanelSettings panelSettings = Resources.Load<PanelSettings>(PanelSettingsResource);
             if (panelSettings == null)
             {
+                // No console will be created, so release the early-capture subscription (see EarlyCapture) — otherwise it
+                // would keep collecting with no consumer to pump it. 不会创建 Console，故释放提前采集订阅（见 EarlyCapture）——
+                // 否则它会一直采集却无人 Pump。
+                _earlyStore?.Stop();
+                _earlyStore = null;
                 Debug.LogWarning(
                     $"[Debugx] 运行时 Console 未启用：未找到 PanelSettings 'Resources/{PanelSettingsResource}'。" +
                     " 请在任意 Resources 目录下创建 UI Toolkit > Panel Settings Asset 并命名为 Console。");
@@ -129,13 +162,32 @@ namespace DebugxLog.Console.Runtime
 
         private void OnEnable()
         {
-            _store = new DebugxLogStore(DebugxRuntimeConsoleStyle.RuntimeBufferCapacity);
+            // Reuse the early-capture store (subscribed at BeforeSceneLoad) so logs from before this GameObject existed —
+            // e.g. DebugxManager.Awake — are not lost. Fall back to a fresh store if early capture didn't run (e.g. the
+            // console was enabled after BeforeSceneLoad). Start() is idempotent, so reusing an already-started store is safe.
+            // 复用提前采集的 store（在 BeforeSceneLoad 订阅），使本 GameObject 存在之前的日志——如 DebugxManager.Awake——不丢失。
+            // 若提前采集未运行（如在 BeforeSceneLoad 之后才启用 Console）则退回新建。Start() 幂等，复用已启动的 store 也安全。
+            _store = _earlyStore ?? new DebugxLogStore(DebugxRuntimeConsoleStyle.RuntimeBufferCapacity);
+            _earlyStore = null;
             _store.Start();
+
+            // Load persisted toolbar state here — before the toolbar is built — so each control syncs its initial value
+            // and the filter applies from the first frame. 在此加载持久化的工具栏状态——早于工具栏构建——使各控件同步初始值、
+            // 过滤从首帧即生效。
+            LoadViewPrefs();
         }
 
         private void OnDisable()
         {
+            SaveViewPrefs(); // persist toolbar state on teardown (play exit / GameObject destroy). 拆卸时（退出 Play/销毁）持久化工具栏状态。
             _store?.Stop();
+        }
+
+        // Also persist when the app is paused, so a backgrounded-then-killed mobile app keeps its toolbar state (OnDisable
+        // may not run in that case). 应用暂停时也持久化，使移动端“后台后被杀”仍保留工具栏状态（此时 OnDisable 可能不执行）。
+        private void OnApplicationPause(bool pause)
+        {
+            if (pause) SaveViewPrefs();
         }
 
         private void Update()
