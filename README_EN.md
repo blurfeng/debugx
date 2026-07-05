@@ -50,7 +50,7 @@ In addition, Debugx has a built-in **Debugx Console** log viewer (an editor wind
   - [Editor Window](#editor-window)
   - [Toolbar & Filtering](#toolbar--filtering)
   - [List & Detail Panel](#list--detail-panel)
-  - [Runtime Panel](#runtime-panel)
+  - [Editor Panel](#editor-panel)
   - [In-Game Runtime Overlay](#in-game-runtime-overlay)
 - [🧩 DebugxManager](#-debugxmanager)
 - [⚠️ Notes](#-notes)
@@ -212,7 +212,7 @@ You can control printing dynamically from code at runtime:
 - `Debugx.enableLog` / `Debugx.enableLogMember`: the master log switch / member-log master switch.
 - `Debugx.logThisKeyMemberOnly`: when set to a Key, only that Key member's logs are printed (`0` disables this filter).
 
-You can also adjust these switches visually at runtime via the [Debugx Console](#-debugx-console)'s Runtime panel / in-game overlay.
+You can also adjust these switches visually at runtime via the [Debugx Console](#-debugx-console)'s Editor panel / in-game overlay.
 
 ## 🎛️ Debugx Console
 `Debugx Console` is a **dedicated log viewer** that captures, filters, collapses and displays logs around "debug members", replacing your reliance on Unity's native Console. It comes in two forms that share the same capture / filter / collapse model:
@@ -221,7 +221,7 @@ You can also adjust these switches visually at runtime via the [Debugx Console](
 - **In-game runtime overlay** — summoned at runtime on device / in builds, touch-friendly.
 
 > [!NOTE]
-> In older versions `DebugxConsole` was just a runtime switch control panel. It's now upgraded into a full log viewer; the former runtime switches and test toggles are housed in the window's [Runtime Panel](#runtime-panel), and the old "on-screen log drawing" feature has been removed and replaced by the [In-Game Runtime Overlay](#in-game-runtime-overlay).
+> In older versions `DebugxConsole` was just a runtime switch control panel. It's now upgraded into a full log viewer; the former runtime switches and test toggles are housed in the window's expandable [Editor Panel](#editor-panel), and the old "on-screen log drawing" feature has been removed and replaced by the [In-Game Runtime Overlay](#in-game-runtime-overlay).
 
 ### Editor Window
 Open it via `Window -> Debugx -> DebugxConsole`. For convenience you can dock it alongside the native `Console` / `Game` tabs. The window captures every Unity log in the project: Debugx member logs are grouped by member; non-Debugx ordinary logs (`Debug.Log`, engine, third-party) are all grouped under **Uncategorized**.  
@@ -233,13 +233,10 @@ From left to right the toolbar provides the following controls (secondary contro
 - **Clear**: clear logs immediately. Its dropdown to the right lets you check **auto-clear timings** — on entering Play / on recompile / on build (all on by default, matching the native Console).
 - **Collapse**: collapse repeated logs with identical content, showing the count as a badge on the right.
 - **Error Pause**: pause playback when an Error / exception occurs (Play mode only).
-- **Runtime**: show / hide the [Runtime Panel](#runtime-panel) below.
-- **Debugx Only**: show only logs printed by Debugx, hiding Uncategorized.
-- **Members**: filter by member, multi-select; includes `All`, each member's `[key] signature`, and `Uncategorized`.
-- **Search box**: live text filtering (the editor version supports regex, case sensitivity and searching the stack).
-- **Log / Warning / Error**: three type toggles with **counts**; click to toggle whether that level is shown (counts over 999 show as `999+`).
-- **View**: the view-options menu — `Show Timestamp` (timestamp column), `Stack: Script Only` (show only business script frames in the stack, hiding engine and plugin-internal frames).
-- **Language**: switch between 中 / EN.
+- **Members**: filter by member, multi-select; includes `All`, each member's `[key] signature`, plus the `Admin` / `Unregistered` / `Uncategorized` pseudo-members.
+- **Editor**: show / hide the expandable [Editor Panel](#editor-panel) below — the view options, in-game Console toggle, runtime switches, test toggles and UI language all live there.
+- **Search box**: live text filtering (substring match, case-insensitive).
+- **Log / Warning / Error**: three type toggles with **counts**, at the far right of the toolbar; click to toggle whether that level is shown (counts over 999 show as `999+`).
 
 ![](Documents/console_editor_toolbar_1.png)
 <!-- Screenshot placeholder: close-up of the editor Console toolbar, with each button labeled -->
@@ -252,21 +249,23 @@ From left to right the toolbar provides the following controls (secondary contro
 - The list **auto-scrolls to the newest when pinned to the bottom**; scrolling up pauses auto-scroll, and scrolling back to the bottom resumes it.
 - Logs are **persisted across recompiles / domain reloads** (cleared after an editor restart); compile errors are mirrored in automatically, and on consecutive compile failures only the latest batch is kept (matching the native Console).
 
-### Runtime Panel
-Click **Runtime** in the toolbar to expand it. This panel houses all the functionality of the old control panel, convenient for tuning while running in the editor:
-- **Enable in-game runtime Console**: whether to auto-create the [In-Game Runtime Overlay](#in-game-runtime-overlay) on the next entry into Play (off by default; affects **editor Play mode only** — on device you must enable it in code, see that section).
-- **Runtime switches** (Play mode only): `EnableLog` (master log switch), `EnableLogMember` (member-log master switch), `Only Key` (print only the member with the given Key, `0` = off), and an individual switch per member. These rewrite `Debugx`'s runtime state live.
+### Editor Panel
+Click **Editor** in the toolbar to expand it. This panel gathers the view options pulled out of the toolbar together with the old control panel's runtime / test switches in one place, convenient for tuning while running in the editor:
+- **View options** (always available): `Debugx Only` (show only logs tagged `[Debugx]`, hiding Uncategorized), `Show Timestamp` (per-row time column), `Stack: Script Only` (show only business script frames in the detail stack, hiding engine and plugin-internal frames).
+- **Enable in-game Console**: whether to auto-create the [In-Game Runtime Overlay](#in-game-runtime-overlay) on the next entry into Play (off by default; affects **editor Play mode only** — on device you must enable it in code, see that section).
+- **Runtime switches** (Play mode only): `EnableLog` (master log switch), `EnableLogMember` (member-log master switch), `Only this key` (print only the member with the given Key, `0` = off). These rewrite `Debugx`'s runtime state live. (Set per-member switches in `Preferences -> Debugx` or in game code.)
 - **Test toggles**: `Awake test log` / `Update test log`, to quickly confirm Debugx is working.
+- **UI Language**: switch between 中 / EN.
 
-![](Documents/console_editor_runtime_1.png)
-<!-- Screenshot placeholder: editor Console with the Runtime panel expanded (overlay enable toggle + runtime switches + test toggles) -->
+![](Documents/console_editor_2.png)
+<!-- Screenshot placeholder: editor Console with the Editor panel expanded (view options + overlay enable toggle + runtime switches + test toggles + language) -->
 
 ### In-Game Runtime Overlay
 `DebugxRuntimeConsole` is a UI Toolkit-based in-game log overlay for viewing logs directly on device / in builds. It is **off** by default and auto-creates only when the following conditions are met:
 
 1. The project has the `DEBUG_X` macro (the overlay is only compiled in when the macro is present).
 2. The runtime-overlay switch `DebugxStaticData.RuntimeConsoleEnabled` is enabled (off by default):
-   - **Editor Play mode**: check **Enable in-game runtime Console** in the `Debugx Console -> Runtime` panel (takes effect on the next entry into Play).
+   - **Editor Play mode**: check **Enable in-game Console** in the `Debugx Console -> Editor` panel (takes effect on the next entry into Play).
    - **Device / builds**: the editor checkbox **is not carried into builds**; you must set `DebugxStaticData.RuntimeConsoleEnabled = true` in your game code (a build's `PlayerPrefs` starts empty, off by default).
 
 > [!NOTE]
@@ -280,7 +279,7 @@ Once the conditions are met, the overlay auto-creates after the first scene load
 > [!NOTE]
 > The backquote key and three-finger gesture rely on the legacy **Input Manager**. If your project only enables the new **Input System**, summon it via the floating button or the `SetVisible(...)` API instead.
 
-The overlay's features are largely the same as the editor version (adapted for touch): `Clear`, `Copy`, `Collapse`, `Debugx Only`, `Members` member filtering, `Time` timestamps, `Net` network tag (cycles All / Server / Client), `Log / Warning / Error` type filtering with counts, and search (matched substrings highlighted). In addition, the **Source** popup provides runtime switches equivalent to the editor Runtime panel (`EnableLog` / `EnableLogMember` / `Only Key` / per-member switches), directly rewriting real print behavior. Selecting a log shows its message and stack text below (source navigation is not supported at runtime).  
+The overlay's features are largely the same as the editor version (adapted for touch): `Clear`, `Copy`, `Collapse`, `Debugx Only`, `Members` member filtering, `Time` timestamps, `Net` network tag (cycles All / Server / Client), `Log / Warning / Error` type filtering with counts, and search (matched substrings highlighted). In addition, the **Source** popup provides runtime switches (`EnableLog` / `EnableLogMember` / `Only Key` plus per-member switches), directly rewriting real print behavior. Selecting a log shows its message and stack text below (source navigation is not supported at runtime).  
 ![](Documents/console_ingame_1.png)
 <!-- Screenshot placeholder: the in-game runtime overlay on device / in Play mode (toolbar + log list + detail) -->
 
