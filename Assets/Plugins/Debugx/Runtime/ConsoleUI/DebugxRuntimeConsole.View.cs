@@ -44,6 +44,15 @@ namespace DebugxLog.Console.Runtime
         private bool _showTimestamp;         // optional timestamp column, toggled by the "Time" toolbar toggle. 可选时间戳列，由 “Time” 工具栏开关切换。
         private int _selectedIndex = -1;
 
+        // Hold-to-clear state: a quick tap on Clear does nothing (guards against accidental clears); holding for
+        // HoldToClearMs fills _clearFill 0→100% across the button, then clears. The repeating tick is paused on release.
+        // 长按清空状态：轻点 Clear 无效（防误触）；按住 HoldToClearMs 会让 _clearFill 在按钮上 0→100% 填充后清空。松手即暂停重复计时。
+        private const long HoldToClearMs = 1000;
+        private Button _clearButton;
+        private VisualElement _clearFill;
+        private IVisualElementScheduledItem _clearHoldTick;
+        private long _clearHoldStartMs = -1;
+
         // ---------- Build ----------
 
         private void BuildUI(VisualElement root)
@@ -169,9 +178,7 @@ namespace DebugxLog.Console.Runtime
             title.style.marginRight = 8;
             bar.Add(title);
 
-            var clear = new Button(ClearConsole) { text = "Clear" };
-            StyleToolbarButton(clear);
-            bar.Add(clear);
+            bar.Add(BuildClearButton());
 
             // Copy the selected entry (message + stack) to the system clipboard. GUIUtility.systemCopyBuffer works at runtime.
             // 复制选中条目（消息 + 堆栈）到系统剪贴板。GUIUtility.systemCopyBuffer 在运行时可用。
@@ -635,6 +642,84 @@ namespace DebugxLog.Console.Runtime
                 UpdateDetail(_rows[_selectedIndex].Entry);
             else
                 UpdateDetail(null);
+        }
+
+        // Clear is a *hold-to-clear* button: a quick tap does nothing (clicking was too easy to mis-trigger); holding for
+        // HoldToClearMs sweeps a translucent red fill across the button and only then clears the console.
+        // Clear 为*长按清空*按钮：轻点无效（点击太易误触）；按住 HoldToClearMs 会有半透明红色填充扫过按钮，满后才清空 Console。
+        private VisualElement BuildClearButton()
+        {
+            // A wrapper hosts the real Button (kept so it themes/measures like the other toolbar buttons) plus the fill.
+            // The fill must be a *sibling*, NOT a child of the Button: Yoga skips a TextElement's text-measure once it has
+            // children, collapsing the button to its padding — so the overlay lives on the wrapper instead.
+            // wrapper 承载真正的 Button（保持与其它工具栏按钮一致的主题/测量）与填充条。填充条必须是按钮的*兄弟*而非子元素：
+            // 一旦 TextElement 有子元素，Yoga 就跳过其文字测量，按钮会塌缩成只剩 padding——故覆盖层挂在 wrapper 上。
+            var wrapper = new VisualElement();
+            wrapper.style.position = Position.Relative; // anchor for the absolute fill. 绝对定位填充条的锚点。
+            wrapper.style.overflow = Overflow.Hidden;   // clip the fill to the button box. 将填充裁剪到按钮框内。
+            wrapper.style.marginLeft = 2;               // toolbar spacing normally set by StyleToolbarButton; moved here so
+            wrapper.style.marginRight = 2;              // the fill aligns to the button box. 工具栏间距移到 wrapper，使填充条对齐按钮框。
+
+            var clear = new Button { text = "Clear" }; // no click Action — clearing is driven by the hold below. 无点击动作——清空由下方长按驱动。
+            StyleToolbarButton(clear);
+            clear.style.marginLeft = 0;                // margins live on the wrapper. 外边距改由 wrapper 承担。
+            clear.style.marginRight = 0;
+            wrapper.Add(clear);
+
+            // Progress fill: an absolutely-positioned overlay stretched to the button's height, its width driven 0→100%
+            // while held. pickingMode = Ignore so it never intercepts the pointer. Added after the button → drawn on top;
+            // translucent, so "Clear" reads through it. 进度填充：绝对定位覆盖层，撑满按钮高度，按住时宽度 0→100%；pickingMode =
+            // Ignore 不拦截指针；在按钮之后添加 → 绘制在其上；半透明，"Clear" 文字可透出。
+            var fill = new VisualElement { pickingMode = PickingMode.Ignore };
+            fill.style.position = Position.Absolute;
+            fill.style.left = 0;
+            fill.style.top = 0;
+            fill.style.bottom = 0;
+            fill.style.width = Length.Percent(0f);
+            fill.style.backgroundColor = DebugxRuntimeConsoleStyle.HoldFillColor;
+            wrapper.Add(fill);
+
+            // Registered in the trickle-down (capture) phase so they run BEFORE the Button's built-in Clickable, which
+            // handles pointer events in the target/bubble phase and may stop their propagation. The Clickable also captures
+            // the pointer on down, so PointerLeave won't fire mid-hold; release (PointerUp) is the reliable cancel, with
+            // Leave/Cancel as best-effort safety nets. 在捕获阶段注册，确保先于按钮内置 Clickable（在目标/冒泡阶段处理指针、可能
+            // 中止其传播）执行。Clickable 还会在按下时捕获指针，故按住途中不触发 PointerLeave；松手（PointerUp）为可靠取消，Leave/Cancel 兜底。
+            clear.RegisterCallback<PointerDownEvent>(OnClearPointerDown, TrickleDown.TrickleDown);
+            clear.RegisterCallback<PointerUpEvent>(_ => CancelClearHold(), TrickleDown.TrickleDown);
+            clear.RegisterCallback<PointerLeaveEvent>(_ => CancelClearHold(), TrickleDown.TrickleDown);
+            clear.RegisterCallback<PointerCancelEvent>(_ => CancelClearHold(), TrickleDown.TrickleDown);
+
+            _clearButton = clear;
+            _clearFill = fill;
+            return wrapper;
+        }
+
+        private void OnClearPointerDown(PointerDownEvent evt)
+        {
+            if (evt.button > 0) return; // ignore right/middle mouse; left mouse (0) and touch pass. 忽略右/中键；左键(0)与触屏放行。
+            if (_clearButton == null || _clearFill == null) return;
+            _clearHoldStartMs = -1; // captured from TimerState.now on the first tick, to measure in panel time. 首帧从 TimerState.now 取起点，用面板时间度量。
+            _clearHoldTick?.Pause();
+            _clearHoldTick = _clearButton.schedule.Execute(OnClearHoldTick).Every(16);
+        }
+
+        private void OnClearHoldTick(TimerState state)
+        {
+            if (_clearHoldStartMs < 0) _clearHoldStartMs = state.now;
+            float ratio = Mathf.Clamp01((state.now - _clearHoldStartMs) / (float)HoldToClearMs);
+            _clearFill.style.width = Length.Percent(ratio * 100f);
+            if (ratio >= 1f)
+            {
+                CancelClearHold();
+                ClearConsole();
+            }
+        }
+
+        private void CancelClearHold()
+        {
+            _clearHoldTick?.Pause();
+            _clearHoldTick = null;
+            if (_clearFill != null) _clearFill.style.width = Length.Percent(0f);
         }
 
         private void ClearConsole()

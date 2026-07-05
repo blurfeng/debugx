@@ -21,6 +21,10 @@ namespace DebugxLog.Console.Runtime
         // Explicit dark button background — the default runtime theme paints buttons light gray, which hides our light
         // text. 显式深色按钮底——默认运行时主题按钮是浅灰底，会盖掉我们的浅色文字。
         public static readonly Color ButtonBg = new Color(0.27f, 0.27f, 0.29f, 1f);
+        // "Hold-to-clear" progress sweep painted over the Clear button while held (translucent red = destructive intent);
+        // grows 0→100% width over the hold duration, half-alpha so the "Clear" text stays legible under it.
+        // “长按清空”进度扫光，按住 Clear 时覆盖其上（半透明红＝破坏性操作意图）；宽度在按住时长内 0→100% 增长，半透明使下方 “Clear” 文字仍可读。
+        public static readonly Color HoldFillColor = new Color(1f, 0.42f, 0.38f, 0.5f);
 
         // Severity colors — used for the row's left color bar and the three count buttons.
         // 严重级别色——用于行左侧色条与三个计数按钮。
