@@ -29,6 +29,13 @@ namespace DebugxLog.Console.Runtime
         // PanelSettings 资源名，从任意 Resources 目录加载（用户创建：Resources/Console.asset）。
         private const string PanelSettingsResource = "Console";
 
+        // The bundled fallback ThemeStyleSheet name (package-internal: Resources/DebugxRuntimeTheme.tss). Assigned to
+        // the PanelSettings when it has no theme set — e.g. the authored theme lived outside the package and wasn't
+        // shipped as UPM. Loaded by name, so no cross-package GUID reference is involved.
+        // 包内自带的回退主题名（包内部：Resources/DebugxRuntimeTheme.tss）。当 PanelSettings 未设置主题时赋给它——例如原
+        // 主题在包外、未随 UPM 发布。按名加载，不涉及任何跨包 GUID 引用。
+        private const string ThemeResource = "DebugxRuntimeTheme";
+
         // High sorting order so the console renders above the game's own runtime UI panels.
         // 高排序序，使 Console 渲染在游戏自身运行时 UI 面板之上。
         private const float PanelSortingOrder = 30000f;
@@ -56,6 +63,31 @@ namespace DebugxLog.Console.Runtime
                     $"[Debugx] 运行时 Console 未启用：未找到 PanelSettings 'Resources/{PanelSettingsResource}'。" +
                     " 请在任意 Resources 目录下创建 UI Toolkit > Panel Settings Asset 并命名为 Console。");
                 return;
+            }
+
+            // When installed as a UPM package, the PanelSettings' theme (themeUss) may point at a Theme Style Sheet
+            // that lived in the dev project (Assets/UI Toolkit/UnityThemes/...) and is NOT shipped inside the package,
+            // so it resolves to null in the consumer project. A runtime panel with no theme refuses to render
+            // ("No Theme Style Sheet set to PanelSettings ..."). Fall back to the package-bundled default theme,
+            // loaded by name so no cross-package GUID is involved. Only fill in when unset, so a theme the user
+            // deliberately assigned is respected. Assigned BEFORE UIDocument.panelSettings so no warning is emitted.
+            // 作为 UPM 包安装时，PanelSettings 的主题（themeUss）可能指向开发工程里（Assets/UI Toolkit/UnityThemes/...）、
+            // 未随包发布的主题样式表，在消费者项目里解析为 null。缺少主题的运行时面板拒绝渲染
+            // （"No Theme Style Sheet set to PanelSettings ..."）。回退到包内自带的默认主题，按名加载、不涉及跨包 GUID。
+            // 仅在未设置时填入，以尊重用户特意指定的主题。在赋值 UIDocument.panelSettings 之前完成，故不会触发警告。
+            if (panelSettings.themeStyleSheet == null)
+            {
+                ThemeStyleSheet theme = Resources.Load<ThemeStyleSheet>(ThemeResource);
+                if (theme != null)
+                {
+                    panelSettings.themeStyleSheet = theme;
+                }
+                else
+                {
+                    Debug.LogWarning(
+                        $"[Debugx] 运行时 Console 主题缺失：PanelSettings '{PanelSettingsResource}' 未设置 Theme Style" +
+                        $" Sheet，且未找到包内回退主题 'Resources/{ThemeResource}'。面板可能无法正常渲染。");
+                }
             }
 
             // Create inactive first so PanelSettings is assigned BEFORE UIDocument.OnEnable builds the panel.
