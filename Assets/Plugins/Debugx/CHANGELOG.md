@@ -1,6 +1,6 @@
 # Changelog
 
-## [2.4.0] - 2026-07-04
+## [2.4.0] - 2026-07-05
 ### Added
 - **Debugx Console** — a dedicated, member-aware log viewer that replaces reliance on Unity's native Console, in two forms sharing one capture / filter / collapse model layer:
   - **Editor window** (Window > Debugx > DebugxConsole): captures all Unity logs (non-Debugx grouped as "Uncategorized"); filter by member / type / Debugx-only / search; collapse duplicates; timestamps; script-only or full stack view; multi-select copy; double-click source navigation; Error Pause; compile-log mirroring; Clear on Play / Recompile / Build; and cross-recompile & domain-reload persistence. A collapsible **Editor** side-panel hosts the runtime switches (EnableLog / EnableLogMember / Only-Key) and test toggles.
