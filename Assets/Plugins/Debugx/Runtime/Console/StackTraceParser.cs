@@ -85,20 +85,12 @@ namespace DebugxLog.Console
         }
 
         /// <summary>
-        /// Whether a frame belongs to the Debugx plugin internals (matches the [HideInCallstack] intent). Such frames
-        /// should be skipped when picking a double-click navigation target and can be folded in the stack view.
-        /// 判断一帧是否属于 Debugx 插件内部（对齐 [HideInCallstack] 意图）。选择双击跳转目标时应跳过此类帧，堆栈视图中亦可折叠。
-        /// </summary>
-        public static bool IsDebugxInternalFrame(StackFrameInfo frame)
-        {
-            if (string.IsNullOrEmpty(frame.Symbol)) return false;
-            return frame.Symbol.Contains("DebugxLog.") || frame.Symbol.Contains("DebugxLogger");
-        }
-
-        /// <summary>
-        /// Picks the best frame to jump to on double-click: the first non-Debugx frame that has source, preferring
-        /// frames under Assets/. Returns false when no navigable frame exists.
-        /// 选出双击跳转的最佳帧：第一个带源码且非 Debugx 的帧，优先 Assets/ 下的帧。无可跳转帧时返回 false。
+        /// Picks the best frame to jump to on double-click: the first frame that has source, preferring frames under
+        /// Assets/. The parser no longer special-cases Debugx-internal frames — it relies on Unity's own
+        /// [HideInCallstack] / "*Logger" callstack stripping to drop the logging plumbing frames before they reach here.
+        /// Returns false when no navigable frame exists.
+        /// 选出双击跳转的最佳帧：第一个带源码的帧，优先 Assets/ 下的帧。解析器不再特殊处理 Debugx 内部帧——由 Unity 自身对
+        /// [HideInCallstack] / "*Logger" 结尾类的调用栈裁剪负责在此之前剔除日志转发帧。无可跳转帧时返回 false。
         /// </summary>
         public static bool TryGetNavigationTarget(List<StackFrameInfo> frames, out StackFrameInfo target)
         {
@@ -108,7 +100,7 @@ namespace DebugxLog.Console
             bool found = false;
             foreach (StackFrameInfo f in frames)
             {
-                if (!f.HasSource || IsDebugxInternalFrame(f)) continue;
+                if (!f.HasSource) continue;
                 if (f.IsInAssets) { target = f; return true; } // Assets frame wins immediately.
                 if (!found) { target = f; found = true; }      // otherwise remember the first source frame.
             }

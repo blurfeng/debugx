@@ -15,7 +15,7 @@ namespace DebugxLog.Console.Editor
     public partial class DebugxConsoleWindow
     {
         private bool _showTimestamp = true;
-        private bool _stackScriptOnly; // default off: show ALL frames; when on, show only script frames (hide engine / Debugx-internal). 默认关闭：显示全部帧；开启后仅显示脚本帧（隐藏引擎/Debugx 内部帧）。
+        private bool _stackScriptOnly; // default off: show ALL frames; when on, show only frames that have source (hides engine frames with no source). 默认关闭：显示全部帧；开启后仅显示带源码的帧（隐藏无源码的引擎帧）。
 
         // The View options are now rendered as inline toggles inside the Editor panel (see RefreshEditorPanel);
         // this file keeps their backing state + the helpers that consume it.
@@ -28,7 +28,7 @@ namespace DebugxLog.Console.Editor
         private bool IsStackFrameVisible(StackFrameInfo frame)
         {
             if (!_stackScriptOnly) return true;
-            return frame.HasSource && !StackTraceParser.IsDebugxInternalFrame(frame);
+            return frame.HasSource;
         }
 
         // Re-render the detail pane for the current primary selection (after a view option changes).
