@@ -101,6 +101,22 @@ namespace DebugxLog
             set => PlayerPrefsSetBool("DebugxStaticData.RuntimeConsoleEnabled", value);
         }
 
+        // Ring-buffer capacity of the in-game runtime overlay Console (DebugxRuntimeConsole). Read once when the buffer is
+        // created (EarlyCapture / OnEnable). The Console's Settings popup exposes a "Capacity" field that live-resizes the
+        // active buffer AND writes this value, so the chosen size also persists to the next Play. Editor-only PlayerPrefs
+        // like RuntimeConsoleEnabled — a player build keeps its own store and falls back to the default below (the Editor
+        // value does NOT carry into a build). §8 rule of thumb: 500–1000 mobile / 2000–5000 desktop.
+        // 游戏内运行时覆盖层 Console（DebugxRuntimeConsole）的环形缓冲容量。在缓冲创建时读取一次（EarlyCapture / OnEnable）。
+        // Console 的 Settings 弹层有一个 “Capacity” 输入框，会即时改变当前缓冲大小并写入此值，故所选尺寸也会沿用到下次 Play。
+        // 与 RuntimeConsoleEnabled 一样是编辑器 PlayerPrefs——实机构建用自身存储并回退到下方默认值（编辑器里的值不会带进构建）。
+        // §8 经验值：移动 500–1000 / 桌面 2000–5000。
+        public const int RuntimeConsoleBufferCapacityDefault = 4000;
+        public static int RuntimeConsoleBufferCapacity
+        {
+            get => Mathf.Max(1, PlayerPrefs.GetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", RuntimeConsoleBufferCapacityDefault));
+            set => PlayerPrefs.SetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", Mathf.Max(1, value));
+        }
+
         #region Text
         public const string ToolTipDefaultDebugxMemberAssets = "默认调试成员信息列表";
         public const string ToolTipCustomDebugxMemberAssets = "自定义调试成员信息列表";

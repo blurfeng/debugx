@@ -45,7 +45,10 @@ namespace DebugxLog.Console.Runtime
 
         // Sizing. 尺寸。
         public const float ListItemHeight = 22f;
-        public const float DetailPaneHeight = 130f;
+        // Fixed height of the bottom detail/stack pane. Roomy enough to read a message plus a few stack frames without
+        // squeezing the list (the panel is enlarged to match — see BuildPanel).
+        // 底部详情/堆栈面板的固定高度。足够读一条消息加几帧堆栈而不挤压列表（面板整体也相应放大——见 BuildPanel）。
+        public const float DetailPaneHeight = 200f;
         public const float SeverityBarWidth = 4f;
         public const float TimestampWidth = 56f;
         public const int CountOverflowThreshold = 999;
@@ -79,8 +82,9 @@ namespace DebugxLog.Console.Runtime
         // backquote key). 触屏端同时按下、点击即可开合 Console 的手指数（反引号键的移动端替代）。
         public const int SummonTouchCount = 3;
 
-        // Ring-buffer capacity for the runtime Console (mobile-friendly default; §8 suggests 500–1000 mobile / 2000–5000 desktop).
-        // 运行时 Console 的环形缓冲容量（对移动端友好的默认值；§8 建议移动 500–1000 / 桌面 2000–5000）。
-        public const int RuntimeBufferCapacity = 1000;
+        // Ring-buffer capacity moved to a persisted, user-editable setting: DebugxStaticData.RuntimeConsoleBufferCapacity
+        // (default 4000; live-editable via the Console's Settings popup). §8 rule of thumb: 500–1000 mobile / 2000–5000 desktop.
+        // 环形缓冲容量已迁移为可持久化、用户可编辑的设置：DebugxStaticData.RuntimeConsoleBufferCapacity
+        // （默认 4000；可在 Console 的 Settings 弹层里即时修改）。§8 经验值：移动 500–1000 / 桌面 2000–5000。
     }
 }

@@ -70,7 +70,7 @@ namespace DebugxLog.Console.Runtime
             if (_earlyStore != null || _instance != null || !Application.isPlaying) return;
             if (!DebugxStaticData.RuntimeConsoleEnabled) return;
 
-            _earlyStore = new DebugxLogStore(DebugxRuntimeConsoleStyle.RuntimeBufferCapacity);
+            _earlyStore = new DebugxLogStore(DebugxStaticData.RuntimeConsoleBufferCapacity);
             _earlyStore.Start();
         }
 
@@ -167,7 +167,7 @@ namespace DebugxLog.Console.Runtime
             // console was enabled after BeforeSceneLoad). Start() is idempotent, so reusing an already-started store is safe.
             // 复用提前采集的 store（在 BeforeSceneLoad 订阅），使本 GameObject 存在之前的日志——如 DebugxManager.Awake——不丢失。
             // 若提前采集未运行（如在 BeforeSceneLoad 之后才启用 Console）则退回新建。Start() 幂等，复用已启动的 store 也安全。
-            _store = _earlyStore ?? new DebugxLogStore(DebugxRuntimeConsoleStyle.RuntimeBufferCapacity);
+            _store = _earlyStore ?? new DebugxLogStore(DebugxStaticData.RuntimeConsoleBufferCapacity);
             _earlyStore = null;
             _store.Start();
 

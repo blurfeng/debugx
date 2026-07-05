@@ -112,7 +112,7 @@ namespace DebugxLog.Console.Runtime
             panel.style.left = 8;
             panel.style.top = 8;
             panel.style.width = Length.Percent(66);
-            panel.style.height = Length.Percent(58);
+            panel.style.height = Length.Percent(66);
             panel.style.minWidth = 320;
             panel.style.backgroundColor = DebugxRuntimeConsoleStyle.PanelBg;
             panel.style.flexDirection = FlexDirection.Column;

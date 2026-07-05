@@ -28,7 +28,7 @@ namespace DebugxLog.Console.Runtime
 
         private Button BuildSourceButton()
         {
-            _sourceButton = new Button(ToggleSourcePopup) { text = "Source" };
+            _sourceButton = new Button(ToggleSourcePopup) { text = "Settings" };
             StyleToolbarButton(_sourceButton);
             return _sourceButton;
         }
@@ -54,7 +54,7 @@ namespace DebugxLog.Console.Runtime
             header.style.paddingTop = 2;
             header.style.paddingBottom = 2;
 
-            var titleLabel = new Label("Runtime Switches");
+            var titleLabel = new Label("Runtime Settings");
             titleLabel.style.color = DebugxRuntimeConsoleStyle.TextColor;
             titleLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
             titleLabel.style.flexGrow = 1;
@@ -63,9 +63,10 @@ namespace DebugxLog.Console.Runtime
             header.Add(close);
             popup.Add(header);
 
-            // Make the semantic distinction explicit (§6-B8): these change real printing, not the view filter.
-            // 明示语义区分（§6-B8）：这些改的是真实打印，不是视图过滤。
-            var note = new Label("Changes real printing, not the view.");
+            // Make the semantic distinction explicit (§6-B8): the switches below change real printing, not the view filter
+            // (the Buffer section at the bottom is the exception — it is a view/storage setting).
+            // 明示语义区分（§6-B8）：下面的开关改的是真实打印，不是视图过滤（底部的 Buffer 一项例外——它是视图/存储设置）。
+            var note = new Label("Switches below change real printing, not the view.");
             note.style.color = DebugxRuntimeConsoleStyle.TimestampColor;
             note.style.fontSize = DebugxRuntimeConsoleStyle.FontSizeSmall;
             note.style.whiteSpace = WhiteSpace.Normal;
@@ -120,8 +121,11 @@ namespace DebugxLog.Console.Runtime
             onlyLabel.style.fontSize = DebugxRuntimeConsoleStyle.FontSizeSmall;
             onlyLabel.style.marginRight = 6;
 
+            // Compact fixed width instead of flexGrow: the field only holds a small member key, so a narrow box fits the
+            // 260px popup and no longer stretches across the whole row.
+            // 用紧凑定宽替代 flexGrow：这里只填一个不大的成员 key，窄框即可贴合 260px 弹层，不再撑满整行。
             var onlyField = new IntegerField { value = Debugx.logThisKeyMemberOnly };
-            onlyField.style.flexGrow = 1;
+            onlyField.style.width = 64;
             onlyField.RegisterValueChangedCallback(evt => Debugx.logThisKeyMemberOnly = evt.newValue);
 
             onlyRow.Add(onlyLabel);
@@ -149,6 +153,44 @@ namespace DebugxLog.Console.Runtime
                         v => Debugx.SetMemberEnable(key, v)));
                 }
             }
+
+            // Buffer capacity — a VIEW/storage setting (unlike the switches above, this does not change real printing):
+            // the runtime Console's ring-buffer size. Editing it live-resizes the active buffer immediately (shrinking
+            // drops the oldest overflow) AND persists the size via DebugxStaticData so it is reused on the next Play.
+            // 环形缓冲容量——一个视图/存储设置（区别于上面的开关，它不改变真实打印）：运行时 Console 的环形缓冲大小。编辑时
+            // 即时改变当前缓冲大小（缩小则丢弃最旧的溢出条目），并通过 DebugxStaticData 持久化，使其在下次 Play 沿用。
+            var bufferTitle = new Label("Buffer");
+            bufferTitle.style.color = DebugxRuntimeConsoleStyle.TextColor;
+            bufferTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            bufferTitle.style.marginTop = 4;
+            bufferTitle.style.marginLeft = 4;
+            _sourceListContainer.Add(bufferTitle);
+
+            var capRow = new VisualElement();
+            capRow.style.flexDirection = FlexDirection.Row;
+            capRow.style.alignItems = Align.Center;
+            capRow.style.marginLeft = 4;
+            capRow.style.marginTop = 2;
+            capRow.style.marginBottom = 2;
+
+            var capLabel = new Label("Capacity");
+            capLabel.style.color = DebugxRuntimeConsoleStyle.TextColor;
+            capLabel.style.fontSize = DebugxRuntimeConsoleStyle.FontSizeSmall;
+            capLabel.style.marginRight = 6;
+
+            int currentCap = _store != null ? _store.Capacity : DebugxStaticData.RuntimeConsoleBufferCapacity;
+            var capField = new IntegerField { value = currentCap };
+            capField.style.width = 64;
+            capField.RegisterValueChangedCallback(evt =>
+            {
+                int c = Mathf.Max(1, evt.newValue);
+                if (_store != null) _store.Capacity = c; // live-resize the active buffer. 即时改变当前缓冲大小。
+                DebugxStaticData.RuntimeConsoleBufferCapacity = c; // persist for next Play. 持久化，供下次 Play 使用。
+            });
+
+            capRow.Add(capLabel);
+            capRow.Add(capField);
+            _sourceListContainer.Add(capRow);
         }
 
         // A tight [checkbox][label] row reflecting + writing a bool (reuses the toolbar's BuildCheckToggle layout).
