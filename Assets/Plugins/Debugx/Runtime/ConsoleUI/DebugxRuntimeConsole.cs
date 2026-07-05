@@ -1,6 +1,9 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace DebugxLog.Console.Runtime
 {
@@ -115,12 +118,12 @@ namespace DebugxLog.Console.Runtime
         private bool _uiBuilt;
         private bool _visible;
 
-#if ENABLE_LEGACY_INPUT_MANAGER
+#if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
         // Multi-finger tap debounce: fires once when the finger count first reaches the threshold, re-armed only after
-        // every finger lifts (so holding fingers down or adjusting them doesn't retoggle). Guarded with the same symbol
-        // as its only reader so it isn't an unused field (CS0414) under a new-Input-System-only project.
-        // 多指点击防抖：手指数首次达到阈值时触发一次，仅在全部手指抬起后重新武装（故按住或调整手指不会反复开合）。用与其唯一读取处
-        // 相同的符号守卫，避免在仅启用新输入系统的工程下成为未使用字段（CS0414）。
+        // every finger lifts (so holding fingers down or adjusting them doesn't retoggle). Shared by both input backends;
+        // guarded so it isn't an unused field (CS0414) when neither input backend is compiled in.
+        // 多指点击防抖：手指数首次达到阈值时触发一次，仅在全部手指抬起后重新武装（故按住或调整手指不会反复开合）。新旧输入系统共用；
+        // 加守卫避免在两套输入都未编译进来时成为未使用字段（CS0414）。
         private bool _multiTouchArmed = true;
 #endif
 
@@ -165,29 +168,81 @@ namespace DebugxLog.Console.Runtime
 
         private void HandleToggleInput()
         {
-#if ENABLE_LEGACY_INPUT_MANAGER
             // Backquote toggles the console on desktop; a multi-finger tap toggles it on touch devices (plus the floating
-            // button). Both read UnityEngine.Input, so they are guarded: a project with the new Input System only (legacy
-            // input disabled) still compiles and does not throw. 反引号键在桌面端开合 Console；触屏端多指点击开合（外加悬浮按钮）。
-            // 二者都读 UnityEngine.Input，故加守卫：仅启用新输入系统（禁用旧输入）的工程仍能编译、且不会抛异常。
-            if (Input.GetKeyDown(KeyCode.BackQuote))
+            // button). The new Input System path takes priority via #if/#elif, so a project with Both input backends
+            // enabled compiles only the new path and never toggles twice in one frame (open→close); a project with only
+            // the legacy Input Manager falls back to it. 反引号键在桌面端开合 Console；触屏端多指点击开合（外加悬浮按钮）。
+            // 用 #if/#elif 让新输入系统优先：同时启用两套输入（Both）的工程只编译新输入分支，不会同一帧开→关抵消；仅旧输入的工程回退到旧输入。
+#if ENABLE_INPUT_SYSTEM
+            if (ReadToggleInputSystem())
                 SetVisible(!_visible);
+#elif ENABLE_LEGACY_INPUT_MANAGER
+            if (ReadToggleLegacy())
+                SetVisible(!_visible);
+#endif
+        }
 
-            int touchCount = Input.touchCount;
-            if (touchCount >= DebugxRuntimeConsoleStyle.SummonTouchCount)
+#if ENABLE_INPUT_SYSTEM
+        // New Input System reader: backquote key + multi-finger tap. Keyboard/Touchscreen can be null when the matching
+        // device is absent, so both are null-checked. Active fingers are those whose press is held this frame.
+        // 新输入系统读取：反引号键 + 多指点击。无对应设备时 Keyboard/Touchscreen 可能为 null，故判空。活跃手指即本帧处于按下状态的触点。
+        private bool ReadToggleInputSystem()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard != null && keyboard.backquoteKey.wasPressedThisFrame)
+                return true;
+
+            int activeTouchCount = 0;
+            Touchscreen touchscreen = Touchscreen.current;
+            if (touchscreen != null)
+            {
+                var touches = touchscreen.touches;
+                for (int i = 0; i < touches.Count; i++)
+                {
+                    if (touches[i].press.isPressed)
+                        activeTouchCount++;
+                }
+            }
+
+            return UpdateMultiTouchArm(activeTouchCount);
+        }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER && !ENABLE_INPUT_SYSTEM
+        // Legacy Input Manager reader: backquote key + multi-finger tap. Compiled only when the new Input System is not
+        // active (Both routes through the new path above). 旧 Input Manager 读取：反引号键 + 多指点击。仅在未启用新输入系统时编译
+        // （Both 走上面的新输入分支）。
+        private bool ReadToggleLegacy()
+        {
+            if (Input.GetKeyDown(KeyCode.BackQuote))
+                return true;
+
+            return UpdateMultiTouchArm(Input.touchCount);
+        }
+#endif
+
+#if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
+        // Multi-finger tap debounce: returns true once when the active-finger count first reaches the threshold, re-armed
+        // only after every finger lifts. Shared by both input backends. 多指点击防抖：活跃手指数首次达到阈值时返回一次 true，
+        // 仅在全部手指抬起后重新武装。新旧输入系统共用。
+        private bool UpdateMultiTouchArm(int activeTouchCount)
+        {
+            if (activeTouchCount >= DebugxRuntimeConsoleStyle.SummonTouchCount)
             {
                 if (_multiTouchArmed)
                 {
                     _multiTouchArmed = false;
-                    SetVisible(!_visible);
+                    return true;
                 }
             }
-            else if (touchCount == 0)
+            else if (activeTouchCount == 0)
             {
                 _multiTouchArmed = true; // re-arm only once every finger has lifted. 仅在全部手指抬起后重新武装。
             }
-#endif
+
+            return false;
         }
+#endif
 
         /// <summary>
         /// Show or hide the console panel. Public so game code can bind its own gesture / hotkey (e.g. shake-to-open).

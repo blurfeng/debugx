@@ -3,7 +3,8 @@
     "rootNamespace": "DebugxLog.Console.Runtime",
     "references": [
         "DebugxLog.Console",
-        "Debugx"
+        "Debugx",
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
