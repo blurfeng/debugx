@@ -23,8 +23,16 @@ namespace DebugxLog.Console.Runtime
         private VisualElement _stackContainer;
         private TextField _searchField;
 
-        private Button _logButton, _warnButton, _errorButton;
+        private VisualElement _logButton, _warnButton, _errorButton;
+        private Label _logCount, _warnCount, _errorCount;
         private Button _netButton;
+
+        // Severity icon set + branding icon, loaded once from Resources. Null when a file is missing → graceful fallback
+        // to color-bar rows / colored count text. 严重级别图标集 + 品牌图标，从 Resources 加载一次。文件缺失时为 null →
+        // 优雅回退到色条行 / 彩色计数文字。
+        private Texture2D _iconLog, _iconWarn, _iconError, _iconArticle;
+        private bool _iconsLoaded;
+        private bool _useIconRows;
 
         private ScrollView _listScroll;
         private bool _stickToBottom = true; // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
@@ -35,6 +43,8 @@ namespace DebugxLog.Console.Runtime
 
         private void BuildUI(VisualElement root)
         {
+            EnsureIconsLoaded();
+
             // Let clicks pass through the (empty) root to the game; only interactive children capture input, so the game
             // still receives touches/clicks while the console is hidden. Children remain pickable despite the parent.
             // 让点击穿透（空的）根节点到游戏；仅交互子元素捕获输入，故 Console 隐藏时游戏仍接收触摸/点击。父级 Ignore 不影响子元素可拾取。
@@ -49,7 +59,10 @@ namespace DebugxLog.Console.Runtime
 
         private VisualElement BuildOpenButton()
         {
-            var btn = new Button(() => SetVisible(true)) { text = "Debugx" };
+            // Branding icon (icon_article) + "Debugx" text. Built as an icon/label row inside the Button rather than using
+            // Button.text, so the glyph sits beside the label. 品牌图标（icon_article）+ “Debugx” 文字。以按钮内的图标/文字
+            // 行构建，而非用 Button.text，让图标排在文字旁边。
+            var btn = new Button(() => SetVisible(true));
             btn.style.position = Position.Absolute;
             btn.style.left = 8;
             btn.style.top = 8;
@@ -58,8 +71,23 @@ namespace DebugxLog.Console.Runtime
             btn.style.paddingTop = 3;
             btn.style.paddingBottom = 3;
             btn.style.backgroundColor = DebugxRuntimeConsoleStyle.OpenButtonBg;
-            btn.style.color = DebugxRuntimeConsoleStyle.TextColor;
-            btn.style.fontSize = DebugxRuntimeConsoleStyle.FontSizeSmall;
+            btn.style.flexDirection = FlexDirection.Row;
+            btn.style.alignItems = Align.Center;
+
+            if (_iconArticle != null)
+            {
+                var img = new Image { image = _iconArticle, scaleMode = ScaleMode.ScaleToFit };
+                img.style.width = DebugxRuntimeConsoleStyle.OpenButtonIconSize;
+                img.style.height = DebugxRuntimeConsoleStyle.OpenButtonIconSize;
+                img.style.marginRight = 4;
+                img.style.flexShrink = 0;
+                btn.Add(img);
+            }
+
+            var label = new Label("Debugx");
+            label.style.color = DebugxRuntimeConsoleStyle.TextColor;
+            label.style.fontSize = DebugxRuntimeConsoleStyle.FontSizeSmall;
+            btn.Add(label);
             return btn;
         }
 
@@ -180,19 +208,19 @@ namespace DebugxLog.Console.Runtime
             StyleToolbarButton(_netButton);
             bar.Add(_netButton);
 
-            _logButton = BuildCountButton(DebugxRuntimeConsoleStyle.LogColor, () =>
+            _logButton = BuildCountButton(_iconLog, DebugxRuntimeConsoleStyle.LogColor, out _logCount, () =>
             {
                 _criteria.ShowLog = !_criteria.ShowLog;
                 UpdateCountButtonStates();
                 OnCriteriaChanged();
             });
-            _warnButton = BuildCountButton(DebugxRuntimeConsoleStyle.WarnColor, () =>
+            _warnButton = BuildCountButton(_iconWarn, DebugxRuntimeConsoleStyle.WarnColor, out _warnCount, () =>
             {
                 _criteria.ShowWarning = !_criteria.ShowWarning;
                 UpdateCountButtonStates();
                 OnCriteriaChanged();
             });
-            _errorButton = BuildCountButton(DebugxRuntimeConsoleStyle.ErrorColor, () =>
+            _errorButton = BuildCountButton(_iconError, DebugxRuntimeConsoleStyle.ErrorColor, out _errorCount, () =>
             {
                 _criteria.ShowError = !_criteria.ShowError;
                 UpdateCountButtonStates();
@@ -265,13 +293,23 @@ namespace DebugxLog.Console.Runtime
             row.style.paddingLeft = 4;
             row.style.paddingRight = 4;
 
-            // A thin severity color bar instead of an icon glyph (runtime fonts may lack symbol glyphs).
-            // 用细的严重级别色条代替图标字形（运行时字体可能缺少符号字形）。
-            var sev = new VisualElement { name = "sev" };
+            // Severity indicator: an info/warning/error icon when the icon set loaded, else a thin color bar fallback
+            // (runtime fonts may lack symbol glyphs, and the icons ship as Resources). Both are built; BindRow shows one.
+            // 严重级别指示：图标集已加载时用 info/warning/error 图标，否则回退为细色条（运行时字体可能缺符号字形，图标随
+            // Resources 分发）。两者都构建，由 BindRow 择一显示。
+            var sev = new VisualElement { name = "sevbar" };
             sev.style.width = DebugxRuntimeConsoleStyle.SeverityBarWidth;
             sev.style.flexShrink = 0;
             sev.style.marginRight = 6;
             sev.style.alignSelf = Align.Stretch;
+            sev.style.display = _useIconRows ? DisplayStyle.None : DisplayStyle.Flex;
+
+            var sevIcon = new Image { name = "sevicon", scaleMode = ScaleMode.ScaleToFit };
+            sevIcon.style.width = DebugxRuntimeConsoleStyle.RowIconSize;
+            sevIcon.style.height = DebugxRuntimeConsoleStyle.RowIconSize;
+            sevIcon.style.marginRight = DebugxRuntimeConsoleStyle.RowIconMarginRight;
+            sevIcon.style.flexShrink = 0;
+            sevIcon.style.display = _useIconRows ? DisplayStyle.Flex : DisplayStyle.None;
 
             // Optional timestamp column, shown/hidden per BindRow by the "Time" toggle. 可选时间戳列，由 BindRow 按 “Time” 开关显隐。
             var time = new Label { name = "time" };
@@ -306,6 +344,7 @@ namespace DebugxLog.Console.Runtime
             badge.style.color = DebugxRuntimeConsoleStyle.TextColor;
 
             row.Add(sev);
+            row.Add(sevIcon);
             row.Add(time);
             row.Add(net);
             row.Add(msg);
@@ -319,7 +358,10 @@ namespace DebugxLog.Console.Runtime
             CollapsedRow row = _rows[index];
             DebugxLogEntry e = row.Entry;
 
-            element.Q<VisualElement>("sev").style.backgroundColor = SeverityColor(e.LogType);
+            if (_useIconRows)
+                element.Q<Image>("sevicon").image = SeverityIcon(e.LogType);
+            else
+                element.Q<VisualElement>("sevbar").style.backgroundColor = SeverityColor(e.LogType);
 
             var time = element.Q<Label>("time");
             if (_showTimestamp)
@@ -504,9 +546,9 @@ namespace DebugxLog.Console.Runtime
         private void UpdateCounts()
         {
             LogStatistics s = _store.Statistics;
-            _logButton.text = CountText(s.LogCount);
-            _warnButton.text = CountText(s.WarningCount);
-            _errorButton.text = CountText(s.ErrorCount);
+            _logCount.text = CountText(s.LogCount);
+            _warnCount.text = CountText(s.WarningCount);
+            _errorCount.text = CountText(s.ErrorCount);
         }
 
         private void UpdateCountButtonStates()
@@ -602,6 +644,31 @@ namespace DebugxLog.Console.Runtime
             }
         }
 
+        // Load the icon set once from Resources. _useIconRows gates the row/count-button icon path — off when any severity
+        // icon is missing, so the Console degrades to color bars/text instead of blank gaps.
+        // 从 Resources 加载图标集一次。_useIconRows 控制行/计数按钮的图标路径——任一严重级别图标缺失时关闭，使 Console 降级为
+        // 色条/文字而非留空。
+        private void EnsureIconsLoaded()
+        {
+            if (_iconsLoaded) return;
+            _iconsLoaded = true;
+            _iconLog = Resources.Load<Texture2D>(DebugxRuntimeConsoleStyle.IconInfoResource);
+            _iconWarn = Resources.Load<Texture2D>(DebugxRuntimeConsoleStyle.IconWarningResource);
+            _iconError = Resources.Load<Texture2D>(DebugxRuntimeConsoleStyle.IconErrorResource);
+            _iconArticle = Resources.Load<Texture2D>(DebugxRuntimeConsoleStyle.IconArticleResource);
+            _useIconRows = _iconLog != null && _iconWarn != null && _iconError != null;
+        }
+
+        private Texture2D SeverityIcon(LogType type)
+        {
+            switch (LogStatistics.SeverityOf(type))
+            {
+                case LogSeverity.Warning: return _iconWarn;
+                case LogSeverity.Error: return _iconError;
+                default: return _iconLog;
+            }
+        }
+
         private static string SingleLine(string text)
         {
             if (string.IsNullOrEmpty(text)) return string.Empty;
@@ -685,13 +752,36 @@ namespace DebugxLog.Console.Runtime
                 ? DebugxRuntimeConsoleStyle.CountOverflowThreshold + "+"
                 : n.ToString();
 
-        private Button BuildCountButton(Color color, Action onClick)
+        // A native-Console-style count button: severity icon + a count label, toggling that type's filter. Falls back to
+        // a color-tinted number when the icon is missing. Mirrors the Editor Console's MakeCountButton.
+        // 原生 Console 风格的计数按钮：严重级别图标 + 计数标签，点击切换该类型过滤。图标缺失时回退为彩色数字。对齐 Editor
+        // 版的 MakeCountButton。
+        private VisualElement BuildCountButton(Texture2D icon, Color fallbackColor, out Label countLabel, Action onClick)
         {
-            var btn = new Button(onClick) { text = "0" };
+            var btn = new VisualElement();
             StyleToolbarButton(btn);
-            btn.style.color = color;
-            btn.style.unityFontStyleAndWeight = FontStyle.Bold;
+            btn.style.flexDirection = FlexDirection.Row;
+            btn.style.alignItems = Align.Center;
             btn.style.minWidth = 34;
+
+            if (icon != null)
+            {
+                var img = new Image { image = icon, scaleMode = ScaleMode.ScaleToFit };
+                img.style.width = DebugxRuntimeConsoleStyle.CountIconSize;
+                img.style.height = DebugxRuntimeConsoleStyle.CountIconSize;
+                img.style.marginRight = DebugxRuntimeConsoleStyle.CountIconMarginRight;
+                img.style.flexShrink = 0;
+                btn.Add(img);
+            }
+
+            countLabel = new Label("0");
+            countLabel.style.unityFontStyleAndWeight = FontStyle.Bold;
+            countLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+            // No glyph → color the number by severity so the type stays readable. 无图标 → 用严重级别色标注数字，保留类型可读性。
+            if (icon == null) countLabel.style.color = fallbackColor;
+            btn.Add(countLabel);
+
+            btn.RegisterCallback<ClickEvent>(_ => onClick());
             return btn;
         }
 
@@ -736,7 +826,7 @@ namespace DebugxLog.Console.Runtime
             popup.style.top = top;
         }
 
-        private static void StyleToolbarButton(Button b)
+        private static void StyleToolbarButton(VisualElement b)
         {
             b.style.marginLeft = 2;
             b.style.marginRight = 2;

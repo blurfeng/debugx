@@ -48,6 +48,21 @@ namespace DebugxLog.Console.Runtime
         public const float InactiveOpacity = 0.4f;
         public const int FontSizeSmall = 11;
 
+        // Severity icons + branding icon, loaded from any Resources folder at runtime (files live under
+        // Plugins/Debugx/Resources). When absent the Console falls back to the color bar / colored count text.
+        // 严重级别图标 + 品牌图标，运行时从任意 Resources 目录加载（文件位于 Plugins/Debugx/Resources）。缺失时 Console
+        // 回退到色条 / 彩色计数文字。
+        public const string IconInfoResource = "icon_info";
+        public const string IconWarningResource = "icon_warning";
+        public const string IconErrorResource = "icon_error";
+        public const string IconArticleResource = "icon_article";
+
+        public const float RowIconSize = 14f;
+        public const float RowIconMarginRight = 5f;
+        public const float CountIconSize = 14f;
+        public const float CountIconMarginRight = 3f;
+        public const float OpenButtonIconSize = 15f;
+
         // Number of simultaneous fingers whose tap toggles the console on touch devices (a mobile alternative to the
         // backquote key). 触屏端同时按下、点击即可开合 Console 的手指数（反引号键的移动端替代）。
         public const int SummonTouchCount = 3;
