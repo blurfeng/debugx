@@ -54,12 +54,14 @@ namespace DebugxLog.Console.Editor
         private VisualElement _clearDivider; // absolute-positioned line inside Clear's right edge (custom height %). 置于 Clear 右边缘的绝对定位竖线（可自定义高度占比）。
         private ToolbarButton _clearDropdownButton;
         private Label _memberNameLabel, _memberCaretLabel; // Members button split into text + independently-sized caret. Members 按钮拆成文字 + 可独立调大小的三角。
-        private ToolbarToggle _collapseToggle, _onlyDebugxToggle, _errorPauseToggle;
+        private ToolbarToggle _collapseToggle, _errorPauseToggle;
         private ToolbarSearchField _searchField;
-        private ToolbarButton _langButton;
 
-        // Fixed group widths (per current language) used by the responsive show/hide logic.
-        // 供响应式显隐逻辑使用的固定分组宽度（按当前语言）。
+        // Fixed group widths (per current language) used by the responsive show/hide logic. _wBase is the always-visible
+        // left minimum EXCLUDING the counts — the counts' width is measured live in UpdateResponsive (it grows with the
+        // digit count) so they are always reserved accurately and never overflow.
+        // 供响应式显隐逻辑使用的固定分组宽度（按当前语言）。_wBase 是不含计数按钮的左侧常驻最小宽度——计数按钮宽度随位数增长，
+        // 在 UpdateResponsive 内实时测量预留，从而始终精确预留、永不溢出。
         private float _wBase, _wSearch, _wFilters, _wRuntimeGroup;
 
         // Native-style count buttons (icon + count) for the three severities.
@@ -74,8 +76,11 @@ namespace DebugxLog.Console.Editor
         private bool _errorPause;
         private bool _chineseUi; // false = English (default). UI language, independent of system language. 默认英文，独立于系统语言。
 
-        // Cached console icons.
+        // Cached severity icons (loaded from the plugin Resources; shared by list rows and count buttons).
+        // 缓存的严重级别图标（从插件 Resources 加载；列表行与计数按钮共用）。
         private Texture _iconLog, _iconWarn, _iconError;
+        // Gray "_g" variants used on a count button when that severity's count is 0. 计数为 0 时计数按钮使用的灰色 "_g" 变体。
+        private Texture _iconLogGray, _iconWarnGray, _iconErrorGray;
 
         private string L(string cn, string en) => _chineseUi ? cn : en;
 
@@ -112,9 +117,16 @@ namespace DebugxLog.Console.Editor
 
         public void CreateGUI()
         {
-            _iconLog = EditorGUIUtility.IconContent("console.infoicon.sml").image;
-            _iconWarn = EditorGUIUtility.IconContent("console.warnicon.sml").image;
-            _iconError = EditorGUIUtility.IconContent("console.erroricon.sml").image;
+            // Severity icons now come from the plugin's Resources (shared with the runtime Console); fall back to Unity's
+            // built-in console icons if a Resources file is missing. Gray "_g" variants are shown when a count is 0.
+            // 严重级别图标改用插件 Resources（与运行时 Console 共用）；Resources 缺失时回退到 Unity 内置控制台图标。
+            // 计数为 0 时显示灰色 "_g" 变体。
+            _iconLog = LoadSeverityIcon("icon_info", "console.infoicon.sml");
+            _iconWarn = LoadSeverityIcon("icon_warning", "console.warnicon.sml");
+            _iconError = LoadSeverityIcon("icon_error", "console.erroricon.sml");
+            _iconLogGray = Resources.Load<Texture2D>("icon_info_g");
+            _iconWarnGray = Resources.Load<Texture2D>("icon_warning_g");
+            _iconErrorGray = Resources.Load<Texture2D>("icon_error_g");
 
             VisualElement root = rootVisualElement;
             root.Add(BuildToolbar());
@@ -156,18 +168,38 @@ namespace DebugxLog.Console.Editor
             // 工具栏尺寸变化时重算可选分组的显隐。
             toolbar.RegisterCallback<GeometryChangedEvent>(_ => UpdateResponsive());
 
+            // Two-group layout so the counts are STRUCTURALLY protected, not just reserved by width math:
+            //  - leftGroup: flex-grow + flex-shrink + overflow:hidden. It absorbs ALL narrowing; when the window is too
+            //    small its right edge (the search side) is clipped rather than the counts.
+            //  - countsGroup: flex-shrink 0, pinned to the far right. It is laid out independently of leftGroup, so no
+            //    amount of overflow inside leftGroup can ever push the counts off-screen.
+            // The responsive show/hide logic still hides optional buttons INSIDE leftGroup for usability.
+            // 采用左右两组布局，让计数在结构上被保护，而非仅靠宽度数学预留：
+            //  - leftGroup：flex-grow + flex-shrink + overflow:hidden。它吸收全部收缩；窗口过小时被裁的是它的右缘（搜索侧），而非计数。
+            //  - countsGroup：flex-shrink 0，固定贴最右。它独立于 leftGroup 布局，故 leftGroup 内部再怎么溢出都无法把计数挤出屏幕。
+            // 响应式显隐逻辑仍作用于 leftGroup 内部的可选按钮，用于提升可用性。
+            var leftGroup = new VisualElement();
+            leftGroup.style.flexDirection = FlexDirection.Row;
+            leftGroup.style.flexGrow = 1;
+            leftGroup.style.flexShrink = 1;
+            leftGroup.style.minWidth = 0;
+            leftGroup.style.overflow = Overflow.Hidden;
+            // No explicit height: as a direct toolbar child it stretches to the toolbar's height (align-items:stretch),
+            // exactly as the buttons did when they were direct children. 不设显式高度：作为工具栏直接子级，它按 align-items:stretch
+            // 拉伸到工具栏高度，与按钮此前作为直接子级时一致。
+
             _clearButton = new ToolbarButton(OnClearClicked);
             // Divider line lives inside the Clear button (right edge) so its % height resolves against a real,
             // sized parent; styled in StyleClearSplit. 分隔线作为 Clear 按钮的子元素置于右边缘，其百分比高度可对
             // 一个有确定尺寸的父级解析；样式见 StyleClearSplit。
             _clearDivider = new VisualElement { pickingMode = PickingMode.Ignore };
             _clearButton.Add(_clearDivider);
-            toolbar.Add(_clearButton);
+            leftGroup.Add(_clearButton);
 
             // Native-style: a dropdown arrow next to Clear with the "Clear on ..." options.
             // 原生风格：Clear 旁的下拉三角，内含“清空时机”选项。
             _clearDropdownButton = new ToolbarButton(ShowClearMenu) { text = "▼" };
-            toolbar.Add(_clearDropdownButton);
+            leftGroup.Add(_clearDropdownButton);
 
             _collapseToggle = MakeToggle(string.Empty, CollapseFromPrefs(), evt =>
             {
@@ -175,14 +207,26 @@ namespace DebugxLog.Console.Editor
                 SavePrefs();
                 ForceRefresh();
             });
-            toolbar.Add(_collapseToggle);
+            leftGroup.Add(_collapseToggle);
 
             _errorPauseToggle = MakeToggle(string.Empty, _errorPause, evt =>
             {
                 _errorPause = evt.newValue;
                 SavePrefs();
             });
-            toolbar.Add(_errorPauseToggle);
+            leftGroup.Add(_errorPauseToggle);
+
+            // Members dropdown, then the Editor toggle to its right, sit in the LEFT group before the search.
+            // (View options and UI language moved into the Editor panel — see RefreshRuntimePanel.)
+            // 成员下拉，其右侧是 Editor 开关，放在左侧分组、搜索栏之前。（视图选项与界面语言已移入 Editor 面板，见 RefreshRuntimePanel。）
+            _memberButton = new ToolbarButton(ShowMemberMenu);
+            // Text + caret as separate children so the caret can be sized independently (a small native-style triangle).
+            // 文字与三角拆成两个子元素，让三角可独立设定大小（接近原生的小三角）。
+            _memberNameLabel = new Label { pickingMode = PickingMode.Ignore };
+            _memberCaretLabel = new Label("▼") { pickingMode = PickingMode.Ignore };
+            _memberButton.Add(_memberNameLabel);
+            _memberButton.Add(_memberCaretLabel);
+            leftGroup.Add(_memberButton);
 
             _runtimeToggle = MakeToggle(string.Empty, false, evt =>
             {
@@ -190,7 +234,7 @@ namespace DebugxLog.Console.Editor
                 _runtimePanel.style.display = _runtimeVisible ? DisplayStyle.Flex : DisplayStyle.None;
                 if (_runtimeVisible) RefreshRuntimePanel();
             });
-            toolbar.Add(_runtimeToggle);
+            leftGroup.Add(_runtimeToggle);
 
             _searchField = new ToolbarSearchField();
             _searchField.RegisterValueChangedCallback(evt =>
@@ -199,9 +243,11 @@ namespace DebugxLog.Console.Editor
                 OnCriteriaChanged();
             });
 
-            // The search lives in a flex-grow container so that when the search is hidden the container still fills
-            // the middle, keeping the right-side group pinned to the right (blank gap instead of snapping left).
-            // 搜索栏放入一个 flex-grow 容器：搜索隐藏时容器仍填充中部，使右侧分组保持靠右（中间留白，而非吸附到左边）。
+            // The search is the LAST child of leftGroup and flex-grows to fill leftGroup's leftover, so it (not the
+            // buttons) absorbs the width and is the first thing clipped when the window narrows. leftGroup itself
+            // flex-grows within the toolbar, keeping countsGroup pinned to the far right (blank gap when search hides).
+            // 搜索栏是 leftGroup 的最后一个子元素，flex-grow 填充 leftGroup 剩余空间，故由它（而非按钮）吸收宽度、窗口变窄时最先被裁。
+            // leftGroup 本身在工具栏内 flex-grow，使 countsGroup 始终贴最右（搜索隐藏时中间留白）。
             _searchContainer = new VisualElement();
             _searchContainer.style.flexDirection = FlexDirection.Row;
             _searchContainer.style.flexGrow = 1;
@@ -209,24 +255,25 @@ namespace DebugxLog.Console.Editor
             _searchContainer.style.minWidth = 0;
             _searchContainer.style.alignItems = Align.Center;
             _searchContainer.style.overflow = Overflow.Hidden;
+            // Divider hairline on the search area's LEFT edge (same color/width as the other toolbar separators).
+            // Its width is toggled with the search's visibility in UpdateResponsive, so no stray line remains when the
+            // search is hidden. The left padding gives the search box the same breathing room from the divider as
+            // SearchRightSpace gives it from the counts on the right.
+            // 搜索区左边缘的分隔细线（与其它工具栏分隔线同色同宽）。其宽度在 UpdateResponsive 里随搜索显隐切换，避免搜索隐藏时
+            // 残留竖线。左内边距让搜索框与分隔线之间的留白，与右侧 SearchRightSpace 对称。
+            _searchContainer.style.borderLeftColor = DebugxConsoleStyle.ToolbarDividerColor;
+            _searchContainer.style.paddingLeft = DebugxConsoleStyle.SearchRightSpace;
             _searchContainer.Add(_searchField);
-            toolbar.Add(_searchContainer);
+            leftGroup.Add(_searchContainer);
+            toolbar.Add(leftGroup);
 
-            _onlyDebugxToggle = MakeToggle(string.Empty, _criteria.OnlyDebugx, evt =>
-            {
-                _criteria.OnlyDebugx = evt.newValue;
-                OnCriteriaChanged();
-            });
-            toolbar.Add(_onlyDebugxToggle);
-
-            _memberButton = new ToolbarButton(ShowMemberMenu);
-            // Text + caret as separate children so the caret can be sized independently (a small native-style triangle).
-            // 文字与三角拆成两个子元素，让三角可独立设定大小（接近原生的小三角）。
-            _memberNameLabel = new Label { pickingMode = PickingMode.Ignore };
-            _memberCaretLabel = new Label("▼") { pickingMode = PickingMode.Ignore };
-            _memberButton.Add(_memberNameLabel);
-            _memberButton.Add(_memberCaretLabel);
-            toolbar.Add(_memberButton);
+            // Count buttons live in their own flex-shrink-0 group pinned to the far right. Because this group is laid out
+            // independently of leftGroup, the counts can never be clipped no matter how narrow the window gets.
+            // 计数按钮放在自己的 flex-shrink 0 分组中、固定贴最右。该分组独立于 leftGroup 布局，故无论窗口多窄，计数都不会被裁切。
+            var countsGroup = new VisualElement();
+            countsGroup.style.flexDirection = FlexDirection.Row;
+            countsGroup.style.flexGrow = 0;
+            countsGroup.style.flexShrink = 0; // never shrinks — this is what guarantees the counts stay on-screen. 永不收缩——这正是计数常驻的保证。
 
             _logButton = MakeCountButton(_iconLog, out _logCount, () =>
             {
@@ -246,21 +293,10 @@ namespace DebugxLog.Console.Editor
                 UpdateCountButtonStates();
                 OnCriteriaChanged();
             });
-            toolbar.Add(_logButton);
-            toolbar.Add(_warnButton);
-            toolbar.Add(_errorButton);
-
-            // View options dropdown (timestamp column, stack Script-Only/Full). Same text+caret layout as Members.
-            // 视图选项下拉（时间戳列、堆栈 仅脚本/完整）。与 Members 相同的 文字+三角 布局。
-            _viewButton = new ToolbarButton(ShowViewMenu);
-            _viewNameLabel = new Label { pickingMode = PickingMode.Ignore };
-            _viewCaretLabel = new Label("▼") { pickingMode = PickingMode.Ignore };
-            _viewButton.Add(_viewNameLabel);
-            _viewButton.Add(_viewCaretLabel);
-            toolbar.Add(_viewButton);
-
-            _langButton = new ToolbarButton(ToggleLanguage);
-            toolbar.Add(_langButton);
+            countsGroup.Add(_logButton);
+            countsGroup.Add(_warnButton);
+            countsGroup.Add(_errorButton);
+            toolbar.Add(countsGroup);
 
             ApplyLanguage();
             UpdateCountButtonStates();
@@ -278,7 +314,7 @@ namespace DebugxLog.Console.Editor
             btn.style.paddingLeft = 5;
             btn.style.paddingRight = 5;
 
-            var img = new Image { image = icon, scaleMode = ScaleMode.ScaleToFit };
+            var img = new Image { name = "count-icon", image = icon, scaleMode = ScaleMode.ScaleToFit };
             img.style.width = DebugxConsoleStyle.CountIconSize;
             img.style.height = DebugxConsoleStyle.CountIconSize;
             img.style.marginRight = DebugxConsoleStyle.CountIconMarginRight;
@@ -290,6 +326,10 @@ namespace DebugxLog.Console.Editor
             btn.Add(img);
             btn.Add(countLabel);
             btn.RegisterCallback<ClickEvent>(_ => onClick());
+            // When the count text changes width (e.g. 9 -> 999+), re-evaluate the responsive layout so the wider counts
+            // are reserved and stay on-screen even without a window resize. Idempotent, so no layout thrash.
+            // 当计数文字宽度变化（如 9 -> 999+）时重跑响应式布局，使更宽的计数被预留、无需缩放窗口也能留在屏幕内。幂等，不会抖动。
+            btn.RegisterCallback<GeometryChangedEvent>(_ => UpdateResponsive());
             return btn;
         }
 
@@ -669,6 +709,18 @@ namespace DebugxLog.Console.Editor
             _logCount.text = CountText(s.LogCount);
             _warnCount.text = CountText(s.WarningCount);
             _errorCount.text = CountText(s.ErrorCount);
+
+            // Gray "_g" icon when that severity's count is 0; colored icon otherwise (gray missing → keep colored).
+            // 某类型计数为 0 时用灰色 "_g" 图标；否则用彩色（灰色缺失则保持彩色）。
+            SetCountIcon(_logButton, s.LogCount, _iconLog, _iconLogGray);
+            SetCountIcon(_warnButton, s.WarningCount, _iconWarn, _iconWarnGray);
+            SetCountIcon(_errorButton, s.ErrorCount, _iconError, _iconErrorGray);
+        }
+
+        private static void SetCountIcon(VisualElement btn, int count, Texture colored, Texture gray)
+        {
+            Image img = btn?.Q<Image>("count-icon");
+            if (img != null) img.image = (count == 0 && gray != null) ? gray : colored;
         }
 
         private static string CountText(int n) =>
@@ -692,16 +744,17 @@ namespace DebugxLog.Console.Editor
             _clearDropdownButton.tooltip = L("清空时机选项", "Clear-on options");
             _collapseToggle.text = L("折叠", "Collapse");
             _errorPauseToggle.text = L("错误暂停", "Error Pause");
-            _onlyDebugxToggle.text = L("仅Debugx", "Debugx Only");
             _memberNameLabel.text = L("成员", "Members");
-            _viewNameLabel.text = L("视图", "View");
-            _runtimeToggle.text = L("运行时", "Runtime");
-            // Show the CURRENT language, not the target one.
-            // 显示当前语言，而非切换目标语言。
-            _langButton.text = _chineseUi ? "中" : "EN";
-            _langButton.tooltip = L("切换界面语言 (中/英)", "Switch UI language (EN/CN)");
+            _runtimeToggle.text = L("编辑器", "Editor");
 
             ApplyToolbarLayout();
+
+            // The View options + language button now live in the Editor panel; re-localize it too when it's open.
+            // Deferred so a language-button click (which originates from a control inside the panel) doesn't rebuild the
+            // panel mid-event. 视图选项与语言按钮现位于 Editor 面板；面板打开时一并重建以本地化。延迟执行，避免语言按钮的
+            // 点击（来自面板内控件）在事件处理途中重建面板。
+            if (_runtimeVisible && _runtimePanel != null)
+                _runtimePanel.schedule.Execute(RefreshRuntimePanel);
         }
 
         private void ToggleLanguage()
@@ -719,11 +772,8 @@ namespace DebugxLog.Console.Editor
             float clearDropdown = DebugxConsoleStyle.ClearDropdownWidth;
             float collapse = Wc(DebugxConsoleStyle.CollapseWidth);
             float errorPause = Wc(DebugxConsoleStyle.ErrorPauseWidth);
-            float runtime = Wc(DebugxConsoleStyle.RuntimeWidth);
-            float debugxOnly = Wc(DebugxConsoleStyle.DebugxOnlyWidth);
+            float runtime = Wc(DebugxConsoleStyle.EditorWidth);
             float members = Wc(DebugxConsoleStyle.MembersWidth);
-            float view = Wc(DebugxConsoleStyle.ViewWidth);
-            float lang = Wc(DebugxConsoleStyle.LangButtonWidth);
             float countMin = Wc(DebugxConsoleStyle.CountWidth);
 
             // Clear + divider + dropdown arrow styled together to match the native Clear dropdown.
@@ -732,10 +782,7 @@ namespace DebugxLog.Console.Editor
             StyleItem(_collapseToggle, collapse);
             StyleItem(_errorPauseToggle, errorPause);
             StyleItem(_runtimeToggle, runtime);
-            StyleItem(_onlyDebugxToggle, debugxOnly);
             StyleMemberDropdown(_memberButton, _memberNameLabel, _memberCaretLabel, members);
-            StyleMemberDropdown(_viewButton, _viewNameLabel, _viewCaretLabel, view);
-            StyleItem(_langButton, lang);
 
             // Count buttons: width grows with the number, but never below CountWidth.
             // 计数按钮：宽度随数字增长，但不小于 CountWidth。
@@ -751,9 +798,13 @@ namespace DebugxLog.Console.Editor
             _searchField.style.minWidth = DebugxConsoleStyle.SearchMinWidth;
             _searchField.style.marginRight = DebugxConsoleStyle.SearchRightSpace;
 
-            _wBase = clear + clearDropdown + collapse + countMin * 3f + view + lang;
+            // Counts are NOT baked into _wBase: their auto width grows with the digit count, so they are reserved live
+            // from resolvedStyle in UpdateResponsive (see CountsWidth). Baking a fixed estimate here let big numbers
+            // overflow and clip the counts. 计数按钮不并入 _wBase：其自适应宽度随位数增长，改在 UpdateResponsive 里按
+            // resolvedStyle 实时预留（见 CountsWidth）。此处若固定估算，大数字会溢出并裁掉计数。
+            _wBase = clear + clearDropdown + collapse;
             _wSearch = DebugxConsoleStyle.SearchMinWidth + DebugxConsoleStyle.SearchRightSpace;
-            _wFilters = debugxOnly + members;
+            _wFilters = members;
             _wRuntimeGroup = runtime + errorPause;
 
             UpdateResponsive();
@@ -777,6 +828,7 @@ namespace DebugxLog.Console.Editor
             el.style.alignItems = Align.Center;
             el.style.unityTextAlign = TextAnchor.MiddleCenter;
             CenterChildText(el);
+            SetLeftDivider(el); // uniform left-side hairline divider (see SetLeftDivider for why left). 统一的左侧细线分隔（为何用左侧见 SetLeftDivider）。
         }
 
         // Count button: min width = CountWidth, actual width auto (content-driven); content centered.
@@ -793,6 +845,7 @@ namespace DebugxLog.Console.Editor
             el.style.paddingRight = DebugxConsoleStyle.ItemPadding;
             el.style.justifyContent = Justify.Center;
             el.style.alignItems = Align.Center;
+            SetLeftDivider(el); // count buttons are right-aligned, so their hairline sits on the LEFT. 计数按钮右对齐，细线画在左侧。
         }
 
         // Force text children (labels) to center, overriding toolbar USS that left-aligns them.
@@ -806,6 +859,25 @@ namespace DebugxLog.Console.Editor
             });
         }
 
+        // Uniform toolbar separators: every item draws its divider as a single LEFT-side hairline of the same width +
+        // color, and zeroes its other three borders. The LEFT side matters — Unity's native toolbar gives items a
+        // margin-left of -1px so adjacent borders overlap/collapse; a RIGHT border gets covered by the next item and
+        // vanishes, while a LEFT border moves WITH the item and stays visible. One border per seam also means two
+        // borders can never stack into a thick line. The first item (Clear) and the caret clear their own left border
+        // afterward — their seam is drawn by the custom child divider line instead.
+        // 统一的工具栏分隔线：每个条目都把分隔线画成左侧一条同宽同色的细线，其余三边置零。用左侧很关键——Unity 原生工具栏给
+        // 条目设了 -1px 的 margin-left 让相邻边框重叠折叠；右边框会被后一个条目盖住而消失，左边框则随条目移动、始终可见。
+        // 每条接缝只有一条边框，也不会叠成粗线。第一个条目（Clear）与三角随后各自清掉左边框——它们之间改由自绘竖线分隔。
+        private static void SetLeftDivider(VisualElement el)
+        {
+            if (el == null) return;
+            el.style.borderTopWidth = 0;
+            el.style.borderBottomWidth = 0;
+            el.style.borderRightWidth = 0;
+            el.style.borderLeftWidth = DebugxConsoleStyle.ToolbarDividerWidth;
+            el.style.borderLeftColor = DebugxConsoleStyle.ToolbarDividerColor;
+        }
+
         // Style the Clear button + hairline divider + dropdown caret to read like the native console's Clear
         // dropdown: "Clear" and a "▼" caret each centered in their own zone, separated by a dark vertical
         // hairline. Behaviour is unchanged (main = clear, caret = menu).
@@ -817,8 +889,8 @@ namespace DebugxLog.Console.Editor
             {
                 StyleItem(main, mainWidth);
                 main.style.marginRight = 0;
-                main.style.borderRightWidth = 0; // no full-height border; the divider child draws a custom-height line. 不用满高边框，改由 divider 子元素画可调高度的线。
-                main.style.paddingRight = 0;      // so the divider sits exactly on the right edge (boundary with the caret). 使分隔线正好落在右边缘（与三角的交界）。
+                main.style.borderLeftWidth = 0;  // first toolbar item — no leading divider; Clear|caret is drawn by the divider child. 工具栏第一个条目——前面不画分隔线；Clear|三角 由 divider 子元素绘制。
+                main.style.paddingRight = 0;      // so the divider child sits exactly on the right edge (boundary with the caret). 使分隔线子元素正好落在右边缘（与三角的交界）。
             }
 
             if (divider != null)
@@ -830,8 +902,8 @@ namespace DebugxLog.Console.Editor
                 divider.style.right = 0;
                 divider.style.top = Length.Percent(inset);
                 divider.style.bottom = Length.Percent(inset);
-                divider.style.width = DebugxConsoleStyle.ClearDividerWidth;
-                divider.style.backgroundColor = DebugxConsoleStyle.ClearDividerColor;
+                divider.style.width = DebugxConsoleStyle.ToolbarDividerWidth;
+                divider.style.backgroundColor = DebugxConsoleStyle.ToolbarDividerColor;
             }
 
             if (arrow != null)
@@ -861,6 +933,7 @@ namespace DebugxLog.Console.Editor
                 button.style.flexDirection = FlexDirection.Row;
                 button.style.alignItems = Align.Center;
                 button.style.justifyContent = Justify.Center;
+                SetLeftDivider(button); // uniform left-side hairline divider. 统一的左侧细线分隔。
             }
 
             if (name != null)
@@ -881,21 +954,26 @@ namespace DebugxLog.Console.Editor
         }
 
         // Progressively hide optional groups when the toolbar is too narrow:
-        // search -> (Debugx Only + Members) -> (Runtime + Error Pause).
-        // 工具栏过窄时依次隐藏可选分组：搜索栏 -> (仅Debugx + 成员) -> (运行时 + 错误暂停)。
+        // search -> Members -> (Editor + Error Pause).
+        // 工具栏过窄时依次隐藏可选分组：搜索栏 -> 成员 -> (编辑器 + 错误暂停)。
         private void UpdateResponsive()
         {
             if (_toolbar == null) return;
             float avail = _toolbar.contentRect.width - DebugxConsoleStyle.ResponsiveBuffer; // buffer for item margins. 预留条目间距余量。
             if (avail <= 1f || float.IsNaN(avail)) return;
 
+            // Reserve the counts' ACTUAL current width (they grow with their digit count and must stay visible), so the
+            // groups below hide early enough that the counts never overflow the right edge and get clipped.
+            // 预留计数按钮的实际当前宽度（随位数增长，且必须常驻），使下方分组足够早地隐藏，让计数永不溢出右边缘被裁切。
+            float baseW = _wBase + CountsWidth();
+
             // Fixed groups (left + right) hide only when they overflow; the flex-grow middle container keeps the right
             // group right-aligned (blank gap in the middle when the search is hidden). Hide order: filters, then runtime.
             // 固定分组（左 + 右）仅在溢出时隐藏；flex-grow 中部容器让右侧分组保持靠右（搜索隐藏时中间留白）。隐藏顺序：过滤组，再运行时组。
-            bool showFilters = _wBase + _wFilters + _wRuntimeGroup <= avail;
-            bool showRuntime = showFilters || _wBase + _wRuntimeGroup <= avail;
+            bool showFilters = baseW + _wFilters + _wRuntimeGroup <= avail;
+            bool showRuntime = showFilters || baseW + _wRuntimeGroup <= avail;
 
-            float fixedVisible = _wBase
+            float fixedVisible = baseW
                 + (showFilters ? _wFilters : 0f)
                 + (showRuntime ? _wRuntimeGroup : 0f);
 
@@ -904,10 +982,29 @@ namespace DebugxLog.Console.Editor
             bool showSearch = avail - fixedVisible >= _wSearch;
 
             SetVisible(_searchField, showSearch);
-            SetVisible(_onlyDebugxToggle, showFilters);
+            // The search area's left divider only makes sense while the search is visible. 搜索区左侧分隔线仅在搜索可见时显示。
+            _searchContainer.style.borderLeftWidth = showSearch ? DebugxConsoleStyle.ToolbarDividerWidth : 0f;
             SetVisible(_memberButton, showFilters);
             SetVisible(_runtimeToggle, showRuntime);
             SetVisible(_errorPauseToggle, showRuntime);
+        }
+
+        // Sum of the three count buttons' resolved (laid-out) widths — their real footprint including the current digit
+        // count. resolvedStyle keeps the full width even while an overflowing button is visually clipped, so this stays
+        // accurate and lets UpdateResponsive keep them on-screen. Falls back to CountWidth per button before first layout.
+        // 三个计数按钮已解析（布局后）宽度之和——含当前位数的真实占位。即便按钮溢出被裁，resolvedStyle 仍保留完整宽度，故此值
+        // 始终准确，让 UpdateResponsive 得以把它们留在屏幕内。首次布局前每个按钮回退到 CountWidth。
+        private float CountsWidth()
+        {
+            float min = Wc(DebugxConsoleStyle.CountWidth);
+            return CountWidth(_logButton, min) + CountWidth(_warnButton, min) + CountWidth(_errorButton, min);
+        }
+
+        private static float CountWidth(VisualElement btn, float min)
+        {
+            if (btn == null) return min;
+            float w = btn.resolvedStyle.width;
+            return w > 1f && !float.IsNaN(w) ? w : min; // before layout resolves, width is 0/NaN — use the minimum. 布局解析前宽度为 0/NaN——用最小值。
         }
 
         private static void SetVisible(VisualElement el, bool visible)
@@ -998,6 +1095,14 @@ namespace DebugxLog.Console.Editor
                 case LogSeverity.Error: return _iconError;
                 default: return _iconLog;
             }
+        }
+
+        // Load a severity icon from the plugin Resources, falling back to a built-in editor console icon when absent.
+        // 从插件 Resources 加载严重级别图标，缺失时回退到内置编辑器控制台图标。
+        private static Texture LoadSeverityIcon(string resourceName, string builtinName)
+        {
+            Texture t = Resources.Load<Texture2D>(resourceName);
+            return t != null ? t : EditorGUIUtility.IconContent(builtinName).image;
         }
 
         private static string SingleLine(string text)

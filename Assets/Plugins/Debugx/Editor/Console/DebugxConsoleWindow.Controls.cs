@@ -105,7 +105,7 @@ namespace DebugxLog.Console.Editor
             panel.style.paddingTop = 4;
             panel.style.paddingBottom = 4;
             panel.style.borderBottomWidth = 1;
-            panel.style.borderBottomColor = DebugxConsoleStyle.RuntimePanelBorderColor;
+            panel.style.borderBottomColor = DebugxConsoleStyle.EditorPanelBorderColor;
             return panel;
         }
 
@@ -127,22 +127,57 @@ namespace DebugxLog.Console.Editor
 
             bool playing = Application.isPlaying;
 
-            // --- In-game runtime Console availability (always editable; decides the NEXT entry to Play) ---
-            // Off here keeps the on-device overlay Console from cluttering the Game view while this docked window is in use.
-            // --- 游戏内运行时 Console 是否可用（始终可编辑；决定下次进入 Play）---
-            // 在此关闭，可避免使用本停靠窗口时，设备端覆盖层 Console 干扰 Game 视图。
-            var runtimeConsoleToggle = new Toggle(L("启用游戏内运行时 Console", "Enable in-game runtime Console"))
-                { value = DebugxStaticData.RuntimeConsoleEnabled };
-            runtimeConsoleToggle.RegisterValueChangedCallback(evt => DebugxStaticData.RuntimeConsoleEnabled = evt.newValue);
-            _runtimePanel.Add(runtimeConsoleToggle);
+            // --- View / display options (Debugx-Only filter + the ex-toolbar "View" options; always editable) ---
+            // --- 视图 / 显示选项（仅Debugx 过滤 + 原顶部栏「视图」选项；始终可编辑）---
+            var viewTitle = new Label(L("视图", "View"));
+            viewTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
+            _runtimePanel.Add(viewTitle);
 
-            var runtimeConsoleHint = new Label(L(
+            // Debugx Only: filters the list to logs tagged [Debugx]; independent of the runtime switches below.
+            // 仅Debugx：把列表过滤为带 [Debugx] 标签的日志；与下方运行时开关无关。
+            var onlyDebugxToggle = new Toggle(L("仅Debugx", "Debugx Only")) { value = _criteria.OnlyDebugx };
+            onlyDebugxToggle.tooltip = L("仅显示带 [Debugx] 标签的日志。", "Show only logs tagged with [Debugx].");
+            onlyDebugxToggle.RegisterValueChangedCallback(evt =>
+            {
+                _criteria.OnlyDebugx = evt.newValue;
+                OnCriteriaChanged();
+            });
+            _runtimePanel.Add(onlyDebugxToggle);
+
+            // Show Timestamp: toggles the per-row time column. 显示时间戳：显隐每行的时间列。
+            var showTimestamp = new Toggle(L("显示时间戳", "Show Timestamp")) { value = _showTimestamp };
+            showTimestamp.tooltip = L("在每行左侧显示日志时间。", "Show the log time at the start of each row.");
+            showTimestamp.RegisterValueChangedCallback(evt =>
+            {
+                _showTimestamp = evt.newValue;
+                SavePrefs();
+                _listView?.RefreshItems(); // re-bind rows to show/hide the timestamp column. 重绑行以显隐时间戳列。
+            });
+            _runtimePanel.Add(showTimestamp);
+
+            // Stack: Script Only — the detail stack shows only script frames (hide engine / Debugx-internal frames).
+            // 堆栈：仅脚本——详情堆栈仅显示脚本帧（隐藏引擎/Debugx 内部帧）。
+            var stackScriptOnly = new Toggle(L("堆栈：仅脚本", "Stack: Script Only")) { value = _stackScriptOnly };
+            stackScriptOnly.tooltip = L("详情堆栈仅显示脚本帧，隐藏引擎/Debugx 内部帧。", "Show only script frames in the detail stack; hide engine / Debugx-internal frames.");
+            stackScriptOnly.RegisterValueChangedCallback(evt =>
+            {
+                _stackScriptOnly = evt.newValue;
+                SavePrefs();
+                RefreshSelectedDetail();
+            });
+            stackScriptOnly.style.marginBottom = 6;
+            _runtimePanel.Add(stackScriptOnly);
+
+            // Description moved to the toggle's tooltip (hover) instead of an inline hint label below it.
+            // 说明移到开关的 tooltip（悬停显示），不再用其下方的行内提示标签。
+            var runtimeConsoleToggle = new Toggle(L("启用游戏内 Console", "Enable in-game Console"))
+                { value = DebugxStaticData.RuntimeConsoleEnabled };
+            runtimeConsoleToggle.tooltip = L(
                 "控制游戏内覆盖层 Console 是否在进入 Play 时自建（下次 Play 生效）。默认关闭——编辑器里通常用不到（本窗口已够用）。此勾选只写编辑器的 PlayerPrefs，不影响构建；实机需在游戏代码中置 DebugxStaticData.RuntimeConsoleEnabled = true。",
-                "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Off by default — usually not needed in the Editor (this window covers it). This tick only writes Editor PlayerPrefs and does NOT affect a build; enable it in-build via DebugxStaticData.RuntimeConsoleEnabled = true in game code."));
-            runtimeConsoleHint.style.color = DebugxConsoleStyle.HintColor;
-            runtimeConsoleHint.style.whiteSpace = WhiteSpace.Normal;
-            runtimeConsoleHint.style.marginBottom = 6;
-            _runtimePanel.Add(runtimeConsoleHint);
+                "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Off by default — usually not needed in the Editor (this window covers it). This tick only writes Editor PlayerPrefs and does NOT affect a build; enable it in-build via DebugxStaticData.RuntimeConsoleEnabled = true in game code.");
+            runtimeConsoleToggle.RegisterValueChangedCallback(evt => DebugxStaticData.RuntimeConsoleEnabled = evt.newValue);
+            runtimeConsoleToggle.style.marginBottom = 6;
+            _runtimePanel.Add(runtimeConsoleToggle);
 
             // --- Runtime source switches (only meaningful in Play mode) ---
             var runtimeGroup = new VisualElement();
@@ -164,25 +199,9 @@ namespace DebugxLog.Console.Editor
             onlyKey.RegisterValueChangedCallback(evt => Debugx.logThisKeyMemberOnly = evt.newValue);
             runtimeGroup.Add(onlyKey);
 
-            DebugxProjectSettings settings = DebugxProjectSettings.Instance;
-            if (settings != null && settings.members != null && settings.members.Length > 0)
-            {
-                var membersTitle = new Label(L("成员开关", "Members"));
-                membersTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-                membersTitle.style.marginTop = 3;
-                runtimeGroup.Add(membersTitle);
-
-                foreach (DebugxMemberInfo m in settings.members)
-                {
-                    if (m == null) continue;
-                    int key = m.key;
-                    string sig = string.IsNullOrEmpty(m.signature) ? "Member" : m.signature;
-                    var t = new Toggle($"[{key}] {sig}") { value = Debugx.MemberIsEnable(key) };
-                    t.RegisterValueChangedCallback(evt => Debugx.SetMemberEnable(key, evt.newValue));
-                    runtimeGroup.Add(t);
-                }
-            }
-
+            // Per-member runtime send switches removed here — that surface duplicated the toolbar's Members control for
+            // the user's purposes; per-member state is still settable in Preferences > Debugx and via game code.
+            // 此处的逐成员运行时发送开关已移除——对用户而言与顶部栏 Members 重复；逐成员状态仍可在 Preferences > Debugx 与游戏代码中设置。
             _runtimePanel.Add(runtimeGroup);
 
             if (!playing)
@@ -206,6 +225,26 @@ namespace DebugxLog.Console.Editor
             var update = new Toggle(L("Update 测试打印", "Update test log")) { value = DebugxStaticData.EnableUpdateTestLog };
             update.RegisterValueChangedCallback(evt => DebugxStaticData.EnableUpdateTestLog = evt.newValue);
             _runtimePanel.Add(update);
+
+            // --- UI language (moved here from the toolbar): a single button showing the current language; click toggles. ---
+            // ToggleLanguage re-localizes the toolbar and (deferred) rebuilds this panel — see ApplyLanguage.
+            // --- 界面语言（从顶部栏移来）：一个显示当前语言的按钮，点击切换。ToggleLanguage 会重新本地化工具栏并（延迟）重建本面板，见 ApplyLanguage。 ---
+            var langRow = new VisualElement();
+            langRow.style.flexDirection = FlexDirection.Row;
+            langRow.style.alignItems = Align.Center;
+            langRow.style.marginTop = 8;
+
+            var langLabel = new Label(L("界面语言", "UI Language"));
+            langLabel.style.marginRight = 6;
+            langRow.Add(langLabel);
+
+            // Shows the CURRENT language (中 / EN), not the switch target. 显示当前语言（中 / EN），而非切换目标。
+            var langButton = new Button(ToggleLanguage) { text = _chineseUi ? "中" : "EN" };
+            langButton.tooltip = L("切换界面语言 (中/英)", "Switch UI language (EN/CN)");
+            langButton.style.width = 40;
+            langRow.Add(langButton);
+
+            _runtimePanel.Add(langRow);
         }
     }
 }
