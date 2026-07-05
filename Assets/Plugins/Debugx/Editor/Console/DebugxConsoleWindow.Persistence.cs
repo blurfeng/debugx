@@ -94,8 +94,18 @@ namespace DebugxLog.Console.Editor
             catch { return; }
             if (payload?.entries == null || payload.entries.Count == 0) return;
 
+            long maxSeq = 0;
             foreach (PersistedEntry p in payload.entries)
-                _store.Buffer.Add(FromPersisted(p));
+            {
+                DebugxLogEntry entry = FromPersisted(p);
+                if (entry.SequenceId > maxSeq) maxSeq = entry.SequenceId;
+                _store.Buffer.Add(entry);
+            }
+
+            // The fresh collector restarts its sequence at 0; push it past the restored ids so newly-captured entries
+            // don't collide with them (SequenceId must stay globally unique for selection tracking across eviction).
+            // 全新采集器的序号从 0 起；将其推过已恢复的 id，避免新捕获条目与之碰撞（SequenceId 须保持全局唯一，供跨淘汰的选中跟踪）。
+            _store.Collector.SeedSequence(maxSeq);
 
             _store.MarkViewDirty();
         }

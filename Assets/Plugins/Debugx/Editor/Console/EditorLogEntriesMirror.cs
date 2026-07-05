@@ -18,10 +18,11 @@ namespace DebugxLog.Console.Editor
     /// versions), the mirror disables itself and returns an empty list rather than throwing. Must be used on the main
     /// thread (it touches editor state).
     ///
-    /// 通过反射从 Unity 内部编辑器控制台存储（<c>UnityEditor.LogEntries</c>）读取编译器/资源导入消息。这些消息被直接注入
-    /// 控制台、从不经由 <c>Application.logMessageReceived(Threaded)</c>，故 Console 的 live 采集通道漏掉它们；在此镜像它们，
-    /// 使 Debugx Console 在编译警告/错误上与原生控制台对齐。它们还能跨域重载存活（不同于我们的内存缓冲），故调用方每次窗口
-    /// 启用时重读。所有反射一次解析并加保护：任一内部成员缺失（跨 Unity 版本 API 变化）时，镜像自禁用、返回空列表而非抛异常。
+    /// 通过反射从 Unity 内部编辑器控制台存储（<c>UnityEditor.LogEntries</c>）读取脚本编译消息。这是 Debugx Console 编译
+    /// 警告/错误的权威来源：与原生控制台完全一致、且能跨域重载存活（不同于我们的内存缓冲），故调用方每次窗口启用时重读。
+    /// 注意部分编译错误也会经 <c>Application.logMessageReceived(Threaded)</c>（live 通道）到达；live 通道据此
+    /// （用 <see cref="LooksLikeCompileMessage"/>）丢弃其重复副本，而历史消息（窗口打开前打印的、或重载后已存在的）在此重新拉取。
+    /// 所有反射一次解析并加保护：任一内部成员缺失（跨 Unity 版本 API 变化）时，镜像自禁用、返回空列表而非抛异常。
     /// 必须在主线程使用（会触碰编辑器状态）。
     /// </summary>
     internal static class EditorLogEntriesMirror
@@ -43,7 +44,7 @@ namespace DebugxLog.Console.Editor
         private static readonly Regex _compileMsgRegex = new Regex(
             @"\(\d+,\d+\):\s*(error|warning)\s+\w+:", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
-        /// <summary>One mirrored compiler / asset-import entry. 一条镜像来的编译器/资源导入条目。</summary>
+        /// <summary>One mirrored script-compile entry. 一条镜像来的脚本编译条目。</summary>
         internal struct Entry
         {
             public LogType Type;

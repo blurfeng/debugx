@@ -84,10 +84,13 @@ namespace DebugxLog.Console
 
             if (_criteria.OnlyDebugx && !e.IsDebugx) return false;
 
-            if (!_criteria.ShowAdmin && e.Category == LogEntryCategory.Admin) return false;
-
+            // Member-key filter. Compile messages are editor tooling output, not a Debugx member, so they are exempt
+            // (governed by the severity toggles / search instead) — otherwise unchecking "Uncategorized", whose sentinel
+            // key they share, would also hide compiler errors. Admin (key 0) and Unregistered ARE first-class filter keys.
+            // 成员 key 过滤。编译消息是编辑器工具输出、并非 Debugx 成员，故豁免（改由 严重级别/搜索 控制）——否则取消勾选“未分类”
+            //（与其共用哨兵 key）会连带隐藏编译错误。Admin（key 0）与 未注册 则是一等过滤 key。
             HashSet<int> keys = _criteria.VisibleMemberKeys;
-            if (keys != null && !keys.Contains(e.MemberKey)) return false;
+            if (keys != null && e.Category != LogEntryCategory.Compile && !keys.Contains(e.MemberKey)) return false;
 
             switch (_criteria.NetTagMode)
             {

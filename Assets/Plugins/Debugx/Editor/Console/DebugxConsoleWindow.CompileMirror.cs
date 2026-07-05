@@ -5,19 +5,25 @@ using UnityEngine;
 namespace DebugxLog.Console.Editor
 {
     /// <summary>
-    /// Debugx Console — compile-log mirroring. Compiler / asset-import messages never come through the live log
-    /// channels, so they are read from the internal editor console (see <see cref="EditorLogEntriesMirror"/>) and
-    /// injected into the shared store, matching the native console. Kept in a partial file to keep the main viewer
-    /// focused. All reflection lives in <see cref="EditorLogEntriesMirror"/>; this half is just the wiring.
-    /// Debugx Console —— 编译日志镜像。编译器/资源导入消息从不经 live 日志通道，故从内部编辑器控制台读取
-    /// （见 <see cref="EditorLogEntriesMirror"/>）并注入共享 store，与原生控制台对齐。拆到 partial 文件让主查看器保持聚焦。
-    /// 反射都在 <see cref="EditorLogEntriesMirror"/> 里；这半边只是接线。
+    /// Debugx Console — compile-log mirroring. Script-compile messages are not reliably delivered by the live log
+    /// channels (they are injected straight into the editor console, and only SOME compile errors also surface on the
+    /// live channel), so they are read authoritatively from the internal editor console (see
+    /// <see cref="EditorLogEntriesMirror"/>) and injected into the shared store, matching the native console. Kept in a
+    /// partial file to keep the main viewer focused. All reflection lives in <see cref="EditorLogEntriesMirror"/>; this
+    /// half is just the wiring.
+    /// Debugx Console —— 编译日志镜像。脚本编译消息不由 live 日志通道可靠投递（它们被直接注入编辑器控制台，且只有“部分”
+    /// 编译错误也会出现在 live 通道），故从内部编辑器控制台权威读取（见 <see cref="EditorLogEntriesMirror"/>）并注入共享
+    /// store，与原生控制台对齐。拆到 partial 文件让主查看器保持聚焦。反射都在 <see cref="EditorLogEntriesMirror"/> 里；
+    /// 这半边只是接线。
     /// </summary>
     public partial class DebugxConsoleWindow
     {
-        // Keys of compile entries already mirrored this domain session, to avoid re-adding on repeated scans. Reset on
-        // Clear (so a later scan can re-mirror) and naturally empty after a domain reload (new window instance).
-        // 本域会话已镜像过的编译条目的键，避免多次扫描重复添加。Clear 时重置（便于之后重扫再镜像），域重载后自然清空（新窗口实例）。
+        // Snapshot of the compile-entry keys mirrored on the LAST scan. Each scan compares the current key set against
+        // this via SetEquals: unchanged -> skip; changed -> drop the whole mirrored batch and re-inject the current one
+        // (so it never accumulates — it always holds just the latest batch's keys). Reset on Clear (so a later scan can
+        // re-mirror) and naturally empty after a domain reload (new window instance).
+        // 上一次扫描镜像的编译条目键集的快照。每次扫描用 SetEquals 与当前键集比较：无变化 -> 跳过；有变化 -> 移除整批已镜像条目
+        // 并重新注入当前批（故绝不累积——始终只保存最新一批的键）。Clear 时重置（便于之后重扫再镜像），域重载后自然清空（新窗口实例）。
         private readonly HashSet<string> _mirroredCompileKeys = new HashSet<string>();
 
         // Set true to request a scan on the next editor-update tick (deferred to the main thread, after CreateGUI).
@@ -96,6 +102,6 @@ namespace DebugxLog.Console.Editor
 
         // Called from ClearConsole so a subsequent scan can re-mirror compile messages still present in the console.
         // 由 ClearConsole 调用，使之后的扫描能重新镜像控制台里仍存在的编译消息。
-        private void ResetCompileMirrorDedup() => _mirroredCompileKeys.Clear();
+        private void ResetCompileMirrorTracking() => _mirroredCompileKeys.Clear();
     }
 }

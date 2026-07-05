@@ -52,9 +52,6 @@ namespace DebugxLog.Console
         /// <summary>Only show Debugx logs (hide non-Debugx "Uncategorized"). 仅显示 Debugx 日志（隐藏非 Debugx 的“未分类”）。</summary>
         public bool OnlyDebugx = false;
 
-        /// <summary>Show the Admin (LogAdm) channel. 显示 Admin（LogAdm）通道。</summary>
-        public bool ShowAdmin = true;
-
         /// <summary>
         /// Visible member keys. Null means "no member filter, all visible". A non-null set (including an empty one)
         /// shows only entries whose <see cref="DebugxLogEntry.MemberKey"/> is in the set (include

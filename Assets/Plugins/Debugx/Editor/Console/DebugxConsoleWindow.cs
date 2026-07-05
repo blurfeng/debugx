@@ -11,10 +11,11 @@ namespace DebugxLog.Console.Editor
     /// <summary>
     /// The Editor-side Debugx Console: a UIToolkit log viewer that consumes the shared <see cref="DebugxLogStore"/>.
     /// This is the display layer only — all capture / buffering / filtering / collapsing / stats live in the shared
-    /// model layer and are reused by the future runtime Console. Editor-only concerns (source navigation, Error Pause,
-    /// Clear on Play) are wired here.
+    /// model layer and are reused by the runtime Console (<c>DebugxRuntimeConsole</c>). Editor-only concerns (source
+    /// navigation, Error Pause, Clear on Play) are wired here.
     /// Editor 端的 Debugx Console：消费共享层 <see cref="DebugxLogStore"/> 的 UIToolkit 日志查看器。这里只有显示层——
-    /// 采集/缓冲/过滤/折叠/统计都在共享模型层，未来运行时 Console 复用。Editor 专属能力（源码跳转、错误暂停、进入 Play 清空）在此接线。
+    /// 采集/缓冲/过滤/折叠/统计都在共享模型层，由运行时 Console（<c>DebugxRuntimeConsole</c>）一同复用。
+    /// Editor 专属能力（源码跳转、错误暂停、进入 Play 清空）在此接线。
     /// </summary>
     public partial class DebugxConsoleWindow : EditorWindow
     {
@@ -62,7 +63,7 @@ namespace DebugxLog.Console.Editor
         // digit count) so they are always reserved accurately and never overflow.
         // 供响应式显隐逻辑使用的固定分组宽度（按当前语言）。_wBase 是不含计数按钮的左侧常驻最小宽度——计数按钮宽度随位数增长，
         // 在 UpdateResponsive 内实时测量预留，从而始终精确预留、永不溢出。
-        private float _wBase, _wSearch, _wFilters, _wRuntimeGroup;
+        private float _wBase, _wSearch, _wFilters, _wEditorGroup;
 
         // Native-style count buttons (icon + count) for the three severities.
         // 三个严重级别的原生风格计数按钮（图标 + 计数）。
@@ -131,8 +132,8 @@ namespace DebugxLog.Console.Editor
             VisualElement root = rootVisualElement;
             root.Add(BuildToolbar());
 
-            _runtimePanel = BuildRuntimePanel();
-            root.Add(_runtimePanel);
+            _editorPanel = BuildEditorPanel();
+            root.Add(_editorPanel);
 
             var split = new TwoPaneSplitView(1, DebugxConsoleStyle.DetailPaneHeight, TwoPaneSplitViewOrientation.Vertical);
             split.style.flexGrow = 1;
@@ -217,8 +218,8 @@ namespace DebugxLog.Console.Editor
             leftGroup.Add(_errorPauseToggle);
 
             // Members dropdown, then the Editor toggle to its right, sit in the LEFT group before the search.
-            // (View options and UI language moved into the Editor panel — see RefreshRuntimePanel.)
-            // 成员下拉，其右侧是 Editor 开关，放在左侧分组、搜索栏之前。（视图选项与界面语言已移入 Editor 面板，见 RefreshRuntimePanel。）
+            // (View options and UI language moved into the Editor panel — see RefreshEditorPanel.)
+            // 成员下拉，其右侧是 Editor 开关，放在左侧分组、搜索栏之前。（视图选项与界面语言已移入 Editor 面板，见 RefreshEditorPanel。）
             _memberButton = new ToolbarButton(ShowMemberMenu);
             // Text + caret as separate children so the caret can be sized independently (a small native-style triangle).
             // 文字与三角拆成两个子元素，让三角可独立设定大小（接近原生的小三角）。
@@ -228,13 +229,13 @@ namespace DebugxLog.Console.Editor
             _memberButton.Add(_memberCaretLabel);
             leftGroup.Add(_memberButton);
 
-            _runtimeToggle = MakeToggle(string.Empty, false, evt =>
+            _editorPanelToggle = MakeToggle(string.Empty, false, evt =>
             {
-                _runtimeVisible = evt.newValue;
-                _runtimePanel.style.display = _runtimeVisible ? DisplayStyle.Flex : DisplayStyle.None;
-                if (_runtimeVisible) RefreshRuntimePanel();
+                _editorPanelVisible = evt.newValue;
+                _editorPanel.style.display = _editorPanelVisible ? DisplayStyle.Flex : DisplayStyle.None;
+                if (_editorPanelVisible) RefreshEditorPanel();
             });
-            leftGroup.Add(_runtimeToggle);
+            leftGroup.Add(_editorPanelToggle);
 
             _searchField = new ToolbarSearchField();
             _searchField.RegisterValueChangedCallback(evt =>
@@ -745,7 +746,7 @@ namespace DebugxLog.Console.Editor
             _collapseToggle.text = L("折叠", "Collapse");
             _errorPauseToggle.text = L("错误暂停", "Error Pause");
             _memberNameLabel.text = L("成员", "Members");
-            _runtimeToggle.text = L("编辑器", "Editor");
+            _editorPanelToggle.text = L("编辑器", "Editor");
 
             ApplyToolbarLayout();
 
@@ -753,8 +754,8 @@ namespace DebugxLog.Console.Editor
             // Deferred so a language-button click (which originates from a control inside the panel) doesn't rebuild the
             // panel mid-event. 视图选项与语言按钮现位于 Editor 面板；面板打开时一并重建以本地化。延迟执行，避免语言按钮的
             // 点击（来自面板内控件）在事件处理途中重建面板。
-            if (_runtimeVisible && _runtimePanel != null)
-                _runtimePanel.schedule.Execute(RefreshRuntimePanel);
+            if (_editorPanelVisible && _editorPanel != null)
+                _editorPanel.schedule.Execute(RefreshEditorPanel);
         }
 
         private void ToggleLanguage()
@@ -781,7 +782,7 @@ namespace DebugxLog.Console.Editor
             StyleClearSplit(_clearButton, _clearDivider, _clearDropdownButton, clear, clearDropdown);
             StyleItem(_collapseToggle, collapse);
             StyleItem(_errorPauseToggle, errorPause);
-            StyleItem(_runtimeToggle, runtime);
+            StyleItem(_editorPanelToggle, runtime);
             StyleMemberDropdown(_memberButton, _memberNameLabel, _memberCaretLabel, members);
 
             // Count buttons: width grows with the number, but never below CountWidth.
@@ -805,7 +806,7 @@ namespace DebugxLog.Console.Editor
             _wBase = clear + clearDropdown + collapse;
             _wSearch = DebugxConsoleStyle.SearchMinWidth + DebugxConsoleStyle.SearchRightSpace;
             _wFilters = members;
-            _wRuntimeGroup = runtime + errorPause;
+            _wEditorGroup = runtime + errorPause;
 
             UpdateResponsive();
         }
@@ -970,12 +971,12 @@ namespace DebugxLog.Console.Editor
             // Fixed groups (left + right) hide only when they overflow; the flex-grow middle container keeps the right
             // group right-aligned (blank gap in the middle when the search is hidden). Hide order: filters, then runtime.
             // 固定分组（左 + 右）仅在溢出时隐藏；flex-grow 中部容器让右侧分组保持靠右（搜索隐藏时中间留白）。隐藏顺序：过滤组，再运行时组。
-            bool showFilters = baseW + _wFilters + _wRuntimeGroup <= avail;
-            bool showRuntime = showFilters || baseW + _wRuntimeGroup <= avail;
+            bool showFilters = baseW + _wFilters + _wEditorGroup <= avail;
+            bool showEditorPanel = showFilters || baseW + _wEditorGroup <= avail;
 
             float fixedVisible = baseW
                 + (showFilters ? _wFilters : 0f)
-                + (showRuntime ? _wRuntimeGroup : 0f);
+                + (showEditorPanel ? _wEditorGroup : 0f);
 
             // Search shows only if the leftover middle can hold it at its minimum width.
             // 仅当中部剩余空间能容纳搜索栏最小宽度时才显示搜索栏。
@@ -985,8 +986,8 @@ namespace DebugxLog.Console.Editor
             // The search area's left divider only makes sense while the search is visible. 搜索区左侧分隔线仅在搜索可见时显示。
             _searchContainer.style.borderLeftWidth = showSearch ? DebugxConsoleStyle.ToolbarDividerWidth : 0f;
             SetVisible(_memberButton, showFilters);
-            SetVisible(_runtimeToggle, showRuntime);
-            SetVisible(_errorPauseToggle, showRuntime);
+            SetVisible(_editorPanelToggle, showEditorPanel);
+            SetVisible(_errorPauseToggle, showEditorPanel);
         }
 
         // Sum of the three count buttons' resolved (laid-out) widths — their real footprint including the current digit
@@ -1030,7 +1031,7 @@ namespace DebugxLog.Console.Editor
         {
             if (_store == null) return;
             _store.Clear();
-            ResetCompileMirrorDedup(); // so a later scan can re-mirror compile messages still in the console. 便于之后重扫再镜像仍在控制台里的编译消息。
+            ResetCompileMirrorTracking(); // so a later scan can re-mirror compile messages still in the console. 便于之后重扫再镜像仍在控制台里的编译消息。
             _selectedIndex = -1;
             _listView?.ClearSelection();
             if (_detailImgui != null) UpdateDetail(null);
@@ -1070,7 +1071,7 @@ namespace DebugxLog.Console.Editor
 
             // Runtime source switches are only usable in Play mode; refresh their enabled state.
             // 运行时源头开关仅在 Play 模式可用；刷新其可用状态。
-            if (_runtimeVisible) RefreshRuntimePanel();
+            if (_editorPanelVisible) RefreshEditorPanel();
         }
 
         private void OnCompilationStarted(object context)

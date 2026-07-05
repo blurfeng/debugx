@@ -133,11 +133,11 @@ namespace DebugxLog.Console
         }
 
         /// <summary>
-        /// Inject an externally-sourced, non-Debugx entry (e.g. compiler / asset-import messages mirrored from the
-        /// editor console, which never arrive via the log channels) into the same pipeline, so it is buffered,
-        /// filtered, collapsed and displayed like any other entry. Delivered on the next <see cref="Pump"/>. Intended
-        /// for main-thread editor use but thread-safe via the same backpressure-bounded queue.
-        /// 注入一条外部来源、非 Debugx 的条目（如从编辑器控制台镜像来的编译器/资源导入消息，它们从不经日志通道到达）进入
+        /// Inject an externally-sourced, non-Debugx entry (e.g. script-compile messages mirrored from the editor
+        /// console, which never arrive via the log channels) into the same pipeline, so it is buffered, filtered,
+        /// collapsed and displayed like any other entry. Delivered on the next <see cref="Pump"/>. Intended for
+        /// main-thread editor use but thread-safe via the same backpressure-bounded queue.
+        /// 注入一条外部来源、非 Debugx 的条目（如从编辑器控制台镜像来的脚本编译消息，它们从不经日志通道到达）进入
         /// 同一管线，使其与其它条目一样被缓冲/过滤/折叠/显示。于下次 <see cref="Pump"/> 交付。面向主线程的编辑器用途，
         /// 但经同一条背压受限队列而线程安全。
         /// </summary>
@@ -268,6 +268,23 @@ namespace DebugxLog.Console
         private long NextSequence()
         {
             return Interlocked.Increment(ref _sequence);
+        }
+
+        /// <summary>
+        /// Advance the sequence counter so entries produced afterwards get ids strictly greater than
+        /// <paramref name="lastId"/>. Used after restoring persisted entries (which carry their pre-domain-reload ids,
+        /// while a freshly-constructed collector restarts <see cref="_sequence"/> from 0) so newly-captured entries can
+        /// never collide with the restored ones — preserving the global-uniqueness of <see cref="DebugxLogEntry.SequenceId"/>
+        /// that selection tracking relies on. No-op when the counter is already ahead. Main-thread call expected.
+        /// 将序号计数器推进，使之后产出的条目 id 严格大于 <paramref name="lastId"/>。用于恢复持久化条目（它们携带域重载前的 id，
+        /// 而全新构造的采集器会把 <see cref="_sequence"/> 从 0 重新计数）之后，使新捕获条目绝不与恢复条目碰撞——从而维持
+        /// 选中跟踪所依赖的 <see cref="DebugxLogEntry.SequenceId"/> 全局唯一性。计数器已领先时为空操作。应在主线程调用。
+        /// </summary>
+        public void SeedSequence(long lastId)
+        {
+            long current = Interlocked.Read(ref _sequence);
+            if (lastId > current)
+                Interlocked.Exchange(ref _sequence, lastId);
         }
     }
 }

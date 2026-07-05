@@ -15,9 +15,9 @@ namespace DebugxLog.Console.Editor
     public partial class DebugxConsoleWindow
     {
         private ToolbarButton _memberButton;
-        private ToolbarToggle _runtimeToggle;
-        private VisualElement _runtimePanel;
-        private bool _runtimeVisible;
+        private ToolbarToggle _editorPanelToggle;
+        private VisualElement _editorPanel;
+        private bool _editorPanelVisible;
 
         // ---------- Member filter (B1) ----------
 
@@ -42,6 +42,23 @@ namespace DebugxLog.Console.Editor
                     menu.AddItem(new GUIContent($"[{key}] {sig}"), IsMemberVisible(key), () => ToggleMember(key));
                 }
             }
+
+            // Pseudo-members that are NOT in the configured member list but still appear as entries. They must be listed
+            // here (and in BuildAllMemberKeySet) or narrowing the filter would silently and unrecoverably hide them.
+            // Admin = LogAdm channel (key 0); Unregistered = a log from an unknown key; Uncategorized = non-Debugx logs.
+            // (The runtime Console derives these from the buffer, so this keeps the two front-ends consistent.)
+            // 不在配置成员列表里、但仍会作为条目出现的伪成员。必须在此列出（并纳入 BuildAllMemberKeySet），否则收窄过滤会静默且
+            // 不可恢复地隐藏它们。Admin = LogAdm 通道（key 0）；Unregistered = 未知 key 的日志；Uncategorized = 非 Debugx 日志。
+            //（运行时 Console 从缓冲派生这些项，故此举使两个前端保持一致。）
+            if (settings != null && settings.AdminInfo != null)
+            {
+                DebugxMemberInfo admin = settings.AdminInfo;
+                menu.AddItem(new GUIContent($"[{admin.key}] {admin.signature}"),
+                    IsMemberVisible(admin.key), () => ToggleMember(admin.key));
+            }
+
+            menu.AddItem(new GUIContent(L("未注册", "Unregistered")),
+                IsMemberVisible(DebugxRawLog.UnregisteredKey), () => ToggleMember(DebugxRawLog.UnregisteredKey));
 
             menu.AddItem(new GUIContent(L("未分类", "Uncategorized")),
                 IsMemberVisible(DebugxLogEntry.UncategorizedKey), () => ToggleMember(DebugxLogEntry.UncategorizedKey));
@@ -76,6 +93,10 @@ namespace DebugxLog.Console.Editor
                 foreach (DebugxMemberInfo m in settings.members)
                     if (m != null) set.Add(m.key);
             }
+            // Pseudo-members that also appear as entries but are not in the configured list — see ShowMemberMenu.
+            // 同样会作为条目出现、但不在配置列表里的伪成员——见 ShowMemberMenu。
+            if (settings != null && settings.AdminInfo != null) set.Add(settings.AdminInfo.key);
+            set.Add(DebugxRawLog.UnregisteredKey);
             set.Add(DebugxLogEntry.UncategorizedKey);
             return set;
         }
@@ -96,7 +117,7 @@ namespace DebugxLog.Console.Editor
 
         // ---------- Runtime source switches + Test (absorbed from the old DebugxConsole) ----------
 
-        private VisualElement BuildRuntimePanel()
+        private VisualElement BuildEditorPanel()
         {
             var panel = new VisualElement();
             panel.style.display = DisplayStyle.None; // hidden until the Runtime toggle is turned on. 打开“运行时”开关前隐藏。
@@ -113,17 +134,17 @@ namespace DebugxLog.Console.Editor
         // 项目设置（重新）应用时触发；刷新依赖成员的控件。
         private void OnSettingsApplied()
         {
-            if (_runtimeVisible) RefreshRuntimePanel();
+            if (_editorPanelVisible) RefreshEditorPanel();
             Repaint();
         }
 
         // Rebuilds the runtime panel from the current Debugx state and play-mode. Called on show / play-mode change /
         // settings apply — so it reflects live values at those moments.
         // 依据当前 Debugx 状态与 Play 模式重建运行时面板。在 显示 / Play 模式变化 / 设置应用 时调用，故这些时刻反映最新值。
-        private void RefreshRuntimePanel()
+        private void RefreshEditorPanel()
         {
-            if (_runtimePanel == null) return;
-            _runtimePanel.Clear();
+            if (_editorPanel == null) return;
+            _editorPanel.Clear();
 
             bool playing = Application.isPlaying;
 
@@ -131,7 +152,7 @@ namespace DebugxLog.Console.Editor
             // --- 视图 / 显示选项（仅Debugx 过滤 + 原顶部栏「视图」选项；始终可编辑）---
             var viewTitle = new Label(L("视图", "View"));
             viewTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
-            _runtimePanel.Add(viewTitle);
+            _editorPanel.Add(viewTitle);
 
             // Debugx Only: filters the list to logs tagged [Debugx]; independent of the runtime switches below.
             // 仅Debugx：把列表过滤为带 [Debugx] 标签的日志；与下方运行时开关无关。
@@ -142,7 +163,7 @@ namespace DebugxLog.Console.Editor
                 _criteria.OnlyDebugx = evt.newValue;
                 OnCriteriaChanged();
             });
-            _runtimePanel.Add(onlyDebugxToggle);
+            _editorPanel.Add(onlyDebugxToggle);
 
             // Show Timestamp: toggles the per-row time column. 显示时间戳：显隐每行的时间列。
             var showTimestamp = new Toggle(L("显示时间戳", "Show Timestamp")) { value = _showTimestamp };
@@ -153,7 +174,7 @@ namespace DebugxLog.Console.Editor
                 SavePrefs();
                 _listView?.RefreshItems(); // re-bind rows to show/hide the timestamp column. 重绑行以显隐时间戳列。
             });
-            _runtimePanel.Add(showTimestamp);
+            _editorPanel.Add(showTimestamp);
 
             // Stack: Script Only — the detail stack shows only script frames (hide engine / Debugx-internal frames).
             // 堆栈：仅脚本——详情堆栈仅显示脚本帧（隐藏引擎/Debugx 内部帧）。
@@ -166,7 +187,7 @@ namespace DebugxLog.Console.Editor
                 RefreshSelectedDetail();
             });
             stackScriptOnly.style.marginBottom = 6;
-            _runtimePanel.Add(stackScriptOnly);
+            _editorPanel.Add(stackScriptOnly);
 
             // Description moved to the toggle's tooltip (hover) instead of an inline hint label below it.
             // 说明移到开关的 tooltip（悬停显示），不再用其下方的行内提示标签。
@@ -177,7 +198,7 @@ namespace DebugxLog.Console.Editor
                 "Whether the in-game overlay Console self-creates on entering Play (applies next Play). Off by default — usually not needed in the Editor (this window covers it). This tick only writes Editor PlayerPrefs and does NOT affect a build; enable it in-build via DebugxStaticData.RuntimeConsoleEnabled = true in game code.");
             runtimeConsoleToggle.RegisterValueChangedCallback(evt => DebugxStaticData.RuntimeConsoleEnabled = evt.newValue);
             runtimeConsoleToggle.style.marginBottom = 6;
-            _runtimePanel.Add(runtimeConsoleToggle);
+            _editorPanel.Add(runtimeConsoleToggle);
 
             // --- Runtime source switches (only meaningful in Play mode) ---
             var runtimeGroup = new VisualElement();
@@ -202,29 +223,29 @@ namespace DebugxLog.Console.Editor
             // Per-member runtime send switches removed here — that surface duplicated the toolbar's Members control for
             // the user's purposes; per-member state is still settable in Preferences > Debugx and via game code.
             // 此处的逐成员运行时发送开关已移除——对用户而言与顶部栏 Members 重复；逐成员状态仍可在 Preferences > Debugx 与游戏代码中设置。
-            _runtimePanel.Add(runtimeGroup);
+            _editorPanel.Add(runtimeGroup);
 
             if (!playing)
             {
                 var hint = new Label(L("以上仅在游戏运行时可设置。", "The above can only be set during Play mode."));
                 hint.style.color = DebugxConsoleStyle.HintColor;
                 hint.style.whiteSpace = WhiteSpace.Normal;
-                _runtimePanel.Add(hint);
+                _editorPanel.Add(hint);
             }
 
             // --- Test log toggles (always editable in the Editor) ---
             var testTitle = new Label(L("测试", "Test"));
             testTitle.style.unityFontStyleAndWeight = FontStyle.Bold;
             testTitle.style.marginTop = 5;
-            _runtimePanel.Add(testTitle);
+            _editorPanel.Add(testTitle);
 
             var awake = new Toggle(L("Awake 测试打印", "Awake test log")) { value = DebugxStaticData.EnableAwakeTestLog };
             awake.RegisterValueChangedCallback(evt => DebugxStaticData.EnableAwakeTestLog = evt.newValue);
-            _runtimePanel.Add(awake);
+            _editorPanel.Add(awake);
 
             var update = new Toggle(L("Update 测试打印", "Update test log")) { value = DebugxStaticData.EnableUpdateTestLog };
             update.RegisterValueChangedCallback(evt => DebugxStaticData.EnableUpdateTestLog = evt.newValue);
-            _runtimePanel.Add(update);
+            _editorPanel.Add(update);
 
             // --- UI language (moved here from the toolbar): a single button showing the current language; click toggles. ---
             // ToggleLanguage re-localizes the toolbar and (deferred) rebuilds this panel — see ApplyLanguage.
@@ -244,7 +265,7 @@ namespace DebugxLog.Console.Editor
             langButton.style.width = 40;
             langRow.Add(langButton);
 
-            _runtimePanel.Add(langRow);
+            _editorPanel.Add(langRow);
         }
     }
 }

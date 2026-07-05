@@ -282,15 +282,25 @@ namespace DebugxLog.Console.Runtime
 
         private static int CompareMemberKeys(int a, int b)
         {
-            bool ua = a == DebugxLogEntry.UncategorizedKey;
-            bool ub = b == DebugxLogEntry.UncategorizedKey;
-            if (ua != ub) return ua ? 1 : -1; // Uncategorized sinks to the bottom. 未分类沉底。
+            int ra = MemberSortRank(a), rb = MemberSortRank(b);
+            if (ra != rb) return ra.CompareTo(rb);
             return a.CompareTo(b);
+        }
+
+        // Real members sort first (by key), then Unregistered, then Uncategorized last. Both sentinels (int.MinValue and
+        // int.MinValue+1) would otherwise sort to the very top by raw value.
+        // 真实成员在前（按 key），其后未注册，最后未分类。否则两个哨兵（int.MinValue 与 int.MinValue+1）会按原值排到最前。
+        private static int MemberSortRank(int key)
+        {
+            if (key == DebugxLogEntry.UncategorizedKey) return 2;
+            if (key == DebugxRawLog.UnregisteredKey) return 1;
+            return 0;
         }
 
         private static string MemberLabel(int key, string signature)
         {
             if (key == DebugxLogEntry.UncategorizedKey) return "Uncategorized";
+            if (key == DebugxRawLog.UnregisteredKey) return "Unregistered";
             return string.IsNullOrEmpty(signature) ? "Key " + key : signature;
         }
 

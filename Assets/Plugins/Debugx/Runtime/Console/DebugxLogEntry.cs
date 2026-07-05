@@ -60,8 +60,13 @@ namespace DebugxLog.Console
         public string RichText { get; }
 
         /// <summary>
-        /// Plain text with rich-text tags and the Debugx tag stripped. Used for search matching and collapse keys.
-        /// 剥去富文本标签与 Debugx 标签的纯文本。用于搜索匹配与折叠归并键。
+        /// Plain text used for search matching and collapse keys. For Debugx logs this is the caller's original message
+        /// (which never carries the tag / color / prefix); for non-Debugx logs it is the condition with rich-text tags
+        /// stripped. It does NOT carry the Debugx tag — not because it is stripped, but because these source strings
+        /// never contain it (the tag only ever appears in <see cref="RichText"/>).
+        /// 用于搜索匹配与折叠归并键的纯文本。Debugx 日志为调用方的原始 message（本就不含 标签/颜色/前缀）；非 Debugx 日志为
+        /// 剥去富文本标签后的 condition。它不含 Debugx 标签——不是因为被剥离，而是因为这些源串本就不含它（标签只出现在
+        /// <see cref="RichText"/> 中）。
         /// </summary>
         public string PlainText { get; }
 

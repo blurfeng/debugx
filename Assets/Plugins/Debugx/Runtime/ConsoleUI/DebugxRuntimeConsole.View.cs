@@ -472,6 +472,19 @@ namespace DebugxLog.Console.Runtime
         {
             ApplyCriteria();
             ForceRefresh();
+            // The detail pane's search highlight is built from the current query (ApplySearchHighlight), but the
+            // survived-primary path in ReconcileSelection deliberately does NOT re-render the detail (the entry is
+            // unchanged). So after a search/filter change, refresh the selected detail here to keep its highlight in
+            // sync with the list rows. Only fires on user control changes, never per-tick, so there is no flood cost.
+            // 详情面板的搜索高亮基于当前查询（ApplySearchHighlight）构建，但 ReconcileSelection 中“主行存活”分支刻意不重绘详情
+            //（条目未变）。故搜索/过滤变化后在此刷新选中项详情，使其高亮与列表行一致。仅在用户操作时触发、绝不每帧，故无洪泛开销。
+            RefreshSelectedDetail();
+        }
+
+        private void RefreshSelectedDetail()
+        {
+            if (_selectedIndex >= 0 && _selectedIndex < _rows.Count)
+                UpdateDetail(_rows[_selectedIndex].Entry);
         }
 
         private void ApplyCriteria() => _store.SetFilterCriteria(_criteria);
@@ -955,7 +968,7 @@ namespace DebugxLog.Console.Runtime
         // 并在布局完成后把宽度设为解析出的高度（既匹配其他按钮的自然高度，又是正方形）。
         private static Button BuildCloseButton(System.Action onClick)
         {
-            var b = new Button(onClick) { text = "X" }; // U+00D7 multiplication sign — present in default fonts. 乘号，默认字体都有。
+            var b = new Button(onClick) { text = "X" }; // plain ASCII 'X' as the close glyph — kept simple so runtime default fonts always render it. 用普通 ASCII 'X' 作关闭符，确保运行时默认字体一定能渲染。
             StyleToolbarButton(b);
             b.style.color = new Color(1f, 0.42f, 0.38f); // red, overriding the toolbar text color. 红色，覆盖工具栏文字色。
             b.style.unityFontStyleAndWeight = FontStyle.Bold;
