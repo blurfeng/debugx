@@ -16,6 +16,11 @@ namespace DebugxLog.Console.Runtime
     /// </summary>
     public partial class DebugxRuntimeConsole
     {
+        // Name tag on each list row's root element, so a pointer-down can tell a row click from an empty-area click by
+        // walking up from the event target (see OnListPointerDown). 每个列表行根元素的名字标签，使指针按下时可从事件目标
+        // 向上回溯来区分行点击与空白区点击（见 OnListPointerDown）。
+        private const string RowName = "debugx-row";
+
         private VisualElement _openButton;
         private VisualElement _panelRoot;
         private ListView _listView;
@@ -275,19 +280,27 @@ namespace DebugxLog.Console.Runtime
             _listView = new ListView
             {
                 fixedItemHeight = DebugxRuntimeConsoleStyle.ListItemHeight,
-                selectionType = SelectionType.Single,
+                // Multi-select so Ctrl+click (toggle) / Shift+click (range) + Ctrl/Cmd+C mirror the Editor Console.
+                // These modifier gestures are desktop-only; touch still selects a single row by tapping.
+                // 多选，使 Ctrl+点击（切换）/ Shift+点击（范围）+ Ctrl/Cmd+C 对齐 Editor 版。组合键仅桌面端；触屏仍是单击选中一行。
+                selectionType = SelectionType.Multiple,
                 makeItem = MakeRow,
                 bindItem = BindRow,
                 itemsSource = _rows,
             };
             _listView.style.flexGrow = 1;
             _listView.selectionChanged += OnSelectionChanged;
+            _listView.RegisterCallback<KeyDownEvent>(OnListKeyDown); // Ctrl/Cmd+C copy (Shift = message only). Ctrl/Cmd+C 复制（Shift 仅消息）。
+            // Deselect on empty-area click. Capture phase on the ListView itself so it always fires (before the ListView's
+            // own selection logic) regardless of which internal element is under the pointer. 空白区点击取消选中。注册在
+            // ListView 自身的捕获阶段，无论指针下是哪个内部元素都必定触发（早于 ListView 自身的选择逻辑）。
+            _listView.RegisterCallback<PointerDownEvent>(OnListPointerDown, TrickleDown.TrickleDown);
             return _listView;
         }
 
         private VisualElement MakeRow()
         {
-            var row = new VisualElement();
+            var row = new VisualElement { name = RowName }; // tagged so OnListPointerDown can distinguish row vs empty clicks. 打标签，供 OnListPointerDown 区分行/空白点击。
             row.style.flexDirection = FlexDirection.Row;
             row.style.alignItems = Align.Center;
             row.style.paddingLeft = 4;
@@ -472,12 +485,18 @@ namespace DebugxLog.Console.Runtime
 
         private void RefreshView()
         {
-            // Remember the selected entry by its stable id BEFORE the row list is rebuilt: eviction shifts positional
-            // indices, so a plain _selectedIndex would then point at a different entry. 重建行列表前按稳定 id 记住选中条目：
-            // 淘汰会让位置索引偏移，仅凭 _selectedIndex 之后会指向另一条目。
-            long selectedSeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+            // Remember the WHOLE selection by stable SequenceId BEFORE the row list is rebuilt: eviction/filtering shifts
+            // positional indices, so raw indices would then point at different entries. primarySeq (the detail-pane row)
+            // is captured too so it stays the driver after the rebuild.
+            // 重建行列表前按稳定 SequenceId 记住整份选择：淘汰/过滤会让位置索引偏移，原索引之后会指向别的条目。primarySeq
+            //（详情面板所指行）一并记住，使其在重建后仍是驱动项。
+            long primarySeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
                 ? _rows[_selectedIndex].Entry.SequenceId
                 : -1;
+            var selectedSeqs = new List<long>();
+            foreach (int i in _listView.selectedIndices)
+                if (i >= 0 && i < _rows.Count && _rows[i].Entry != null)
+                    selectedSeqs.Add(_rows[i].Entry.SequenceId);
 
             _rows.Clear();
             IReadOnlyList<CollapsedRow> src = _store.Rows;
@@ -487,7 +506,7 @@ namespace DebugxLog.Console.Runtime
             _listView.RefreshItems();
             UpdateCounts();
             ReapplyMemberFilterOnDrift(); // keep a new member visible under an active partial filter. 让新成员在启用部分过滤时仍可见。
-            ReconcileSelection(selectedSeq);
+            ReconcileSelection(selectedSeqs, primarySeq);
 
             // Tail: auto-scroll to newest only while stuck to the bottom (scrolling up pauses it). 贴底时才自动滚到最新（上滚暂停）。
             EnsureListScrollHook();
@@ -495,37 +514,48 @@ namespace DebugxLog.Console.Runtime
                 _listView.ScrollToItem(_rows.Count - 1);
         }
 
-        // Re-align the ListView selection with the entry it pointed at before the rebuild, keyed by SequenceId. Keeps the
-        // highlight, the detail pane and Copy all referring to the SAME entry after eviction/filtering shifts the rows;
-        // clears the selection when that entry is gone. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged
-        // (the detail already shows this entry, so no rebuild is needed).
-        // 按 SequenceId 把 ListView 选中项重新对齐到重建前所指的条目，使淘汰/过滤导致行偏移后，高亮、详情面板与 Copy 仍指向
-        // 同一条目；该条目已消失时清除选中。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged（详情已是此条目，无需重建）。
-        private void ReconcileSelection(long selectedSeq)
+        // Re-align the ListView selection with the entries it held before the rebuild, keyed by SequenceId. Restores the
+        // WHOLE multi-selection (highlight + Copy targets) after eviction/filtering shifts the rows, and keeps the detail
+        // pane on the primary row (or promotes the first survivor if the primary is gone). SetSelectionWithoutNotify
+        // avoids re-firing OnSelectionChanged. Clears everything when all selected entries are gone.
+        // 按 SequenceId 把 ListView 选中项重新对齐到重建前所持有的条目：淘汰/过滤导致行偏移后恢复整份多选（高亮 + Copy 目标），
+        // 并让详情面板保持在主行（主行消失则提升第一个仍存活项）。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
+        // 全部选中条目都消失时清空。
+        private void ReconcileSelection(List<long> selectedSeqs, long primarySeq)
         {
-            if (selectedSeq < 0) return; // nothing was selected. 原本无选中。
+            if (selectedSeqs.Count == 0) return; // nothing was selected. 原本无选中。
 
-            int newIndex = -1;
+            var seqSet = new HashSet<long>(selectedSeqs);
+            var newIndices = new List<int>();
+            int primaryIndex = -1;
             for (int i = 0; i < _rows.Count; i++)
             {
                 DebugxLogEntry e = _rows[i].Entry;
-                if (e != null && e.SequenceId == selectedSeq) { newIndex = i; break; }
+                if (e == null || !seqSet.Contains(e.SequenceId)) continue;
+                newIndices.Add(i);
+                if (e.SequenceId == primarySeq) primaryIndex = i;
             }
 
-            if (newIndex == _selectedIndex) return; // still aligned. 仍对齐。
-
-            if (newIndex >= 0)
+            if (newIndices.Count == 0)
             {
-                _selectedIndex = newIndex;
-                _listView.SetSelectionWithoutNotify(new[] { newIndex });
-            }
-            else
-            {
-                // The selected entry was evicted or filtered out. 选中条目已被淘汰或过滤掉。
+                // Every selected entry was evicted or filtered out. 所有选中条目都被淘汰或过滤掉。
                 _selectedIndex = -1;
                 _listView.ClearSelection();
                 UpdateDetail(null);
+                return;
             }
+
+            if (primaryIndex >= 0)
+            {
+                _selectedIndex = primaryIndex; // detail already shows this entry. 详情已是此条目。
+            }
+            else
+            {
+                // Primary row gone but others survive: promote the first survivor for the detail pane. 主行消失但仍有存活项：提升第一个供详情显示。
+                _selectedIndex = newIndices[0];
+                UpdateDetail(_rows[_selectedIndex].Entry);
+            }
+            _listView.SetSelectionWithoutNotify(newIndices);
         }
 
         private void EnsureListScrollHook()
@@ -534,6 +564,31 @@ namespace DebugxLog.Console.Runtime
             _listScroll = _listView.Q<ScrollView>();
             if (_listScroll == null) return;
             _listScroll.verticalScroller.valueChanged += OnListScrolled;
+        }
+
+        // Clear the selection when the click did NOT land on a data row (i.e. the empty area below the rows), so Copy
+        // reverts to Copy-All and the detail pane clears — the native Console does the same. Detection walks up from the
+        // event target looking for one of our RowName rows: coordinate-free and version-independent (no reliance on which
+        // internal ListView element is under an empty click). A row hit leaves the selection to the ListView.
+        // 当点击未落在数据行上（即行下方空白区）时清除选中，使 Copy 回到复制全部、详情清空——原生 Console 亦如此。判定从
+        // 事件目标向上回溯查找我们的 RowName 行：不依赖坐标、不依赖版本（无需判断空白点击命中的是哪个 ListView 内部元素）。
+        // 命中行则把选中交给 ListView。
+        private void OnListPointerDown(PointerDownEvent evt)
+        {
+            var el = evt.target as VisualElement;
+            while (el != null && el != _listView)
+            {
+                if (el.name == RowName) return; // clicked inside a row → keep selection. 点在行内 → 保留选中。
+                el = el.hierarchy.parent;
+            }
+            ClearListSelection();
+        }
+
+        private void ClearListSelection()
+        {
+            _selectedIndex = -1;
+            _listView.ClearSelection();
+            UpdateDetail(null);
         }
 
         private void OnListScrolled(float value)
@@ -580,33 +635,61 @@ namespace DebugxLog.Console.Runtime
             ForceRefresh();
         }
 
-        // Copy to the system clipboard: the selected entry, or — when nothing is selected — ALL currently visible rows
-        // (A6.1 Copy / Copy All in one button). Each entry is plain message + raw stack. GUIUtility works at runtime.
-        // 复制到系统剪贴板：选中条目；未选中时复制当前全部可见行（A6.1 复制 / 复制全部合到一个按钮）。每条为纯文本消息 + 原始堆栈。
-        private void CopySelected()
+        // Ctrl/Cmd+C on the focused list copies the selected entries WITH their stacks; adding Shift copies the message
+        // only. Mirrors the Editor Console. Desktop-only (no keyboard on touch). 焦点在列表上时 Ctrl/Cmd+C 复制选中条目
+        //（含堆栈）；加 Shift 仅复制消息。对齐 Editor 版。仅桌面端（触屏无键盘）。
+        private void OnListKeyDown(KeyDownEvent evt)
         {
-            if (_selectedIndex >= 0 && _selectedIndex < _rows.Count)
+            if (evt.keyCode == KeyCode.C && (evt.ctrlKey || evt.commandKey))
             {
-                GUIUtility.systemCopyBuffer = FormatEntryForCopy(_rows[_selectedIndex].Entry);
-                return;
+                CopyEntries(GetSelectedEntries(), withStack: !evt.shiftKey);
+                evt.StopPropagation();
             }
-
-            if (_rows.Count == 0) return;
-            var sb = new System.Text.StringBuilder();
-            for (int i = 0; i < _rows.Count; i++)
-            {
-                if (i > 0) sb.Append('\n');
-                sb.Append(FormatEntryForCopy(_rows[i].Entry));
-            }
-            GUIUtility.systemCopyBuffer = sb.ToString();
         }
 
-        private static string FormatEntryForCopy(DebugxLogEntry e)
+        // Copy button: the selected entries (with stacks), or — when nothing is selected — ALL currently visible rows.
+        // Copy 按钮：选中条目（含堆栈）；未选中时复制当前全部可见行。
+        private void CopySelected()
         {
-            string text = e.PlainText ?? string.Empty;
-            if (!string.IsNullOrEmpty(e.StackTrace))
-                text += "\n" + e.StackTrace;
-            return text;
+            List<DebugxLogEntry> targets = GetSelectedEntries();
+            if (targets.Count == 0) targets = GetAllVisibleEntries();
+            CopyEntries(targets, withStack: true);
+        }
+
+        private List<DebugxLogEntry> GetSelectedEntries()
+        {
+            var list = new List<DebugxLogEntry>();
+            if (_listView == null) return list;
+            var indices = new List<int>(_listView.selectedIndices);
+            indices.Sort(); // copy in visible order regardless of click order. 无论点击顺序，按可见顺序复制。
+            foreach (int i in indices)
+                if (i >= 0 && i < _rows.Count) list.Add(_rows[i].Entry);
+            return list;
+        }
+
+        private List<DebugxLogEntry> GetAllVisibleEntries()
+        {
+            var list = new List<DebugxLogEntry>(_rows.Count);
+            for (int i = 0; i < _rows.Count; i++) list.Add(_rows[i].Entry);
+            return list;
+        }
+
+        // Plain message + raw stack per entry; a trailing blank line separates stacked entries. GUIUtility.systemCopyBuffer
+        // works at runtime. 每条为纯文本消息 + 原始堆栈；带堆栈的多条之间用空行分隔。GUIUtility.systemCopyBuffer 运行时可用。
+        private static void CopyEntries(List<DebugxLogEntry> entries, bool withStack)
+        {
+            if (entries == null || entries.Count == 0) return;
+
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                DebugxLogEntry e = entries[i];
+                sb.Append(e.PlainText);
+                if (withStack && !string.IsNullOrEmpty(e.StackTrace))
+                    sb.Append('\n').Append(e.StackTrace).Append('\n');
+            }
+            GUIUtility.systemCopyBuffer = sb.ToString().TrimEnd('\n');
         }
 
         private void CycleNetTag()
