@@ -43,6 +43,11 @@ namespace DebugxLog.Console.Runtime
         // 因为 <mark=#...> 接收的是十六进制颜色而非 UnityEngine.Color。
         public const string SearchHighlightHex = "FFD54F66";
 
+        // Mouse-wheel scroll step for the detail/stack ScrollView. UI Toolkit's default wheel step scrolls the detail
+        // pane too far per notch; a smaller value gives gentler, near line-by-line scrolling. Tune to taste in-editor.
+        // 详情/堆栈 ScrollView 的滚轮步长。UI Toolkit 默认每格滚动过多，调小可获得更平缓、接近逐行的滚动。进编辑器按手感微调。
+        public const float DetailWheelScrollSize = 12f;
+
         // Sizing. 尺寸。
         public const float ListItemHeight = 22f;
         // Fixed height of the bottom detail/stack pane. Roomy enough to read a message plus a few stack frames without

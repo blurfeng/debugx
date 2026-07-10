@@ -103,5 +103,9 @@ namespace DebugxLog.Console.Editor
         public static readonly float DetailDividerThickness = 1f;
         /// <summary>Height (px) of the splitter's invisible drag grab-strip. Larger = easier to grab; smaller = closer to the 1px line. 分隔线不可见拖拽抓取条的高度（像素）。越大越好抓，越小越贴近细线。</summary>
         public static readonly float DetailDividerGrabSize = 5f;
+
+        // ---- Detail pane ----
+        /// <summary>Extra bottom padding (px) added inside the detail scroll view so the last wrapped line fully clears the viewport when scrolled to the bottom (CalcHeight can under-measure wrapped content by up to ~a line). 详情滚动视图内额外的底部留白（像素），使滚到底时最后一折行完整露出（CalcHeight 对折行内容可能少算近一行）。</summary>
+        public static readonly float DetailBottomPad = 18f;
     }
 }

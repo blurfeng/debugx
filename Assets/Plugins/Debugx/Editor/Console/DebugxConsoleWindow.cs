@@ -503,17 +503,29 @@ namespace DebugxLog.Console.Editor
             _detailContent.text = _detailCombinedText;
         }
 
-        // One stacktrace line as rich text. Source frames become <a href="FilePath" line="Line">RawLine</a> (native's exact
-        // template) so EditorGUI's global hyperlink handler opens the file at the line; the visible text stays the raw frame.
-        // FilePath is passed through verbatim (project-relative or absolute) — the handler resolves both. Only the attribute's
-        // own quote is escaped; the visible RawLine is left as-is (Unity renders any unknown angle-bracket token literally).
-        // 一行堆栈的富文本。源码帧变为 <a href="FilePath" line="Line">RawLine</a>（原生同款模板），使 EditorGUI 全局超链接处理器按行打开文件；
-        // 可见文本仍是原始帧。FilePath 原样传入（工程相对或绝对），处理器都能解析。仅转义属性内的引号；可见的 RawLine 不动（Unity 会把无法识别的尖括号按字面渲染）。
+        // One stacktrace line as rich text. For a source frame, ONLY the "path:line" text inside the trailing "(at …)" is
+        // wrapped as <a href="FilePath" line="Line">path:line</a> — the method signature and the "(at"/")" punctuation stay
+        // plain, matching the native Console (which only underlines the location, not the whole line). The link span is
+        // located on the RawLine itself so its visible text and exact spacing are preserved; href/line use the already-parsed
+        // FilePath/Line. Only the attribute's own quote is escaped. An unexpected shape leaves the whole line plain.
+        // 一行堆栈的富文本。对源码帧，仅把结尾 "(at …)" 括号内的 "路径:行号" 包成 <a href="FilePath" line="Line">路径:行号</a>——
+        // 方法签名与 "(at"/")" 标点保持普通文本，对齐原生 Console（只给位置加下划线，而非整行）。在 RawLine 上定位链接片段以保留其
+        // 可见文本与原始空格；href/line 用已解析的 FilePath/Line。仅转义属性内的引号。形态异常则整行保持普通文本。
         private static string BuildStackFrameRichLine(StackFrameInfo frame)
         {
             if (!frame.HasSource) return frame.RawLine;
+
+            string raw = frame.RawLine;
+            int atIdx = raw.LastIndexOf("(at ", System.StringComparison.Ordinal);
+            int closeIdx = raw.LastIndexOf(')');
+            if (atIdx < 0 || closeIdx <= atIdx + 4) return raw; // no locatable "(at path:line)" span. 找不到可定位的 "(at 路径:行号)" 片段。
+
+            int pathStart = atIdx + 4;                                        // just past "(at ". 紧跟 "(at " 之后。
+            string prefix = raw.Substring(0, pathStart);                     // "Type:Method () (at "
+            string pathText = raw.Substring(pathStart, closeIdx - pathStart); // "Assets/Foo/Bar.cs:42"
+            string suffix = raw.Substring(closeIdx);                          // ")" (+ any trailing whitespace). ")"（及尾随空白）。
             string href = (frame.FilePath ?? string.Empty).Replace("\"", "&quot;");
-            return $"<a href=\"{href}\" line=\"{frame.Line}\">{frame.RawLine}</a>";
+            return $"{prefix}<a href=\"{href}\" line=\"{frame.Line}\">{pathText}</a>{suffix}";
         }
 
         // IMGUI handler for the detail block. IMGUIContainer doesn't scroll, so we host a GUILayout scroll view; the
@@ -552,6 +564,11 @@ namespace DebugxLog.Console.Editor
             // EditorGUI.DoTextField -> hyperLinkClicked -> the global file-opener (we do not subscribe -> no double-open).
             // SelectableLabel：跨行拖选 + Ctrl/Cmd+C；richText 保留成员色；<a> 点击经 EditorGUI.DoTextField -> hyperLinkClicked -> 全局打开文件（我们不订阅 -> 不会重复打开）。
             EditorGUI.SelectableLabel(labelRect, text, style);
+
+            // Trailing pad inside the scroll content so the last wrapped line fully clears the viewport bottom when scrolled
+            // down — CalcHeight can under-measure the wrapped height by up to ~a line, otherwise clipping half the last row.
+            // 滚动内容末尾的留白，使下滚到底时最后一折行完整露出——否则 CalcHeight 对折行高度可能少算近一行、裁掉最后一行的一半。
+            GUILayout.Space(DebugxConsoleStyle.DetailBottomPad);
 
             GUILayout.EndScrollView();
         }
@@ -707,6 +724,24 @@ namespace DebugxLog.Console.Editor
             _listScroll = _listView.Q<ScrollView>();
             if (_listScroll == null) return;
             _listScroll.verticalScroller.valueChanged += OnListScrolled;
+            // RefreshView calls ScrollToItem synchronously in the same frame the rows changed, before the ScrollView has
+            // recomputed its content height / scroller.highValue, so it lands one item short of the bottom — and never
+            // corrects once the log stream stops (no further RefreshView fires). Re-run ScrollToItem when the content
+            // geometry has actually been recomputed (highValue now fresh) so it reaches the true bottom.
+            // RefreshView 在改行的同一帧同步调用 ScrollToItem，早于 ScrollView 重算内容高度/scroller.highValue，故会差最新一行——
+            // 且日志流一停就不再触发 RefreshView、永久停在差一点处。待内容几何真正重算后（highValue 已刷新）再补一次，落到真正底部。
+            _listScroll.contentContainer.RegisterCallback<GeometryChangedEvent>(OnListContentGeometryChanged);
+        }
+
+        // Fires after the list content has been laid out (e.g. new rows added). Only tails when stuck to the bottom, so a
+        // user who scrolled up to read history is left alone. Scrolling shifts the content by transform, not layout, so it
+        // does not re-trigger this — no feedback loop.
+        // 列表内容完成布局后触发（如新增行）。仅在贴底时尾随，故上滚查看历史的用户不受打扰。滚动改的是 transform 而非布局，
+        // 不会再次触发本回调——无反馈环。
+        private void OnListContentGeometryChanged(GeometryChangedEvent evt)
+        {
+            if (!_stickToBottom || _rows.Count == 0) return;
+            _listView.ScrollToItem(_rows.Count - 1);
         }
 
         private void OnListScrolled(float value)

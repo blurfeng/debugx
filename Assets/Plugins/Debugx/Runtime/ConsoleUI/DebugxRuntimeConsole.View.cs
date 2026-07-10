@@ -450,6 +450,8 @@ namespace DebugxLog.Console.Runtime
             var scroll = new ScrollView(ScrollViewMode.Vertical);
             scroll.style.flexGrow = 1;
             scroll.style.backgroundColor = DebugxRuntimeConsoleStyle.DetailBg;
+            // Gentler wheel step: UI Toolkit's default scrolls this small pane too far per notch. 更平缓的滚轮步长：UI Toolkit 默认每格把这块小面板滚太多。
+            scroll.mouseWheelScrollSize = DebugxRuntimeConsoleStyle.DetailWheelScrollSize;
 
             _detailMessage = new Label { enableRichText = true };
             _detailMessage.style.whiteSpace = WhiteSpace.Normal;
@@ -605,6 +607,24 @@ namespace DebugxLog.Console.Runtime
             _listScroll = _listView.Q<ScrollView>();
             if (_listScroll == null) return;
             _listScroll.verticalScroller.valueChanged += OnListScrolled;
+            // RefreshView calls ScrollToItem synchronously in the same frame the rows changed, before the ScrollView has
+            // recomputed its content height / scroller.highValue, so it lands one item short of the bottom — and never
+            // corrects once the log stream stops (no further RefreshView fires). Re-run ScrollToItem when the content
+            // geometry has actually been recomputed (highValue now fresh) so it reaches the true bottom.
+            // RefreshView 在改行的同一帧同步调用 ScrollToItem，早于 ScrollView 重算内容高度/scroller.highValue，故会差最新一行——
+            // 且日志流一停就不再触发 RefreshView、永久停在差一点处。待内容几何真正重算后（highValue 已刷新）再补一次，落到真正底部。
+            _listScroll.contentContainer.RegisterCallback<GeometryChangedEvent>(OnListContentGeometryChanged);
+        }
+
+        // Fires after the list content has been laid out (e.g. new rows added). Only tails when stuck to the bottom, so a
+        // user who scrolled up to read history is left alone. Scrolling shifts the content by transform, not layout, so it
+        // does not re-trigger this — no feedback loop.
+        // 列表内容完成布局后触发（如新增行）。仅在贴底时尾随，故上滚查看历史的用户不受打扰。滚动改的是 transform 而非布局，
+        // 不会再次触发本回调——无反馈环。
+        private void OnListContentGeometryChanged(GeometryChangedEvent evt)
+        {
+            if (!_stickToBottom || _rows.Count == 0) return;
+            _listView.ScrollToItem(_rows.Count - 1);
         }
 
         // Clear the selection when the click did NOT land on a data row (i.e. the empty area below the rows), so Copy
