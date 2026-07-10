@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1] - 2026-07-10
+### Fixed
+- **Debugx Console** tail auto-scroll: when the list was stuck to the bottom, newly added logs did not always reach the very bottom. `ScrollToItem` ran in the same frame the rows changed — before the ScrollView had recomputed its content height / scroll extent — so it landed a row short, and never corrected once the log stream stopped. It now re-scrolls after the content geometry is recomputed. Fixed in both the Editor window and the in-game runtime overlay.
+- **Runtime Console** detail/stack pane scrolled too far per mouse-wheel notch; reduced the wheel step (`ScrollView.mouseWheelScrollSize`) for gentler, near line-by-line scrolling.
+- **Editor Console** stack-frame hyperlink now underlines only the `path:line` inside the trailing `(at …)` instead of the whole frame line, matching Unity's native Console.
+- **Editor Console** detail pane clipped the last wrapped line when scrolled to the bottom (its content height was under-measured); added trailing padding so the last line fully clears the viewport.
+
 ## [2.4.0] - 2026-07-05
 ### Added
 - **Debugx Console** — a dedicated, member-aware log viewer that replaces reliance on Unity's native Console, in two forms sharing one capture / filter / collapse model layer:
