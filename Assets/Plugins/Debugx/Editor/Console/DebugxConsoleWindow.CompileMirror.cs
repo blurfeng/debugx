@@ -1,95 +1,133 @@
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEditor.Compilation;
-using UnityEngine;
 
 namespace DebugxLog.Console.Editor
 {
     /// <summary>
-    /// Debugx Console — compile-log mirroring. Script-compile messages are not reliably delivered by the live log
-    /// channels (they are injected straight into the editor console, and only SOME compile errors also surface on the
-    /// live channel), so they are read authoritatively from the internal editor console (see
-    /// <see cref="EditorLogEntriesMirror"/>) and injected into the shared store, matching the native console. Kept in a
-    /// partial file to keep the main viewer focused. All reflection lives in <see cref="EditorLogEntriesMirror"/>; this
-    /// half is just the wiring.
-    /// Debugx Console —— 编译日志镜像。脚本编译消息不由 live 日志通道可靠投递（它们被直接注入编辑器控制台，且只有“部分”
-    /// 编译错误也会出现在 live 通道），故从内部编辑器控制台权威读取（见 <see cref="EditorLogEntriesMirror"/>）并注入共享
-    /// store，与原生控制台对齐。拆到 partial 文件让主查看器保持聚焦。反射都在 <see cref="EditorLogEntriesMirror"/> 里；
-    /// 这半边只是接线。
+    /// Debugx Console — compile-log mirroring (reconciliation model). Script-compile messages are the one case that
+    /// diverges from the live log channels: they are injected straight into the internal editor console
+    /// (<c>UnityEditor.LogEntries</c>) and only SOME of them also surface on <c>Application.logMessageReceived(Threaded)</c>.
+    /// To match the native console WITHOUT ever losing one, this half:
+    ///  - Never drops the live-channel copies (the collector's live-drop filter was removed), so a compile-looking
+    ///    Error/Warning is shown immediately as an Uncategorized entry and can never be lost to a mirror timing gap.
+    ///  - Reconciles against LogEntries (the authoritative compile set): each pass removes the prior mirror entries AND
+    ///    the live Uncategorized entries whose text matches the authoritative set, then re-injects the authoritative set
+    ///    once each as <see cref="LogEntryCategory.Compile"/>. This "absorbs" a live copy into the single,
+    ///    replace-on-recompile Compile representation (so no duplicate, and old compile errors don't linger after a fix —
+    ///    matching the native console).
+    ///  - A compile-looking live entry that is NOT in LogEntries at all (a false positive, or one still being flushed) is
+    ///    left as a normal Uncategorized log — shown, never dropped; absorbed later if/when it becomes authoritative.
+    /// Reconciliation runs every editor-update tick inside a short window after each trigger (enable / compilationFinished
+    /// / Clear), which closes the LogEntries async-flush race that previously made compile errors "sometimes" go missing.
+    /// All reflection lives in <see cref="EditorLogEntriesMirror"/>; this half is the wiring + buffer reconciliation.
+    /// Debugx Console —— 编译日志镜像（对账模型）。脚本编译消息是唯一与 live 日志通道有出入的场景：它们被直接注入内部编辑器控制台
+    /// （<c>UnityEditor.LogEntries</c>），且只有“部分”也会出现在 <c>Application.logMessageReceived(Threaded)</c> 上。
+    /// 为在“绝不丢失”的前提下对齐原生控制台，这半边：
+    ///  - 不再丢弃 live 通道副本（采集器的 live 丢弃过滤器已移除），故编译类 Error/Warning 会即时以“未分类”条目显示，绝不会因镜像时序而丢失。
+    ///  - 以 LogEntries（权威编译集合）为准对账：每次移除“此前镜像的编译条目”与“文本匹配权威集的 live 未分类条目”，再把权威集合按
+    ///    <see cref="LogEntryCategory.Compile"/> 各注入一次。由此把 live 副本“吸收”进唯一的、可随重编译替换的 Compile 表示
+    ///    （不重复，修复后旧编译错误也不滞留——与原生一致）。
+    ///  - 根本不在 LogEntries 里的“像编译消息”的 live 条目（误判，或正在刷入中）保留为普通“未分类”日志——显示、不丢；之后若成为权威再被吸收。
+    /// 对账在每次触发（启用 / compilationFinished / Clear）后的一小段窗口内逐帧执行，堵住此前令编译错误“偶尔”缺失的 LogEntries 异步刷入竞态。
+    /// 反射都在 <see cref="EditorLogEntriesMirror"/> 里；这半边是接线 + 缓冲对账。
     /// </summary>
     public partial class DebugxConsoleWindow
     {
-        // Snapshot of the compile-entry keys mirrored on the LAST scan. Each scan compares the current key set against
-        // this via SetEquals: unchanged -> skip; changed -> drop the whole mirrored batch and re-inject the current one
-        // (so it never accumulates — it always holds just the latest batch's keys). Reset on Clear (so a later scan can
-        // re-mirror) and naturally empty after a domain reload (new window instance).
-        // 上一次扫描镜像的编译条目键集的快照。每次扫描用 SetEquals 与当前键集比较：无变化 -> 跳过；有变化 -> 移除整批已镜像条目
-        // 并重新注入当前批（故绝不累积——始终只保存最新一批的键）。Clear 时重置（便于之后重扫再镜像），域重载后自然清空（新窗口实例）。
+        // Keys of the authoritative compile entries currently mirrored as Compile entries. Compared each pass so a pass
+        // that would produce the same set (and has nothing to absorb) leaves the buffer untouched — no churn / no reorder.
+        // Reset on Clear; naturally empty after a domain reload (new window instance).
+        // 当前以 Compile 条目镜像的权威编译条目键集。每次对账比较：若产出的集合不变且无待吸收项，则不动缓冲——不刷新、不重排。
+        // Clear 时重置；域重载后自然清空（新窗口实例）。
         private readonly HashSet<string> _mirroredCompileKeys = new HashSet<string>();
 
-        // Set true to request a scan on the next editor-update tick (deferred to the main thread, after CreateGUI).
-        // 置 true 表示请求在下一次 editor-update 帧扫描（延后到主线程、CreateGUI 之后）。
-        private bool _needsCompileMirror;
+        // Reconcile on every editor-update tick until this EditorApplication.timeSinceStartup. Opened/extended on
+        // enable / compilationFinished / Clear so a short window of per-tick reconciliation absorbs both late-flushed
+        // LogEntries and just-arrived live copies. Outside the window PumpCompileMirror is a single cheap comparison.
+        // 逐帧对账直到此 EditorApplication.timeSinceStartup。启用 / compilationFinished / Clear 时打开/延长，用一小段逐帧对账窗口
+        // 吸收“LogEntries 晚刷入”与“刚到达的 live 副本”。窗口外 PumpCompileMirror 只是一次廉价比较。
+        private double _compileRescanUntil;
+
+        // Length of the post-trigger reconciliation window (seconds). Generous enough to cover LogEntries' async flush
+        // after a compile finishes; only active right after a trigger, so the cost is negligible.
+        // 触发后对账窗口时长（秒）。足以覆盖编译完成后 LogEntries 的异步刷入；仅在触发后短暂生效，开销可忽略。
+        private const double CompileRescanWindowSeconds = 1.0;
 
         private void EnableCompileMirror()
         {
-            // Initial scan picks up whatever is already in the console (survives domain reloads). Compile ERRORS do not
-            // trigger a domain reload, so compilationFinished is the trigger that catches them while the window stays alive.
-            // 首次扫描拾取控制台里已有的内容（跨域重载存活）。编译“错误”不会触发域重载，故 compilationFinished 是窗口存活期间捕获它们的触发点。
-            _needsCompileMirror = true;
+            // compilationFinished catches compile ERRORS (which do NOT trigger a domain reload, so the window stays alive
+            // to reconcile them). The initial rescan picks up whatever compile messages already exist (survives domain
+            // reloads, or when the window is opened after errors were already produced).
+            // compilationFinished 捕获编译“错误”（其不触发域重载，窗口存活期间正好对账它们）。首次重扫拾取控制台里已有的编译消息
+            //（跨域重载存活，或窗口在错误已产生之后才打开）。
             CompilationPipeline.compilationFinished += OnCompilationFinishedForMirror;
-
-            // Make this mirror the single source of compile messages: drop the live channel's duplicate copy (some
-            // compile errors arrive there too). Only when the mirror actually resolved — otherwise let the live channel
-            // deliver them (degraded, but not lost).
-            // 让本镜像成为编译消息的唯一来源：丢弃 live 通道的重复副本（部分编译错误也会经它到达）。仅当镜像确实解析成功时——
-            // 否则让 live 通道照常交付（降级，但不丢失）。
-            if (_store != null && EditorLogEntriesMirror.EnsureAvailable())
-                _store.Collector.LiveUncategorizedFilter = (condition, type) =>
-                    EditorLogEntriesMirror.Available && // if the mirror later degrades, let the live channel deliver. 若镜像后续失效，交回 live 通道交付。
-                    (type == LogType.Error || type == LogType.Warning) &&
-                    EditorLogEntriesMirror.LooksLikeCompileMessage(condition);
+            if (EditorLogEntriesMirror.EnsureAvailable())
+                RequestCompileRescan();
         }
 
         private void DisableCompileMirror()
         {
             CompilationPipeline.compilationFinished -= OnCompilationFinishedForMirror;
-            if (_store != null)
-                _store.Collector.LiveUncategorizedFilter = null;
         }
 
-        private void OnCompilationFinishedForMirror(object context) => _needsCompileMirror = true;
+        private void OnCompilationFinishedForMirror(object context) => RequestCompileRescan();
 
-        // Called from OnEditorUpdate (main thread) BEFORE _store.Pump(), so injected entries are drained the same tick.
-        // 在 OnEditorUpdate（主线程）中、_store.Pump() 之前调用，使注入的条目在同一帧被排空。
+        // Open (or extend) the per-tick reconciliation window. 打开（或延长）逐帧对账窗口。
+        private void RequestCompileRescan()
+            => _compileRescanUntil = EditorApplication.timeSinceStartup + CompileRescanWindowSeconds;
+
+        // Called from OnEditorUpdate (main thread) BEFORE _store.Pump(), so entries injected by a reconcile are drained
+        // the same tick. Reconciles only inside the active window; outside it this is a single comparison.
+        // 在 OnEditorUpdate（主线程）中、_store.Pump() 之前调用，使对账注入的条目在同一帧被排空。仅在活动窗口内对账；窗口外只是一次比较。
         private void PumpCompileMirror()
         {
-            if (!_needsCompileMirror || _store == null) return;
-            _needsCompileMirror = false;
+            if (_store == null) return;
+            if (EditorApplication.timeSinceStartup > _compileRescanUntil) return;
+            ReconcileCompileEntries();
+        }
 
+        // Make the buffer's compile representation match LogEntries exactly, absorbing any live-channel copies into a
+        // single replace-on-recompile Compile entry per authoritative message. See the class summary for the rationale.
+        // 让缓冲的编译表示与 LogEntries 完全一致：把 live 通道副本吸收成“每条权威消息一条、可随重编译替换的 Compile 条目”。理由见类摘要。
+        private void ReconcileCompileEntries()
+        {
             List<EditorLogEntriesMirror.Entry> entries = EditorLogEntriesMirror.ReadCompileEntries();
 
-            // Compute the current authoritative compile-key set. The editor console REPLACES its compile messages on
-            // every recompile (it only ever shows the latest batch), so we mirror that "replace" semantics rather than
-            // just appending: compile ERRORS don't trigger a domain reload, so without this, errors from earlier failed
-            // compiles linger in our buffer while the native console shows only the current batch.
-            // 计算当前权威的编译键集。编辑器控制台在每次重编译时“替换”其编译消息（只显示最新批），故我们对齐这种“替换”语义
-            // 而非只追加：编译“错误”不触发域重载，若不这样做，更早失败编译的错误会滞留在我们的缓冲里，而原生控制台只显示当前批。
-            var currentKeys = new HashSet<string>();
+            // Authoritative compile set: keys (change detection) + normalized message texts (matching live copies).
+            // 权威编译集：键（变更检测）+ 归一化消息文本（匹配 live 副本）。
+            var authKeys = new HashSet<string>();
+            var authTexts = new HashSet<string>();
             foreach (EditorLogEntriesMirror.Entry e in entries)
-                currentKeys.Add(e.Key);
+            {
+                authKeys.Add(e.Key);
+                authTexts.Add(NormalizeCompileText(e.Message));
+            }
 
-            // Unchanged since the last scan → leave the mirrored entries exactly where they are (no churn / no reorder).
-            // 自上次扫描无变化 → 保持已镜像条目原样（不刷新、不重排）。
-            if (currentKeys.SetEquals(_mirroredCompileKeys)) return;
+            // Any live (Uncategorized) compile-looking entry that matches the authoritative set is waiting to be absorbed.
+            // 任何“文本匹配权威集”的 live（未分类）编译类条目，都在等待被吸收。
+            bool hasAbsorbable = false;
+            LogRingBuffer buf = _store.Buffer;
+            for (int i = 0; i < buf.Count; i++)
+            {
+                DebugxLogEntry e = buf[i];
+                if (IsAbsorbableLiveCompile(e, authTexts)) { hasAbsorbable = true; break; }
+            }
 
-            // The compile set changed: drop every previously-mirrored compile entry, then re-mirror the current batch.
-            // RemoveWhere mutates the buffer immediately; InjectExternal queues into the collector, drained by the
-            // _store.Pump() that runs right after this in OnEditorUpdate — so the buffer ends the tick holding only the
-            // current batch. 编译集变化：移除此前镜像的全部编译条目，再重新镜像当前批。RemoveWhere 立即改动缓冲；InjectExternal
-            // 入采集队列，由紧随其后（OnEditorUpdate 里）的 _store.Pump() 排空——故本帧结束时缓冲只含当前批。
-            _store.Buffer.RemoveWhere(e => e.Category == LogEntryCategory.Compile);
+            // Steady state: authoritative set unchanged AND nothing to absorb → leave the buffer untouched (no churn).
+            // 稳定态：权威集不变且无待吸收项 → 不动缓冲（不抖动）。
+            if (!hasAbsorbable && authKeys.SetEquals(_mirroredCompileKeys)) return;
+
+            // Rebuild: drop the prior mirror entries + the live copies we are absorbing, then re-inject the authoritative
+            // set once each as Compile. RemoveWhere mutates now; InjectExternal queues into the collector, drained by the
+            // _store.Pump() that runs right after this in OnEditorUpdate — so the buffer ends the tick holding exactly one
+            // Compile entry per authoritative message, while non-authoritative compile-looking live entries stay as logs.
+            // 重建：移除“此前镜像的编译条目 + 正被吸收的 live 副本”，再把权威集各注入一次为 Compile。RemoveWhere 立即改动缓冲；
+            // InjectExternal 入采集队列，由紧随其后（OnEditorUpdate 里）的 _store.Pump() 排空——故本帧结束时缓冲“每条权威消息恰好一条
+            // Compile 条目”，而“非权威的像编译消息的 live 条目”仍保留为普通日志。
+            _store.Buffer.RemoveWhere(e =>
+                e.Category == LogEntryCategory.Compile || IsAbsorbableLiveCompile(e, authTexts));
+
             _mirroredCompileKeys.Clear();
-
             foreach (EditorLogEntriesMirror.Entry e in entries)
             {
                 _mirroredCompileKeys.Add(e.Key);
@@ -100,17 +138,33 @@ namespace DebugxLog.Console.Editor
             }
         }
 
-        // Called from ClearConsole. Compile errors don't clear themselves (they still exist in the editor console until
-        // fixed), so after a manual/play/build Clear we must re-mirror them. Clearing the key snapshot alone isn't enough:
-        // no compilation event fires on a plain Clear, so PumpCompileMirror would stay dormant. Also request a scan so the
-        // next OnEditorUpdate tick re-reads and re-injects the still-present compile messages.
-        // 由 ClearConsole 调用。编译错误不会自行消失（在修复前它们仍存在于编辑器控制台），故 手动/进Play/构建 Clear 之后必须重新
-        // 镜像它们。仅清空键快照并不够：单纯的 Clear 不会触发任何编译事件，PumpCompileMirror 会一直处于休眠而不重扫。因此这里同时
-        // 请求一次扫描，让下一帧 OnEditorUpdate 重新读取并重新注入仍存在的编译消息。
+        // A live (Uncategorized) entry whose text looks like a compile message AND matches the authoritative set — i.e. a
+        // live copy of a real compile message, to be absorbed into the Compile representation. A compile-looking live
+        // entry NOT in the authoritative set is deliberately excluded (kept as a normal log).
+        // 一条 live（未分类）条目，文本像编译消息且匹配权威集——即真实编译消息的 live 副本，应被吸收进 Compile 表示。
+        // “像编译消息但不在权威集”的 live 条目被有意排除（保留为普通日志）。
+        private static bool IsAbsorbableLiveCompile(DebugxLogEntry e, HashSet<string> authTexts)
+            => e != null
+               && e.Category == LogEntryCategory.Uncategorized
+               && EditorLogEntriesMirror.LooksLikeCompileMessage(e.PlainText)
+               && authTexts.Contains(NormalizeCompileText(e.PlainText));
+
+        // Normalized text key for matching the same compile message across the two sources (live condition vs LogEntries
+        // message). They are the same underlying diagnostic string; trimming absorbs trailing whitespace/newline differences.
+        // 归一化文本键，用于跨两个来源匹配同一条编译消息（live 的 condition 与 LogEntries 的 message）。二者是同一段诊断串；
+        // Trim 吸收结尾空白/换行差异。
+        private static string NormalizeCompileText(string s) => s == null ? string.Empty : s.Trim();
+
+        // Called from ClearConsole. Compile errors don't clear themselves (they still exist in LogEntries until fixed), so
+        // after a manual/play/build Clear we must re-mirror them. Clearing the key snapshot alone isn't enough: a plain
+        // Clear fires no compilation event, so reconciliation would stay dormant. Open a rescan window so the next ticks
+        // re-read and re-inject the still-present compile messages.
+        // 由 ClearConsole 调用。编译错误不会自行消失（修复前仍存在于 LogEntries），故 手动/进Play/构建 Clear 之后必须重新镜像它们。
+        // 仅清空键快照并不够：单纯的 Clear 不触发任何编译事件，对账会一直休眠。故打开一个重扫窗口，让随后几帧重新读取并重新注入仍存在的编译消息。
         private void ResetCompileMirrorTracking()
         {
             _mirroredCompileKeys.Clear();
-            _needsCompileMirror = true;
+            RequestCompileRescan();
         }
     }
 }

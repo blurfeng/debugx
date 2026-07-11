@@ -11,8 +11,10 @@ namespace DebugxLog.Console.Editor
     /// reflection. This is the authoritative source of compile warnings/errors for the Debugx Console: it matches the
     /// native console exactly and survives domain reloads (unlike our in-memory buffer), so callers re-read on every
     /// window enable. Note some compile errors ALSO arrive on <c>Application.logMessageReceived(Threaded)</c> (the live
-    /// channel); the live channel drops those (via <see cref="LooksLikeCompileMessage"/>) so they are not duplicated,
-    /// and historical messages (logged before the window opened, or already present after a reload) are re-sourced here.
+    /// channel); those live copies are NOT dropped — the Console keeps them and reconciles duplicates against this
+    /// authoritative set on the main thread (see DebugxConsoleWindow.CompileMirror), matching a live copy to its
+    /// authoritative entry via <see cref="LooksLikeCompileMessage"/> + message text. Historical messages (logged before
+    /// the window opened, or already present after a reload) are re-sourced here.
     ///
     /// All reflection is resolved once and guarded: if any internal member is missing (the API changed across Unity
     /// versions), the mirror disables itself and returns an empty list rather than throwing. Must be used on the main
@@ -20,8 +22,9 @@ namespace DebugxLog.Console.Editor
     ///
     /// 通过反射从 Unity 内部编辑器控制台存储（<c>UnityEditor.LogEntries</c>）读取脚本编译消息。这是 Debugx Console 编译
     /// 警告/错误的权威来源：与原生控制台完全一致、且能跨域重载存活（不同于我们的内存缓冲），故调用方每次窗口启用时重读。
-    /// 注意部分编译错误也会经 <c>Application.logMessageReceived(Threaded)</c>（live 通道）到达；live 通道据此
-    /// （用 <see cref="LooksLikeCompileMessage"/>）丢弃其重复副本，而历史消息（窗口打开前打印的、或重载后已存在的）在此重新拉取。
+    /// 注意部分编译错误也会经 <c>Application.logMessageReceived(Threaded)</c>（live 通道）到达；这些 live 副本不再被丢弃——
+    /// Console 保留它们，并在主线程按此权威集对账去重（见 DebugxConsoleWindow.CompileMirror），用 <see cref="LooksLikeCompileMessage"/>
+    /// + 消息文本把 live 副本匹配到其权威条目。历史消息（窗口打开前打印的、或重载后已存在的）在此重新拉取。
     /// 所有反射一次解析并加保护：任一内部成员缺失（跨 Unity 版本 API 变化）时，镜像自禁用、返回空列表而非抛异常。
     /// 必须在主线程使用（会触碰编辑器状态）。
     /// </summary>
@@ -29,18 +32,19 @@ namespace DebugxLog.Console.Editor
     {
         // Bit values of the internal UnityEditor.ConsoleWindow.Mode flags. Stable across 2019–2022. We mirror ONLY
         // script-compile messages: they are the case that matters, they survive domain reloads in LogEntries, and they
-        // have a stable, recognisable text format so the live channel can suppress its duplicate copy (some compile
-        // errors DO arrive on the live channel). Asset-import messages are left to the live channel.
+        // have a stable, recognisable text format so a live copy (some compile errors DO arrive on the live channel) can
+        // be reconciled against this authoritative set. Asset-import messages are left to the live channel.
         // 内部 UnityEditor.ConsoleWindow.Mode 标志的位值。2019–2022 稳定。我们只镜像 脚本编译 消息：它是关键场景、在 LogEntries
-        // 里跨域重载存活、且文本格式稳定可识别，便于 live 通道抑制其重复副本（部分编译错误确实会经 live 通道到达）。资源导入消息交给 live 通道。
+        // 里跨域重载存活、且文本格式稳定可识别，便于把 live 副本（部分编译错误确实会经 live 通道到达）与此权威集对账。资源导入消息交给 live 通道。
         private const int ModeScriptCompileError = 1 << 11;
         private const int ModeScriptCompileWarning = 1 << 12;
         private const int CompileMask = ModeScriptCompileError | ModeScriptCompileWarning;
 
         // Matches Unity's C# compile message format: "...(line,col): error CS0103: ..." / "...: warning CS0414: ...".
-        // Used by LooksLikeCompileMessage so the live channel can drop its duplicate of a mirrored compile message.
+        // Used by LooksLikeCompileMessage to spot a live-channel copy of a compile message so it can be reconciled
+        // against the authoritative mirror set (absorbed into the single Compile entry) instead of showing twice.
         // 匹配 Unity 的 C# 编译消息格式："...(行,列): error CS0103: ..." / "...: warning CS0414: ..."。
-        // 供 LooksLikeCompileMessage 使用，让 live 通道丢弃与镜像重复的编译消息。
+        // 供 LooksLikeCompileMessage 识别 live 通道的编译消息副本，以便与权威镜像集对账（吸收进唯一的 Compile 条目）而非重复显示。
         private static readonly Regex _compileMsgRegex = new Regex(
             @"\(\d+,\d+\):\s*(error|warning)\s+\w+:", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -116,9 +120,9 @@ namespace DebugxLog.Console.Editor
         }
 
         /// <summary>
-        /// Whether a log condition looks like a Unity C# compile message. The live channel uses this to drop its
-        /// duplicate of a compile message that this mirror provides authoritatively. Thread-safe (pure).
-        /// 某条日志文本是否像 Unity C# 编译消息。live 通道用它丢弃与本镜像重复的编译消息。线程安全（纯函数）。
+        /// Whether a log condition looks like a Unity C# compile message. Used by the Console's reconciliation to spot a
+        /// live-channel copy of a compile message and absorb it into the authoritative mirror set. Thread-safe (pure).
+        /// 某条日志文本是否像 Unity C# 编译消息。供 Console 对账识别 live 通道的编译消息副本并吸收进权威镜像集。线程安全（纯函数）。
         /// </summary>
         internal static bool LooksLikeCompileMessage(string condition)
             => !string.IsNullOrEmpty(condition) && _compileMsgRegex.IsMatch(condition);
