@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.4.2] - 2026-07-11
+### Fixed
+- **Editor / runtime Console** stack traces no longer leak Debugx's own forwarder frames. The raw stack the Console receives via `Application.logMessageReceived` is *not* run through Unity's `[HideInCallstack]` stripping — that only happens inside Unity's own Console window — so the generated `DebugxLogger` forwarding frame stayed in the trace and double-clicking a log jumped to the forwarder instead of the caller's business code. `StackTraceParser` now reproduces the stripping itself (reflecting on each frame's method, cached by `Type|Method`, with a name-based fallback for the generated forwarder to survive AOT) and skips those frames in stack display, double-click navigation, and stack copy.
+- **Editor Console** occasionally missed compile errors/warnings that Unity's native Console showed. The live channel dropped compile messages and relied on a single `LogEntries` scan at `compilationFinished` to re-add them, but `LogEntries` flushes asynchronously and out of sync with that event — if the one scan ran before an error was flushed, the error was lost for good. Reworked into an absorb-and-reconcile model: the live channel no longer drops compile messages (they appear immediately as Uncategorized), the mirror reconciles against `LogEntries` as the source of truth, and a 1-second bounded re-scan window closes the async-flush race.
+- **Editor Console** compile errors did not reappear after **Clear**. Clear now pumps the compile mirror again, re-reading the errors still present in the editor console and re-injecting them.
+### Changed
+- **Error icon** changed from an exclamation mark to an "x", for clearer distinction from the info icon.
+
 ## [2.4.1] - 2026-07-10
 ### Fixed
 - **Debugx Console** tail auto-scroll: when the list was stuck to the bottom, newly added logs did not always reach the very bottom. `ScrollToItem` ran in the same frame the rows changed — before the ScrollView had recomputed its content height / scroll extent — so it landed a row short, and never corrected once the log stream stopped. It now re-scrolls after the content geometry is recomputed. Fixed in both the Editor window and the in-game runtime overlay.
