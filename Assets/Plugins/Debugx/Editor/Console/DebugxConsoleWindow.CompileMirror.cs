@@ -100,8 +100,17 @@ namespace DebugxLog.Console.Editor
             }
         }
 
-        // Called from ClearConsole so a subsequent scan can re-mirror compile messages still present in the console.
-        // 由 ClearConsole 调用，使之后的扫描能重新镜像控制台里仍存在的编译消息。
-        private void ResetCompileMirrorTracking() => _mirroredCompileKeys.Clear();
+        // Called from ClearConsole. Compile errors don't clear themselves (they still exist in the editor console until
+        // fixed), so after a manual/play/build Clear we must re-mirror them. Clearing the key snapshot alone isn't enough:
+        // no compilation event fires on a plain Clear, so PumpCompileMirror would stay dormant. Also request a scan so the
+        // next OnEditorUpdate tick re-reads and re-injects the still-present compile messages.
+        // 由 ClearConsole 调用。编译错误不会自行消失（在修复前它们仍存在于编辑器控制台），故 手动/进Play/构建 Clear 之后必须重新
+        // 镜像它们。仅清空键快照并不够：单纯的 Clear 不会触发任何编译事件，PumpCompileMirror 会一直处于休眠而不重扫。因此这里同时
+        // 请求一次扫描，让下一帧 OnEditorUpdate 重新读取并重新注入仍存在的编译消息。
+        private void ResetCompileMirrorTracking()
+        {
+            _mirroredCompileKeys.Clear();
+            _needsCompileMirror = true;
+        }
     }
 }
