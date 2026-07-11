@@ -496,6 +496,7 @@ namespace DebugxLog.Console.Editor
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)
             {
+                if (frame.HideInCallstack) continue;       // [HideInCallstack] forwarder frames are always dropped. [HideInCallstack] 转发帧始终剔除。
                 if (!IsStackFrameVisible(frame)) continue; // Script-Only / Full toggle (View menu). 仅脚本/完整 切换（视图菜单）。
                 sb.Append('\n').Append(BuildStackFrameRichLine(frame));
             }
@@ -601,7 +602,7 @@ namespace DebugxLog.Console.Editor
                 () => CopyEntries(new List<DebugxLogEntry> { e }, withStack: true));
             if (!string.IsNullOrEmpty(e.StackTrace))
                 menu.AddItem(new GUIContent(L("复制堆栈", "Copy Stack")), false,
-                    () => EditorGUIUtility.systemCopyBuffer = e.StackTrace);
+                    () => EditorGUIUtility.systemCopyBuffer = StackTraceParser.StripHiddenFrames(e.StackTrace));
             menu.ShowAsContext();
         }
 

@@ -487,6 +487,7 @@ namespace DebugxLog.Console.Runtime
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)
             {
+                if (frame.HideInCallstack) continue; // [HideInCallstack] forwarder frames are always dropped. [HideInCallstack] 转发帧始终剔除。
                 var line = new Label(frame.RawLine) { enableRichText = false };
                 line.style.whiteSpace = WhiteSpace.Normal;
                 line.style.color = DebugxRuntimeConsoleStyle.TextColor;

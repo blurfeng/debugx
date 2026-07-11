@@ -72,8 +72,13 @@ namespace DebugxLog.Console.Editor
                 if (i > 0) sb.Append('\n');
                 DebugxLogEntry e = entries[i];
                 sb.Append(e.PlainText);
-                if (withStack && !string.IsNullOrEmpty(e.StackTrace))
-                    sb.Append('\n').Append(e.StackTrace).Append('\n'); // trailing blank line separates stacked entries. 结尾空行分隔多条带堆栈的条目。
+                if (withStack)
+                {
+                    // Strip [HideInCallstack] frames so the clipboard matches the visible stack. 剔除 [HideInCallstack] 帧，使剪贴板与可见堆栈一致。
+                    string stack = StackTraceParser.StripHiddenFrames(e.StackTrace);
+                    if (!string.IsNullOrEmpty(stack))
+                        sb.Append('\n').Append(stack).Append('\n'); // trailing blank line separates stacked entries. 结尾空行分隔多条带堆栈的条目。
+                }
             }
             EditorGUIUtility.systemCopyBuffer = sb.ToString().TrimEnd('\n');
         }
