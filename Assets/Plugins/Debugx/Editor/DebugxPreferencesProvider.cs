@@ -69,7 +69,10 @@ namespace DebugxLog.Editor
             }
 
             string defineSymbols = PlayerSettings.GetScriptingDefineSymbols(NamedBuildTarget.Standalone);
-            if (!defineSymbols.Contains("DEBUG_X"))
+            // 按 ';' 精确匹配宏符号，避免把 DEBUG_XR 等含子串的其它宏误判为已配置 DEBUG_X。
+            // Match the define token exactly (split on ';') so symbols that merely contain the substring — e.g. DEBUG_XR —
+            // aren't mistaken for DEBUG_X being configured.
+            if (System.Array.IndexOf(defineSymbols.Split(';'), "DEBUG_X") < 0)
             {
                 EditorGUILayout.HelpBox(
                     DebugxStaticData.IsChineseSimplified

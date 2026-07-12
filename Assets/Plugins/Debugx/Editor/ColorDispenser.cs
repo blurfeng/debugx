@@ -17,8 +17,6 @@ namespace DebugxLog.Editor
         private const float SLight = 0.75f;
         private const float VLight = 0.17f;
 
-        private static bool _isDarkSkin;
-
         /// <summary>
         /// HSV color model. Values range from 0 to 1.
         /// HSV颜色模型。值为0-1。
@@ -32,8 +30,13 @@ namespace DebugxLog.Editor
             public ColorHSV(float h)
             {
                 this.h = h;
-                s = _isDarkSkin ? SDark : SLight;
-                v = _isDarkSkin ? VDark : VLight;
+                // 实时查询编辑器皮肤，不缓存：Preferences 切换 Dark/Light 不会触发脚本域重载，缓存会过期，
+                // 导致按错误皮肤生成 S/V（并使 AdaptColorByEditorSkin 反复误判“已变更”、无法幂等）。
+                // Query the editor skin live, do not cache: switching Dark/Light in Preferences doesn't reload the script
+                // domain, so a cache goes stale and colors are built for the wrong skin (also breaking AdaptColorByEditorSkin's idempotency).
+                bool isDark = EditorGUIUtility.isProSkin;
+                s = isDark ? SDark : SLight;
+                v = isDark ? VDark : VLight;
             }
         }
 
@@ -42,12 +45,15 @@ namespace DebugxLog.Editor
             DebugxProjectSettingsAsset.GetRandomColorForMember += GetRandomColorForMember;
             DebugxProjectSettingsAsset.GetNormalMemberColor += GetNormalMemberColor;
             DebugxProjectSettingsAsset.GetMasterMemberColor += GetMasterMemberColor;
-            _isDarkSkin = EditorGUIUtility.isProSkin;
         }
 
         public static void OnQuit()
         {
+            // 三个订阅对称退订，避免残留回调（此前只退订了 GetRandomColorForMember）。
+            // Unsubscribe all three symmetrically (previously only GetRandomColorForMember was removed).
             DebugxProjectSettingsAsset.GetRandomColorForMember -= GetRandomColorForMember;
+            DebugxProjectSettingsAsset.GetNormalMemberColor -= GetNormalMemberColor;
+            DebugxProjectSettingsAsset.GetMasterMemberColor -= GetMasterMemberColor;
         }
 
         /// <summary>
@@ -64,7 +70,7 @@ namespace DebugxLog.Editor
 
         private static Color GetNormalMemberColor()
         {
-            return _isDarkSkin ? Color.white : Color.black;
+            return EditorGUIUtility.isProSkin ? Color.white : Color.black;
         }
 
         private static Color GetMasterMemberColor()

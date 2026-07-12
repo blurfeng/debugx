@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using DebugxLog.Tools;
 using System.Diagnostics;
+using System.IO;
 
 namespace DebugxLog
 {
@@ -58,9 +59,11 @@ namespace DebugxLog
 #if UNITY_EDITOR
             // The editor rewrites the Log output path to the "Logs" folder of the project.
             // 编辑器时重写Log输出路径到项目Logs文件夹下。
-            string directoryPathCover = Application.dataPath;
-            directoryPathCover = directoryPathCover.Replace("Assets", "Logs");
-            LogOutput.DirectoryPath = directoryPathCover;
+            // 取工程根目录（dataPath 的父目录）再拼 Logs，避免 string.Replace 把路径中更靠前的其它 "Assets" 一并替换。
+            // Take the project root (parent of dataPath) then append "Logs", so string.Replace can't also rewrite
+            // another "Assets" occurring earlier in the path.
+            string projectRoot = Directory.GetParent(Application.dataPath).FullName;
+            LogOutput.DirectoryPath = Path.Combine(projectRoot, "Logs");
 #elif UNITY_STANDALONE_WIN
             LogOutput.DirectoryPath = Application.dataPath;
 #elif UNITY_ANDROID

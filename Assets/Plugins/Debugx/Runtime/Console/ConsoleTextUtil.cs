@@ -12,9 +12,14 @@ namespace DebugxLog.Console
         // Targets the tag set Unity's Console understands; leaves other '<...>' (e.g. generics) untouched.
         // 剥去常见的 Unity 富文本标签，使消息可作为纯文本用于匹配/折叠。
         // 仅针对 Unity Console 识别的标签集合；不动其它 '<...>'（如泛型）。
+        // CultureInvariant 使 IgnoreCase 折叠不随运行区域变化：否则土耳其/阿塞拜疆区域下含字母 i 的大写标签
+        // （如 <I>、<SIZE>、<ALIGN>）会剥不掉，导致同一消息在不同区域的 PlainText 不一致（影响折叠与搜索）。
+        // CultureInvariant keeps IgnoreCase folding stable across locales: without it, uppercase tags containing the
+        // letter i (e.g. <I>, <SIZE>, <ALIGN>) fail to strip under Turkish/Azerbaijani cultures, so the same message
+        // yields different PlainText per locale (breaking collapsing and search).
         private static readonly Regex _richTextRegex = new Regex(
             @"</?(?:color|b|i|size|material|quad|u|s|sub|sup|mark|align|alpha|font)(?:=[^>]*)?>",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
         /// <summary>
         /// Returns the message with recognized Unity rich-text tags removed. Null/empty inputs pass through.

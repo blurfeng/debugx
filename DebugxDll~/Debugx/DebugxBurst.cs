@@ -7,7 +7,7 @@ namespace DebugxLog
     /// 用于Burst多线程代码中的Debug工具类。
     /// Debug utility class for Burst multithreaded code.
     /// </summary>
-    public class DebugxBurst
+    public static class DebugxBurst
     {
         //在DOTS的Burst中的限制问题：
         //一些受到限制的代码，一些功能不支持，在编译时会直接报红。

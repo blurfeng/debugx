@@ -50,6 +50,7 @@ namespace DebugxLog.Console.Editor
         private readonly GUIContent _detailContent = new GUIContent(string.Empty); // reused for CalcHeight/GetRect (no per-repaint alloc). 复用于 CalcHeight/GetRect（避免每帧分配）。
         private bool _detailScriptOnlyCache;               // ScriptOnly state the cache was built under; rebuild when it flips. 构建缓存时的 仅脚本 状态；翻转时重建。
         private GUIStyle _detailStyle;                     // lazily built "CN Message" (or fallback) clone. 惰性构建的 "CN Message"（或回退）克隆样式。
+        private bool _detailStyleIsProSkin;                // editor skin the style was built under; rebuild when it flips (skin switch doesn't reload the domain). 构建样式时的编辑器皮肤；翻转时重建（切换皮肤不重载脚本域）。
         private ScrollView _listScroll;      // the ListView's internal scroll view, for tail (stick-to-bottom) detection. ListView 内部滚动视图，用于 tail(贴底)检测。
         private bool _stickToBottom = true;  // auto-scroll to newest only while the list is at the bottom. 仅当列表贴底时自动滚到最新。
 
@@ -583,17 +584,36 @@ namespace DebugxLog.Console.Editor
 
         // The detail text style: native Console's "CN Message" (already richText + wordWrap), cloned before mutating so we
         // don't leak tweaks into the shared skin; falls back to a rich-text label clone if the style name is absent.
+        // Rebuilt when the editor skin flips: switching Dark/Light does NOT reload the script domain, so a once-cached
+        // skin-dependent text color goes stale (the same trap ColorDispenser avoids). We also force the default
+        // (non-<color>) text color to the current skin's standard label color for every SelectableLabel state — otherwise
+        // stack-trace and Uncategorized lines (which carry no <color> tag) render in whatever color the cached clone
+        // happened to hold, e.g. black-on-dark after a Light->Dark switch. Member <color> spans still override it.
         // 详情文本样式：原生 Console 的 "CN Message"（本就 richText + wordWrap），修改前克隆以免污染共享皮肤；样式缺失则回退到富文本 label 克隆。
+        // 皮肤翻转时重建：切换 Dark/Light 不会重载脚本域，故一次性缓存的皮肤相关文字色会过期（ColorDispenser 规避的同一陷阱）。
+        // 并强制把默认（无 <color>）文字色设为当前皮肤的标准 label 色，覆盖 SelectableLabel 各状态——否则堆栈与未分类行（不带
+        // <color> 标签）会沿用缓存克隆里的颜色，如 Light→Dark 切换后在暗色底上呈黑字。成员的 <color> 片段仍会覆盖此默认色。
         private GUIStyle DetailStyle
         {
             get
             {
-                if (_detailStyle == null)
+                bool isDark = EditorGUIUtility.isProSkin;
+                if (_detailStyle == null || _detailStyleIsProSkin != isDark)
                 {
                     GUIStyle src = GUI.skin.FindStyle("CN Message");
                     _detailStyle = src != null
                         ? new GUIStyle(src) { richText = true, wordWrap = true }
                         : new GUIStyle(EditorStyles.label) { richText = true, wordWrap = true, padding = new RectOffset(6, 6, 6, 6) };
+
+                    // Skin-correct default text color for all states SelectableLabel may draw in (normal + when the label
+                    // is focused/selected). 各状态（普通 + 选中/聚焦时）都用与当前皮肤匹配的默认文字色。
+                    Color textColor = EditorStyles.label.normal.textColor;
+                    _detailStyle.normal.textColor = textColor;
+                    _detailStyle.focused.textColor = textColor;
+                    _detailStyle.active.textColor = textColor;
+                    _detailStyle.hover.textColor = textColor;
+
+                    _detailStyleIsProSkin = isDark;
                 }
                 return _detailStyle;
             }
@@ -664,12 +684,25 @@ namespace DebugxLog.Console.Editor
             RefreshView();
         }
 
+        // Reused across refreshes to avoid per-refresh allocation while preserving the FULL multi-selection.
+        // 跨刷新复用，既避免每次刷新分配，又能保留【完整】的多选。
+        private readonly HashSet<long> _selectedSeqScratch = new HashSet<long>();
+        private readonly List<int> _selectedIndexScratch = new List<int>();
+
         private void RefreshView()
         {
-            // Remember the selected entry by its stable id BEFORE rebuilding rows: eviction shifts positional indices,
-            // so a plain _selectedIndex would then point at a different entry (wrong detail / wrong Copy target).
-            // 重建行列表前按稳定 id 记住选中条目：淘汰会让位置索引偏移，仅凭 _selectedIndex 之后会指向另一条目（详情/Copy 目标错位）。
-            long selectedSeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+            // Remember ALL selected entries by their stable ids BEFORE rebuilding rows (multi-select), plus the primary:
+            // eviction/filtering shifts positional indices, so plain indices would point at different entries AND a
+            // multi-selection would collapse to a single row (wrong detail / silent Ctrl+C data loss).
+            // 重建行列表前按稳定 id 记住【全部】选中条目（多选）与主选中项：淘汰/过滤会让位置索引偏移，仅凭索引之后会指向
+            // 别的条目，且多选会被压成单选（详情错位 / Ctrl+C 静默丢数据）。
+            _selectedSeqScratch.Clear();
+            foreach (int idx in _listView.selectedIndices)
+            {
+                if (idx >= 0 && idx < _rows.Count && _rows[idx].Entry != null)
+                    _selectedSeqScratch.Add(_rows[idx].Entry.SequenceId);
+            }
+            long primarySeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
                 ? _rows[_selectedIndex].Entry.SequenceId
                 : -1;
 
@@ -681,7 +714,7 @@ namespace DebugxLog.Console.Editor
             _listView.RefreshItems();
             HideListEmptyLabel();
             UpdateCounts();
-            ReconcileSelection(selectedSeq);
+            ReconcileSelection(primarySeq);
 
             // Tail: auto-scroll to the newest entry only while the list is stuck to the bottom (native behaviour).
             // Scrolling up pauses the tail; scrolling back to the bottom resumes it (see OnListScrolled).
@@ -691,35 +724,44 @@ namespace DebugxLog.Console.Editor
                 _listView.ScrollToItem(_rows.Count - 1);
         }
 
-        // Re-align the ListView selection with the entry it pointed at before the rebuild, keyed by SequenceId, so the
-        // highlight, the detail pane and Copy keep referring to the SAME entry after eviction/filtering shifts the rows;
-        // clears the selection when that entry is gone. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged.
-        // 按 SequenceId 把选中项重新对齐到重建前所指条目，使淘汰/过滤导致行偏移后，高亮、详情与 Copy 仍指向同一条目；
-        // 该条目消失时清除选中。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
-        private void ReconcileSelection(long selectedSeq)
+        // Re-align the ENTIRE selection (all selected SequenceIds captured in _selectedSeqScratch, plus the primary) with
+        // the entries they pointed at before the rebuild, so the highlight, the detail pane and Copy keep referring to the
+        // SAME entries after eviction/filtering shifts the rows; surviving rows keep their multi-selection instead of being
+        // collapsed to one. Clears when none survive. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged.
+        // 按 SequenceId 把【整份】选中（_selectedSeqScratch 中的全部 id 与主选中）重新对齐到重建前所指条目，使淘汰/过滤导致
+        // 行偏移后，高亮、详情与 Copy 仍指向同一批条目；幸存行保留多选而非被压成单选；全部消失时清除。
+        // SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
+        private void ReconcileSelection(long primarySeq)
         {
-            if (selectedSeq < 0) return; // nothing was selected. 原本无选中。
+            if (_selectedSeqScratch.Count == 0) return; // nothing was selected. 原本无选中。
 
-            int newIndex = -1;
+            _selectedIndexScratch.Clear();
+            int primaryIndex = -1;
             for (int i = 0; i < _rows.Count; i++)
             {
                 DebugxLogEntry e = _rows[i].Entry;
-                if (e != null && e.SequenceId == selectedSeq) { newIndex = i; break; }
+                if (e == null) continue;
+                if (_selectedSeqScratch.Contains(e.SequenceId))
+                {
+                    _selectedIndexScratch.Add(i);
+                    if (e.SequenceId == primarySeq) primaryIndex = i;
+                }
             }
 
-            if (newIndex == _selectedIndex) return; // still aligned. 仍对齐。
-
-            if (newIndex >= 0)
-            {
-                _selectedIndex = newIndex;
-                _listView.SetSelectionWithoutNotify(new[] { newIndex });
-            }
-            else
+            if (_selectedIndexScratch.Count == 0)
             {
                 _selectedIndex = -1;
                 _listView.ClearSelection();
                 UpdateDetail(null);
+                return;
             }
+
+            _selectedIndex = primaryIndex >= 0 ? primaryIndex : _selectedIndexScratch[0];
+            _listView.SetSelectionWithoutNotify(_selectedIndexScratch);
+            // Primary was evicted but other rows survive: show the new primary's detail so it stays coherent.
+            // 主选中被淘汰但其它行幸存：改显示新的主选中详情，保持一致。
+            if (primaryIndex < 0)
+                UpdateDetail(_rows[_selectedIndex].Entry);
         }
 
         // Lazily hook the ListView's internal scroll view to track whether it is at the bottom. Retried each refresh

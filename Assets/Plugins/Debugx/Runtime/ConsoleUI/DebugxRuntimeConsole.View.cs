@@ -641,7 +641,12 @@ namespace DebugxLog.Console.Runtime
             var el = evt.target as VisualElement;
             while (el != null && el != _listView)
             {
-                if (el.name == RowName) return; // clicked inside a row → keep selection. 点在行内 → 保留选中。
+                // Clicked inside a data row → keep selection. Also keep it when the click lands on the ListView's own
+                // scrollbar (a Scroller descendant): dragging/clicking the scrollbar to browse history must NOT wipe the
+                // current (multi-)selection or the detail/Copy target — only clicks on the empty area below rows should.
+                // 点在数据行内 → 保留选中。点在 ListView 自身的滚动条（Scroller 后代）上也保留：用滚动条拖动/点击浏览历史时
+                // 不应清空当前（多）选与详情/Copy 目标；只有点击行下方空白区才清空。
+                if (el.name == RowName || el is Scroller) return;
                 el = el.hierarchy.parent;
             }
             ClearListSelection();

@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Author: Blur Feng
 // Time: 20230109
-// Version: 2.4.0.0
+// Version: 2.4.0.1
 // Description:
 // The debug log is managed according to its members.use macro "DEBUG_X" open the functional.
 // 此插件用于以成员的方式管理调试日志。使用宏"DEBUG_X"来开启功能。
@@ -97,6 +97,14 @@
 // 4.退役旧的屏幕 IMGUI 日志覆盖层（LogOutput.DrawGUI），由运行时 UIToolkit 版 Debugx Console 取代；LogOutput 移除整段 Draw Logs（含 message 路径里的 HandleDrawLogs 调用）。
 // 5.移除项目设置 drawLogToScreen / restrictDrawLogCount / maxDrawLogs 三字段（Unity 侧同步移除镜像/设置UI/Prefs/序列化键）。
 // 6.审查修复：LogCreator 日志文本内嵌时间戳与 OnRawLog.Timestamp 改为单次取值，避免跨秒边界不一致；运行时成员开关表 _memberEnables 的所有读写（OnAwake/ResetToDefault/SetMemberEnable/MemberIsEnable）加锁，防止后台线程产生日志读表时与主线程改开关并发访问 Dictionary。
+////////////////////
+// Version: 2.4.0.1
+// 审查修复（DLL）：
+// 1.LogCreator 在加锁前先对 message.ToString() 求值，避免被打印对象的 ToString() 再打日志时同线程重入 Monitor 破坏共享 _logSb，导致外层日志文本被截断/错乱。
+// 2.LogOutput 的 _writer/_savePath 读写纳入 _locker，修复关闭/重启录制与（可能来自后台线程的）LogCallBack 写文件的竞态；_savePath 仅在写入流就绪后发布，维持 "_savePath 非空 ⇒ _writer 有效" 不变式。
+// 3.LogOutput 裁剪颜色标签的正则改为匹配任意 <color=...> 标签（含 8 位 RGBA 与命名颜色），不再只认 6 位十六进制。
+// 4.性能：日志拼串改为链式 Append 去插值临时串；tag 存在性判定由正则改为 Ordinal IndexOf；文件名/时间戳用 InvariantCulture；DateTime.Now 仅在需要时取值。
+// 5.整理：DebugxBurst 改为 static class；ContainsMemberKey 简化；LogCallBack 移除不可达的 File.AppendText 回退分支；_regexMessageCut 加 RegexOptions.Compiled。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -345,12 +353,7 @@ namespace DebugxLog
         /// 如果存在该成员Key则返回true，否则返回false。</returns>
         public static bool ContainsMemberKey(int key)
         {
-            if (GetMemberInfo(key, out _))
-            {
-                return true;
-            }
-
-            return false;
+            return GetMemberInfo(key, out _);
         }
 
         private static bool GetMemberInfo(int key, out DebugxMemberInfo memberInfo)
@@ -621,9 +624,20 @@ namespace DebugxLog
             bool isServer = hasNetTag && _serverCheckDelegate.Invoke();
 
             // Capture the wall clock ONCE, shared by the embedded "[HH:mm:ss]" string and the structured event's
-            // Timestamp, so the displayed text and the event can never disagree across a second boundary.
+            // Timestamp, so the displayed text and the event can never disagree across a second boundary. Only read it
+            // when actually needed (shown in text or wanted by a subscriber).
             // 只取一次墙钟时间，供内嵌 "[HH:mm:ss]" 串与结构化事件的 Timestamp 共用，使显示文本与事件不会在秒边界处不一致。
-            DateTime now = DateTime.Now;
+            // 仅在确实需要时（显示或有订阅者）才取值。
+            DateTime now = (showTime || OnRawLog != null) ? DateTime.Now : default(DateTime);
+
+            // Resolve message.ToString() BEFORE taking the lock. If it ran inside the lock, a message whose ToString()
+            // (or a property getter it touches) logs again would re-enter LogCreator on the same thread — Monitor is
+            // reentrant — append into the shared _logSb and, in its finally, clear the whole buffer, truncating/garbling
+            // the outer log's text. Converting up-front leaves only allocation-free, non-reentrant appends inside the lock.
+            // 在加锁前先对 message.ToString() 求值。若在锁内触发，被打印对象的 ToString()（或其属性 getter）再打日志会在
+            // 同线程重入 LogCreator（Monitor 可重入），向共享 _logSb 追加并在 finally 清空整个缓冲，导致外层日志文本被截断/错乱。
+            // 提前转换后，锁内只剩无分配、无重入风险的追加操作。
+            string messageText = message == null ? string.Empty : message.ToString();
 
             string finalText;
             lock (_logSbLocker)
@@ -636,25 +650,30 @@ namespace DebugxLog
                         _logSb.Append(isServer ? "Server: " : "Client: ");
 
                     if (showTime)
-                    {
-                        _logSb.Append($" [{now:HH:mm:ss}] ");
-                    }
+                        _logSb.Append(" [").Append(now.ToString("HH:mm:ss")).Append("] ");
 
                     if (info != null)
                     {
                         if (info.LogSignature)
-                            _logSb.Append($"[Sig: {info.signature}]");
+                            _logSb.Append("[Sig: ").Append(info.signature).Append(']');
 
-                        if (!string.IsNullOrEmpty(info.color))
-                            _logSb.Append(info.haveHeader
-                                ? $" <color=#{info.color}>{info.header} : {message}</color>"
-                                : $" <color=#{info.color}>{message}</color>");
+                        bool hasColor = !string.IsNullOrEmpty(info.color);
+                        if (hasColor)
+                            _logSb.Append(" <color=#").Append(info.color).Append('>');
                         else
-                            _logSb.Append(info.haveHeader ? $" {info.header} : {message}" : $" {message}");
+                            _logSb.Append(' ');
+
+                        if (info.haveHeader)
+                            _logSb.Append(info.header).Append(" : ");
+
+                        _logSb.Append(messageText);
+
+                        if (hasColor)
+                            _logSb.Append("</color>");
                     }
                     else
                     {
-                        _logSb.Append($" UnregisteredMember : {message}");
+                        _logSb.Append(" UnregisteredMember : ").Append(messageText);
                     }
 
                     finalText = _logSb.ToString();

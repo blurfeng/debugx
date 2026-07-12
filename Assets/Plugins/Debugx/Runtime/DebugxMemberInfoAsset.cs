@@ -31,7 +31,7 @@ namespace DebugxLog
         public DebugxMemberInfoAsset(int key)
         {
             enableDefault = true;
-            signature = $"Menber {key}";
+            signature = $"Member {key}";
             logSignature = true;
             this.key = key;
             header = String.Empty;

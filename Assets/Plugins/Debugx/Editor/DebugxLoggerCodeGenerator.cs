@@ -35,7 +35,10 @@ namespace DebugxLog.Editor
             }
 
             StringBuilder sb = new StringBuilder();
-            HashSet<string> usedMethodSuffixes = new HashSet<string>();
+            // Holds the FINAL method names already emitted (Log*/LogWarning*/LogError*), not just suffixes, so
+            // dedup catches cross-family collisions (see GetUniqueMethodSuffix).
+            // 保存已生成的【最终方法名】（Log*/LogWarning*/LogError*）而非仅后缀，使去重能捕获跨方法族的撞名（见 GetUniqueMethodSuffix）。
+            HashSet<string> usedMethodNames = new HashSet<string>();
             
             // File header
             sb.AppendLine("// 此文件由 DebugxCodeGenerator 自动生成，请勿手动修改。");
@@ -58,7 +61,7 @@ namespace DebugxLog.Editor
             {
                 foreach (var member in settingsAsset.defaultMemberAssets)
                 {
-                    GenerateMemberMethods(sb, member, usedMethodSuffixes);
+                    GenerateMemberMethods(sb, member, usedMethodNames);
                 }
             }
 
@@ -67,7 +70,7 @@ namespace DebugxLog.Editor
             {
                 foreach (var member in settingsAsset.customMemberAssets)
                 {
-                    GenerateMemberMethods(sb, member, usedMethodSuffixes);
+                    GenerateMemberMethods(sb, member, usedMethodNames);
                 }
             }
 
@@ -104,7 +107,7 @@ namespace DebugxLog.Editor
         /// Generate Log, LogWarning, LogError methods for a member.
         /// 为成员生成 Log、LogWarning、LogError 方法。
         /// </summary>
-        private static void GenerateMemberMethods(StringBuilder sb, DebugxMemberInfoAsset member, HashSet<string> usedMethodSuffixes)
+        private static void GenerateMemberMethods(StringBuilder sb, DebugxMemberInfoAsset member, HashSet<string> usedMethodNames)
         {
             if (string.IsNullOrEmpty(member.signature))
                 return;
@@ -113,7 +116,7 @@ namespace DebugxLog.Editor
             if (string.IsNullOrEmpty(methodSuffixBase))
                 return;
 
-            string methodSuffix = GetUniqueMethodSuffix(methodSuffixBase, member.signature, usedMethodSuffixes);
+            string methodSuffix = GetUniqueMethodSuffix(methodSuffixBase, member.signature, usedMethodNames);
             int key = member.key;
 
             // Log method
@@ -172,7 +175,11 @@ namespace DebugxLog.Editor
                 {
                     if (capitalizeNext && char.IsLetter(c))
                     {
-                        sb.Append(char.ToUpper(c));
+                        // ToUpperInvariant，避免 char.ToUpper 随机器区域变化（土耳其 locale 下 'i'→'İ' U+0130），
+                        // 使生成的方法名不随开发者机器 locale 漂移、引发跨机器编译不一致。
+                        // Use ToUpperInvariant so the generated method name doesn't drift with the machine locale
+                        // (Turkish 'i' -> 'İ' U+0130), which would cause cross-machine compile mismatches.
+                        sb.Append(char.ToUpperInvariant(c));
                         capitalizeNext = false;
                     }
                     else
@@ -205,15 +212,26 @@ namespace DebugxLog.Editor
             return result;
         }
 
-        private static string GetUniqueMethodSuffix(string methodSuffixBase, string signature, HashSet<string> usedMethodSuffixes)
+        private static string GetUniqueMethodSuffix(string methodSuffixBase, string signature, HashSet<string> usedMethodNames)
         {
+            // Dedup on the FINAL method names of all three families (Log*/LogWarning*/LogError*), not just the suffix.
+            // A suffix that is unique on its own can still collide across families: signature "Foo" emits LogWarningFoo
+            // (Warning family) while signature "Warning Foo" -> suffix "WarningFoo" emits LogWarningFoo (Log family) —
+            // same method name, causing CS0111 in the generated file. Bump the suffix until all three names are free.
+            // 按三族的【最终方法名】（Log*/LogWarning*/LogError*）去重，而非仅后缀。后缀本身唯一仍可能跨族撞名：
+            // 签名 "Foo" 生成 LogWarningFoo（Warning 族），而签名 "Warning Foo" 的后缀 "WarningFoo" 其 Log 族也生成 LogWarningFoo，
+            // 两者同名 → 生成文件报 CS0111。递增后缀直到三个名字都空闲。
             string methodSuffix = methodSuffixBase;
             int counter = 2;
-            while (!usedMethodSuffixes.Add(methodSuffix))
+            while (!AreMethodNamesFree(usedMethodNames, methodSuffix))
             {
                 methodSuffix = $"{methodSuffixBase}_{counter}";
                 counter++;
             }
+
+            usedMethodNames.Add("Log" + methodSuffix);
+            usedMethodNames.Add("LogWarning" + methodSuffix);
+            usedMethodNames.Add("LogError" + methodSuffix);
 
             if (!string.Equals(methodSuffix, methodSuffixBase))
             {
@@ -221,6 +239,15 @@ namespace DebugxLog.Editor
             }
 
             return methodSuffix;
+        }
+
+        // Whether all three family method names (Log/LogWarning/LogError + suffix) are still unused.
+        // 三族方法名（Log/LogWarning/LogError + 后缀）是否都尚未使用。
+        private static bool AreMethodNamesFree(HashSet<string> usedMethodNames, string methodSuffix)
+        {
+            return !usedMethodNames.Contains("Log" + methodSuffix)
+                && !usedMethodNames.Contains("LogWarning" + methodSuffix)
+                && !usedMethodNames.Contains("LogError" + methodSuffix);
         }
 
         /// <summary>

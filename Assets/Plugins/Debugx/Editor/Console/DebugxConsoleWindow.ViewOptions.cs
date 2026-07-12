@@ -1,3 +1,4 @@
+using System.Globalization;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -21,7 +22,9 @@ namespace DebugxLog.Console.Editor
         // this file keeps their backing state + the helpers that consume it.
         // 视图选项现以内联勾选形式呈现在 Editor 面板中（见 RefreshEditorPanel）；本文件保留其状态字段与消费它们的辅助方法。
 
-        private static string TimestampText(DebugxLogEntry e) => e.Timestamp.ToString("HH:mm:ss");
+        // InvariantCulture 固定 ':' 分隔符：否则部分系统区域的 TimeSeparator 会把时间戳显示成 12.34.56。
+        // InvariantCulture pins the ':' separator; otherwise some locales' TimeSeparator renders it as 12.34.56.
+        private static string TimestampText(DebugxLogEntry e) => e.Timestamp.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
         // Whether a stack frame is shown under the current Script-Only / Full mode.
         // 当前“仅脚本/完整”模式下是否显示某堆栈帧。

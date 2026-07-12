@@ -3,24 +3,35 @@ using System;
 namespace DebugxLog.Console
 {
     /// <summary>
-    /// Fixed-capacity ring buffer of <see cref="DebugxLogEntry"/>. When full, the oldest entry is dropped (FIFO).
-    /// This is the proper replacement for the old screen-draw buffer (which kept only 100 items of Message+LogType).
-    /// Not thread-safe by design: it is written and read only on the main thread (the collector marshals cross-thread
-    /// captures to the main thread before adding). Callers poll <see cref="Version"/> to detect changes cheaply
-    /// instead of subscribing to a per-add event (avoids event spam during log floods).
-    /// 定容的 <see cref="DebugxLogEntry"/> 环形缓冲。满时丢弃最旧条目（FIFO）。它是旧屏幕绘制缓冲（仅存 100 条
-    /// Message+LogType）的正式替代品。设计上非线程安全：只在主线程读写（采集器会先把跨线程捕获汇集到主线程再 Add）。
-    /// 调用方通过轮询 <see cref="Version"/> 低成本地检测变化，而非订阅每条日志的事件（避免日志洪泛时的事件风暴）。
+    /// Append log buffer of <see cref="DebugxLogEntry"/> backed by a ring. The allocated storage grows on demand
+    /// (doubling) up to <see cref="Capacity"/>; only once that retention cap is reached is the oldest entry dropped
+    /// (FIFO). A very large cap (e.g. int.MaxValue for the Editor Console) therefore costs nothing until entries are
+    /// actually added — an idle console does not pre-allocate. Not thread-safe by design: it is written and read only on
+    /// the main thread (the collector marshals cross-thread captures to the main thread before adding). Callers poll
+    /// <see cref="Version"/> to detect changes cheaply instead of subscribing to a per-add event (avoids event spam
+    /// during log floods).
+    /// 基于环形存储的追加式 <see cref="DebugxLogEntry"/> 缓冲。已分配存储按需翻倍增长，直到达到 <see cref="Capacity"/> 保留
+    /// 上限；唯有到达上限后才丢弃最旧条目（FIFO）。因此设很大的上限（如编辑器 Console 用 int.MaxValue）在真正 Add 前不占内存，
+    /// 空闲 Console 不预分配。设计上非线程安全：只在主线程读写（采集器会先把跨线程捕获汇集到主线程再 Add）。调用方通过轮询
+    /// <see cref="Version"/> 低成本地检测变化，而非订阅每条日志的事件（避免日志洪泛时的事件风暴）。
     /// </summary>
     public sealed class LogRingBuffer
     {
-        /// <summary>Default capacity for the Editor Console. 编辑器 Console 的默认容量。</summary>
-        public const int DefaultCapacity = 5000;
+        /// <summary>
+        /// Default (retention) capacity for the Editor Console: effectively unlimited. Storage still grows on demand, so
+        /// this costs nothing until logs accumulate; entries are only ever dropped if memory is actually exhausted.
+        /// 编辑器 Console 的默认（保留）容量：实际上无上限。存储仍按需增长，故在日志累积前不占内存；只有真正耗尽内存时才会丢条目。
+        /// </summary>
+        public const int DefaultCapacity = int.MaxValue;
+
+        // Smallest storage allocated on the first Add, then doubled as needed up to _maxCapacity.
+        // 首次 Add 分配的最小存储，随后按需翻倍直到 _maxCapacity。
+        private const int InitialCapacity = 64;
 
         private DebugxLogEntry[] _items;
-        private int _start;   // index of the oldest entry. 最旧条目的索引。
+        private int _start;         // index of the oldest entry within _items. _items 中最旧条目的索引。
         private int _count;
-        private int _capacity;
+        private int _maxCapacity;   // retention cap; _items.Length grows lazily up to this. 保留上限；_items.Length 按需增长到此值。
 
         /// <summary>
         /// Monotonic change counter. Incremented on every Add / Clear / capacity change. Display layers compare it
@@ -37,36 +48,45 @@ namespace DebugxLog.Console
 
         public LogRingBuffer(int capacity)
         {
-            _capacity = 0;
             _items = Array.Empty<DebugxLogEntry>();
+            _start = 0;
+            _count = 0;
+            _maxCapacity = 0;
             Capacity = capacity;
         }
 
         /// <summary>
-        /// Buffer capacity. Shrinking drops the oldest overflow entries; growing preserves all current entries.
-        /// 缓冲容量。缩小会丢弃最旧的溢出条目；扩大会保留全部现有条目。
+        /// Retention capacity (the maximum number of entries kept). Growing it is free — storage grows lazily on Add;
+        /// shrinking it below the current count drops the oldest overflow entries and reclaims storage.
+        /// 保留容量（最多保留的条目数）。放大是免费的——存储在 Add 时按需增长；缩小到当前条目数以下会丢弃最旧的溢出条目并回收存储。
         /// </summary>
         public int Capacity
         {
-            get => _capacity;
+            get => _maxCapacity;
             set
             {
                 int newCap = value < 1 ? 1 : value;
-                if (newCap == _capacity) return;
+                if (newCap == _maxCapacity) return;
 
-                var newItems = new DebugxLogEntry[newCap];
-                int keep = _count < newCap ? _count : newCap;
-                int dropped = _count - keep; // when shrinking below current count, evict this many oldest
+                // Only reallocate when the new cap is smaller than the currently allocated storage: shrink it (evicting
+                // the oldest overflow if we drop below the current count). Growing the cap needs no work here — the
+                // storage grows lazily in Add up to the new cap.
+                // 仅当新上限小于当前已分配存储时才重新分配：收缩存储（若降到当前条目数以下则淘汰最旧的溢出条目）。放大上限
+                // 此处无需操作——存储会在 Add 中按需增长到新上限。
+                if (newCap < _items.Length)
+                {
+                    int keep = _count < newCap ? _count : newCap;
+                    int dropped = _count - keep;
+                    var shrunk = new DebugxLogEntry[newCap];
+                    for (int i = 0; i < keep; i++)
+                        shrunk[i] = _items[(_start + dropped + i) % _items.Length];
+                    if (dropped > 0) DroppedCount += dropped;
+                    _items = shrunk;
+                    _start = 0;
+                    _count = keep;
+                }
 
-                for (int i = 0; i < keep; i++)
-                    newItems[i] = _items[(_start + dropped + i) % _capacity];
-
-                if (dropped > 0) DroppedCount += dropped;
-
-                _items = newItems;
-                _start = 0;
-                _count = keep;
-                _capacity = newCap;
+                _maxCapacity = newCap;
                 Version++;
             }
         }
@@ -81,33 +101,53 @@ namespace DebugxLog.Console
             {
                 if (index < 0 || index >= _count)
                     throw new ArgumentOutOfRangeException(nameof(index));
-                return _items[(_start + index) % _capacity];
+                return _items[(_start + index) % _items.Length];
             }
         }
 
         /// <summary>
-        /// Append an entry. If the buffer is full, the oldest entry is evicted first.
-        /// 追加一条。若缓冲已满，先淘汰最旧的一条。
+        /// Append an entry. Grows the storage on demand up to <see cref="Capacity"/>; once at the cap, the oldest entry
+        /// is evicted first (FIFO).
+        /// 追加一条。按需将存储增长到 <see cref="Capacity"/>；到达上限后先淘汰最旧的一条（FIFO）。
         /// </summary>
         public void Add(DebugxLogEntry entry)
         {
             if (entry == null) return;
 
-            if (_count < _capacity)
+            // Storage full but still below the retention cap → grow (double), clamped to the cap.
+            // 存储已满但未达保留上限 → 增长（翻倍），并夹到上限。
+            if (_count == _items.Length && _items.Length < _maxCapacity)
             {
-                _items[(_start + _count) % _capacity] = entry;
+                long doubled = _items.Length == 0 ? InitialCapacity : (long)_items.Length * 2;
+                Reallocate((int)Math.Min(doubled, _maxCapacity));
+            }
+
+            if (_count < _items.Length)
+            {
+                _items[(_start + _count) % _items.Length] = entry;
                 _count++;
             }
             else
             {
-                // Full: overwrite the oldest slot and advance the start pointer.
-                // 已满：覆盖最旧槽位并前移起始指针。
+                // At the retention cap: overwrite the oldest slot and advance the start pointer.
+                // 达到保留上限：覆盖最旧槽位并前移起始指针。
                 _items[_start] = entry;
-                _start = (_start + 1) % _capacity;
+                _start = (_start + 1) % _items.Length;
                 DroppedCount++;
             }
 
             Version++;
+        }
+
+        // Re-linearize the current entries into a freshly-sized array (oldest at index 0).
+        // 将当前条目重新线性化到一个新尺寸数组（最旧位于索引 0）。
+        private void Reallocate(int newLength)
+        {
+            var newItems = new DebugxLogEntry[newLength];
+            for (int i = 0; i < _count; i++)
+                newItems[i] = _items[(_start + i) % _items.Length];
+            _items = newItems;
+            _start = 0;
         }
 
         /// <summary>
@@ -129,10 +169,10 @@ namespace DebugxLog.Console
             int write = 0;
             for (int read = 0; read < _count; read++)
             {
-                DebugxLogEntry e = _items[(_start + read) % _capacity];
+                DebugxLogEntry e = _items[(_start + read) % _items.Length];
                 if (predicate(e)) continue; // remove. 移除。
                 if (write != read)
-                    _items[(_start + write) % _capacity] = e;
+                    _items[(_start + write) % _items.Length] = e;
                 write++;
             }
 
@@ -141,7 +181,7 @@ namespace DebugxLog.Console
 
             // Null the freed tail slots so we don't pin references. 清空腾出的尾部槽，避免滞留引用。
             for (int i = write; i < _count; i++)
-                _items[(_start + i) % _capacity] = null;
+                _items[(_start + i) % _items.Length] = null;
 
             _count = write;
             Version++;
@@ -155,7 +195,7 @@ namespace DebugxLog.Console
         public void Clear()
         {
             if (_count > 0)
-                Array.Clear(_items, 0, _capacity);
+                Array.Clear(_items, 0, _items.Length);
             _start = 0;
             _count = 0;
             Version++;
