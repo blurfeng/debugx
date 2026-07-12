@@ -62,6 +62,9 @@ namespace DebugxLog.Console.Editor
         private Label _memberNameLabel, _memberCaretLabel; // Members button split into text + independently-sized caret. Members 按钮拆成文字 + 可独立调大小的三角。
         private ToolbarToggle _collapseToggle, _errorPauseToggle;
         private ToolbarSearchField _searchField;
+        // Centered "No results for …" overlay shown over the list when an active search matches nothing.
+        // 搜索有内容但无匹配时，覆盖在列表上居中显示的 “No results for …” 提示。
+        private Label _noResultsLabel;
 
         // Fixed group widths (per current language) used by the responsive show/hide logic. _wBase is the always-visible
         // left minimum EXCLUDING the counts — the counts' width is measured live in UpdateResponsive (it grows with the
@@ -365,7 +368,28 @@ namespace DebugxLog.Console.Editor
             // Hide ListView's built-in "List is empty" placeholder on every layout pass.
             // 每次布局时隐藏 ListView 内置的“List is empty”占位。
             _listView.RegisterCallback<GeometryChangedEvent>(_ => HideListEmptyLabel());
-            return _listView;
+
+            // Wrap the list so a centered "No results" overlay can sit on top of it (shown by UpdateNoResultsLabel when a
+            // search matches nothing). PickingMode.Ignore lets clicks pass through to the list's own empty-area handling.
+            // 用容器包裹列表，以便在其上叠加居中的 “No results” 提示（由 UpdateNoResultsLabel 在搜索无匹配时显示）。
+            // PickingMode.Ignore 让点击穿透到列表自身的空白区处理逻辑。
+            var wrapper = new VisualElement();
+            wrapper.style.flexGrow = 1;
+            wrapper.Add(_listView);
+
+            _noResultsLabel = new Label { enableRichText = false, pickingMode = PickingMode.Ignore };
+            _noResultsLabel.style.position = Position.Absolute;
+            _noResultsLabel.style.left = 0;
+            _noResultsLabel.style.right = 0;
+            _noResultsLabel.style.top = 0;
+            _noResultsLabel.style.bottom = 0;
+            _noResultsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _noResultsLabel.style.color = DebugxConsoleStyle.HintColor;
+            _noResultsLabel.style.fontSize = DebugxConsoleStyle.NoResultsFontSize;
+            _noResultsLabel.style.display = DisplayStyle.None;
+            wrapper.Add(_noResultsLabel);
+
+            return wrapper;
         }
 
         private VisualElement MakeRow()
@@ -722,6 +746,8 @@ namespace DebugxLog.Console.Editor
             EnsureListScrollHook();
             if (_stickToBottom && _rows.Count > 0)
                 _listView.ScrollToItem(_rows.Count - 1);
+
+            UpdateNoResultsLabel();
         }
 
         // Re-align the ENTIRE selection (all selected SequenceIds captured in _selectedSeqScratch, plus the primary) with
@@ -1116,6 +1142,18 @@ namespace DebugxLog.Console.Editor
             VisualElement empty = _listView.Q(className: "unity-collection-view__empty-label")
                                   ?? _listView.Q(className: "unity-list-view__empty-label");
             if (empty != null) empty.style.display = DisplayStyle.None;
+        }
+
+        // Show a centered "No results for \"…\"" overlay when an active search matches nothing; hide it otherwise. An empty
+        // list with no search text (a fresh/cleared console, or a member/type filter) shows nothing, matching the native Console.
+        // 当搜索有内容却无匹配时，居中显示 “No results for \"…\"” 提示；其他情况隐藏。无搜索文本的空列表（刚清空的控制台，或成员/类型过滤）
+        // 不显示提示，对齐原生 Console。
+        private void UpdateNoResultsLabel()
+        {
+            if (_noResultsLabel == null) return;
+            bool show = _rows.Count == 0 && !_criteria.Search.IsEmpty;
+            _noResultsLabel.text = show ? $"No results for \"{_criteria.Search.Text}\"" : string.Empty;
+            _noResultsLabel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         // ---------- Events ----------

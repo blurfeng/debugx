@@ -17,6 +17,12 @@ namespace DebugxLog.Console.Runtime
         public static readonly Color DetailBg = new Color(0.09f, 0.09f, 0.10f, 0.98f);
         public static readonly Color BorderColor = new Color(0f, 0f, 0f, 0.6f);
         public static readonly Color TextColor = new Color(0.86f, 0.86f, 0.86f);
+        // Muted color for hint text such as the "No results" overlay. Lighter than the timestamp gray so it reads as a
+        // centered message over the dark panel. 提示文字（如 “No results” 覆盖提示）的柔和色，比时间戳灰更亮，作为深色面板上的居中提示更清晰。
+        public static readonly Color HintColor = new Color(0.6f, 0.6f, 0.62f);
+        // Font size of the centered "No results" search-empty overlay (larger than the row text for emphasis).
+        // 搜索无结果居中提示的字号（比行文字更大以突出）。
+        public const float NoResultsFontSize = 20f;
         public static readonly Color OpenButtonBg = new Color(0.15f, 0.15f, 0.16f, 0.80f);
         // Explicit dark button background — the default runtime theme paints buttons light gray, which hides our light
         // text. 显式深色按钮底——默认运行时主题按钮是浅灰底，会盖掉我们的浅色文字。

@@ -28,6 +28,9 @@ namespace DebugxLog.Console.Runtime
         private Label _detailMessage;
         private VisualElement _stackContainer;
         private TextField _searchField;
+        // Centered "No results for …" overlay shown over the list when an active search matches nothing.
+        // 搜索有内容但无匹配时，覆盖在列表上居中显示的 “No results for …” 提示。
+        private Label _noResultsLabel;
 
         private VisualElement _logButton, _warnButton, _errorButton;
         private Label _logCount, _warnCount, _errorCount;
@@ -312,7 +315,30 @@ namespace DebugxLog.Console.Runtime
             // own selection logic) regardless of which internal element is under the pointer. 空白区点击取消选中。注册在
             // ListView 自身的捕获阶段，无论指针下是哪个内部元素都必定触发（早于 ListView 自身的选择逻辑）。
             _listView.RegisterCallback<PointerDownEvent>(OnListPointerDown, TrickleDown.TrickleDown);
-            return _listView;
+            // Hide ListView's built-in "List is empty" placeholder so it never collides with our "No results" overlay.
+            // 隐藏 ListView 内置的 “List is empty” 占位，避免与我们的 “No results” 提示重叠。
+            _listView.RegisterCallback<GeometryChangedEvent>(_ => HideListEmptyLabel());
+
+            // Wrapper hosting the list + a centered "No results" overlay (see UpdateNoResultsLabel). PickingMode.Ignore lets
+            // clicks pass through to the list's own empty-area deselect handling.
+            // 容器承载列表 + 居中的 “No results” 提示（见 UpdateNoResultsLabel）。PickingMode.Ignore 让点击穿透到列表自身的空白区取消选中逻辑。
+            var wrapper = new VisualElement();
+            wrapper.style.flexGrow = 1;
+            wrapper.Add(_listView);
+
+            _noResultsLabel = new Label { enableRichText = false, pickingMode = PickingMode.Ignore };
+            _noResultsLabel.style.position = Position.Absolute;
+            _noResultsLabel.style.left = 0;
+            _noResultsLabel.style.right = 0;
+            _noResultsLabel.style.top = 0;
+            _noResultsLabel.style.bottom = 0;
+            _noResultsLabel.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _noResultsLabel.style.color = DebugxRuntimeConsoleStyle.HintColor;
+            _noResultsLabel.style.fontSize = DebugxRuntimeConsoleStyle.NoResultsFontSize;
+            _noResultsLabel.style.display = DisplayStyle.None;
+            wrapper.Add(_noResultsLabel);
+
+            return wrapper;
         }
 
         private VisualElement MakeRow()
@@ -557,6 +583,30 @@ namespace DebugxLog.Console.Runtime
             EnsureListScrollHook();
             if (_stickToBottom && _rows.Count > 0)
                 _listView.ScrollToItem(_rows.Count - 1);
+
+            UpdateNoResultsLabel();
+        }
+
+        // Hide ListView's built-in "List is empty" placeholder (class name differs across Unity versions) so it never
+        // shows under our own overlay. 隐藏 ListView 内置的 “List is empty” 占位（类名随 Unity 版本不同），避免显示在我们提示之下。
+        private void HideListEmptyLabel()
+        {
+            if (_listView == null) return;
+            VisualElement empty = _listView.Q(className: "unity-collection-view__empty-label")
+                                  ?? _listView.Q(className: "unity-list-view__empty-label");
+            if (empty != null) empty.style.display = DisplayStyle.None;
+        }
+
+        // Show a centered "No results for \"…\"" overlay when an active search matches nothing; hide it otherwise. An empty
+        // list with no search text (a fresh/cleared console, or a member/type filter) shows nothing, matching the Editor Console.
+        // 当搜索有内容却无匹配时，居中显示 “No results for \"…\"” 提示；其他情况隐藏。无搜索文本的空列表（刚清空的控制台，或成员/类型过滤）
+        // 不显示提示，与 Editor 版 Console 一致。
+        private void UpdateNoResultsLabel()
+        {
+            if (_noResultsLabel == null) return;
+            bool show = _rows.Count == 0 && !_criteria.Search.IsEmpty;
+            _noResultsLabel.text = show ? $"No results for \"{_criteria.Search.Text}\"" : string.Empty;
+            _noResultsLabel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         // Re-align the ListView selection with the entries it held before the rebuild, keyed by SequenceId. Restores the
