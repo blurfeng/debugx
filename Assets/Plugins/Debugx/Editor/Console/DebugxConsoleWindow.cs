@@ -1,10 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
+using DebugxLog.Editor;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEditor.UIElements;
 using UnityEngine;
 using UnityEngine.UIElements;
+using Object = UnityEngine.Object;
 
 namespace DebugxLog.Console.Editor
 {
@@ -306,7 +310,7 @@ namespace DebugxLog.Console.Editor
 
         // Builds a native-Console-style count button: severity icon + a count label, toggling the type filter.
         // 构建原生 Console 风格的计数按钮：严重级别图标 + 计数标签，点击切换该类型过滤。
-        private VisualElement MakeCountButton(Texture icon, out Label countLabel, System.Action onClick)
+        private VisualElement MakeCountButton(Texture icon, out Label countLabel, Action onClick)
         {
             var btn = new VisualElement();
             btn.AddToClassList("unity-toolbar-button");
@@ -431,7 +435,10 @@ namespace DebugxLog.Console.Editor
             time.style.display = _showTimestamp ? DisplayStyle.Flex : DisplayStyle.None;
 
             var msg = element.Q<Label>("msg");
-            msg.text = SingleLine(e.RichText);
+            // Blue <mark> background behind search matches (list rows only; the IMGUI detail pane can't render <mark>).
+            // No-op when the search is empty, so unfiltered rows render exactly as before.
+            // 搜索命中处加蓝色 <mark> 背景（仅列表行；IMGUI 详情面板无法渲染 <mark>）。搜索为空时不处理，故未筛选的行渲染与之前完全一致。
+            msg.text = Apply(SingleLine(e.RichText), _criteria.Search, DebugxConsoleStyle.SearchHighlightHex);
 
             var badge = element.Q<Label>("badge");
             if (row.Count > 1)
@@ -490,7 +497,7 @@ namespace DebugxLog.Console.Editor
                 return;
             }
 
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             sb.Append(e.RichText);
 
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
@@ -517,7 +524,7 @@ namespace DebugxLog.Console.Editor
             if (!frame.HasSource) return frame.RawLine;
 
             string raw = frame.RawLine;
-            int atIdx = raw.LastIndexOf("(at ", System.StringComparison.Ordinal);
+            int atIdx = raw.LastIndexOf("(at ", StringComparison.Ordinal);
             int closeIdx = raw.LastIndexOf(')');
             if (atIdx < 0 || closeIdx <= atIdx + 4) return raw; // no locatable "(at path:line)" span. 找不到可定位的 "(at 路径:行号)" 片段。
 
@@ -1221,6 +1228,83 @@ namespace DebugxLog.Console.Editor
             EditorPrefs.SetBool(PrefPrefix + "StackScriptOnly", _stackScriptOnly);
             if (_store != null)
                 EditorPrefs.SetBool(PrefPrefix + "Collapse", _store.CollapseMode != LogCollapser.Mode.Off);
+        }
+        
+                /// <summary>
+        /// Return <paramref name="richText"/> with the active search's matches wrapped in a &lt;mark=#hex&gt; highlight.
+        /// The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich string once,
+        /// skipping &lt;...&gt; tag spans, to build the visible text plus a visible-&gt;rich index map; find the matches in
+        /// the visible text; then splice &lt;mark&gt;/&lt;/mark&gt; at the mapped rich positions. &lt;mark&gt; only paints a
+        /// background, so member &lt;color&gt; foregrounds survive. No-op when the search is empty or a regex (the search
+        /// boxes only ever set plain substring text, so regex highlight is intentionally skipped) — the input is returned
+        /// unchanged, so the caller can wrap every row unconditionally.
+        /// 返回把当前搜索命中套上 &lt;mark=#hex&gt; 高亮后的 <paramref name="richText"/>。搜索匹配的是可见文本，无法直接按其偏移拼接：
+        /// 一次遍历富文本、跳过 &lt;...&gt; 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置
+        /// 拼入 &lt;mark&gt;/&lt;/mark&gt;。&lt;mark&gt; 只画背景，故成员 &lt;color&gt; 前景色得以保留。搜索为空或为正则时不处理（搜索框只设
+        /// 纯子串，正则高亮有意跳过）——原样返回，故调用方可无条件地对每一行套用。
+        /// </summary>
+        /// <param name="richText">The rich text to highlight. 待高亮的富文本。</param>
+        /// <param name="query">The active search query. 当前搜索查询。</param>
+        /// <param name="highlightHex">RRGGBBAA hex for the &lt;mark&gt; background (no leading '#'). &lt;mark&gt; 背景的 RRGGBBAA 十六进制（不含 '#'）。</param>
+        public static string Apply(string richText, SearchQuery query, string highlightHex)
+        {
+            if (string.IsNullOrEmpty(richText)) return richText;
+            if (query.IsEmpty || query.UseRegex) return richText;
+
+            string needle = query.Text;
+            int n = richText.Length;
+
+            // Build the visible text + a map from each visible char (and an end sentinel) to its index in richText.
+            // 构建可见文本 + 每个可见字符（含末尾哨兵）到其在 richText 中下标的映射。
+            var visible = new StringBuilder(n);
+            var richPos = new List<int>(n + 1);
+            int i = 0;
+            while (i < n)
+            {
+                char c = richText[i];
+                if (c == '<')
+                {
+                    int close = richText.IndexOf('>', i + 1);
+                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
+                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
+                    continue;
+                }
+                richPos.Add(i);
+                visible.Append(c);
+                i++;
+            }
+            richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。
+
+            string hay = visible.ToString();
+            if (hay.Length == 0 || needle.Length > hay.Length) return richText;
+
+            StringComparison cmp = query.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            string open = "<mark=#" + highlightHex + ">";
+
+            var outSb = new StringBuilder(n + 16);
+            int cursor = 0; // how far into richText we've copied. 已复制到 richText 的位置。
+            int from = 0;   // search start in the visible text. 可见文本里的搜索起点。
+            bool any = false;
+            while (true)
+            {
+                int idx = hay.IndexOf(needle, from, cmp);
+                if (idx < 0) break;
+                int ro = richPos[idx];
+                int rc = richPos[idx + needle.Length];
+                if (ro >= cursor)
+                {
+                    outSb.Append(richText, cursor, ro - cursor);
+                    outSb.Append(open);
+                    outSb.Append(richText, ro, rc - ro);
+                    outSb.Append("</mark>");
+                    cursor = rc;
+                    any = true;
+                }
+                from = idx + needle.Length;
+            }
+            if (!any) return richText;
+            outSb.Append(richText, cursor, n - cursor);
+            return outSb.ToString();
         }
     }
 }

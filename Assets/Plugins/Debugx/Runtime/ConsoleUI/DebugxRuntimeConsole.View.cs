@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -820,7 +821,7 @@ namespace DebugxLog.Console.Runtime
         {
             if (entries == null || entries.Count == 0) return;
 
-            var sb = new System.Text.StringBuilder();
+            var sb = new StringBuilder();
             for (int i = 0; i < entries.Count; i++)
             {
                 if (i > 0) sb.Append('\n');
@@ -898,77 +899,11 @@ namespace DebugxLog.Console.Runtime
             return text.Replace('\r', ' ').Replace('\n', ' ');
         }
 
-        // Wrap the active search's matches inside a rich-text string with a <mark> highlight, without disturbing the
-        // existing tags. The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich
-        // string once, skipping <...> tag spans, to build the visible text plus a visible->rich index map; find the
-        // matches in the visible text; then splice <mark>/</mark> at the mapped rich positions. <mark> only paints a
-        // background, so member <color> foregrounds survive. No-op when the search is empty or a regex (the runtime search
-        // box only ever sets plain substring text, so regex highlight is intentionally skipped).
-        // 给富文本里的当前搜索命中套上 <mark> 高亮，且不破坏已有标签。搜索匹配的是可见文本，无法直接按其偏移拼接：一次遍历
-        // 富文本、跳过 <...> 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置拼入
-        // <mark>/</mark>。<mark> 只画背景，故成员 <color> 前景色得以保留。搜索为空或为正则时不处理（运行时搜索框只设纯子串，
-        // 正则高亮有意跳过）。
-        private string ApplySearchHighlight(string richText)
-        {
-            if (string.IsNullOrEmpty(richText)) return richText;
-            SearchQuery q = _criteria.Search;
-            if (q.IsEmpty || q.UseRegex) return richText;
-
-            string needle = q.Text;
-            int n = richText.Length;
-
-            // Build the visible text + a map from each visible char (and an end sentinel) to its index in richText.
-            // 构建可见文本 + 每个可见字符（含末尾哨兵）到其在 richText 中下标的映射。
-            var visible = new System.Text.StringBuilder(n);
-            var richPos = new List<int>(n + 1);
-            int i = 0;
-            while (i < n)
-            {
-                char c = richText[i];
-                if (c == '<')
-                {
-                    int close = richText.IndexOf('>', i + 1);
-                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
-                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
-                    continue;
-                }
-                richPos.Add(i);
-                visible.Append(c);
-                i++;
-            }
-            richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。
-
-            string hay = visible.ToString();
-            if (hay.Length == 0 || needle.Length > hay.Length) return richText;
-
-            StringComparison cmp = q.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            string open = "<mark=#" + DebugxRuntimeConsoleStyle.SearchHighlightHex + ">";
-
-            var outSb = new System.Text.StringBuilder(n + 16);
-            int cursor = 0; // how far into richText we've copied. 已复制到 richText 的位置。
-            int from = 0;   // search start in the visible text. 可见文本里的搜索起点。
-            bool any = false;
-            while (true)
-            {
-                int idx = hay.IndexOf(needle, from, cmp);
-                if (idx < 0) break;
-                int ro = richPos[idx];
-                int rc = richPos[idx + needle.Length];
-                if (ro >= cursor)
-                {
-                    outSb.Append(richText, cursor, ro - cursor);
-                    outSb.Append(open);
-                    outSb.Append(richText, ro, rc - ro);
-                    outSb.Append("</mark>");
-                    cursor = rc;
-                    any = true;
-                }
-                from = idx + needle.Length;
-            }
-            if (!any) return richText;
-            outSb.Append(richText, cursor, n - cursor);
-            return outSb.ToString();
-        }
+        // Wrap the active search's matches with a <mark> highlight, delegating to the shared, UI-agnostic
+        // SearchHighlighter so the Editor Console and this runtime Console paint matches identically.
+        // 给当前搜索命中套上 <mark> 高亮，委托给共享、与 UI 无关的 SearchHighlighter，使 Editor 版与本运行时版 Console 的命中着色一致。
+        private string ApplySearchHighlight(string richText) =>
+            Apply(richText, _criteria.Search, DebugxRuntimeConsoleStyle.SearchHighlightHex);
 
         private static string CountText(int n) =>
             n > DebugxRuntimeConsoleStyle.CountOverflowThreshold
@@ -1093,7 +1028,7 @@ namespace DebugxLog.Console.Runtime
         // (so it matches the other buttons' natural height while being perfectly square).
         // 一个红色 “×” 关闭图标（面板与弹层共用）。复用 StyleToolbarButton 以匹配外边距/底色/字体，再强制成正方形：去掉左右内边距，
         // 并在布局完成后把宽度设为解析出的高度（既匹配其他按钮的自然高度，又是正方形）。
-        private static Button BuildCloseButton(System.Action onClick)
+        private static Button BuildCloseButton(Action onClick)
         {
             var b = new Button(onClick) { text = "X" }; // plain ASCII 'X' as the close glyph — kept simple so runtime default fonts always render it. 用普通 ASCII 'X' 作关闭符，确保运行时默认字体一定能渲染。
             StyleToolbarButton(b);
@@ -1113,6 +1048,83 @@ namespace DebugxLog.Console.Runtime
                 }
             });
             return b;
+        }
+        
+        /// <summary>
+        /// Return <paramref name="richText"/> with the active search's matches wrapped in a &lt;mark=#hex&gt; highlight.
+        /// The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich string once,
+        /// skipping &lt;...&gt; tag spans, to build the visible text plus a visible-&gt;rich index map; find the matches in
+        /// the visible text; then splice &lt;mark&gt;/&lt;/mark&gt; at the mapped rich positions. &lt;mark&gt; only paints a
+        /// background, so member &lt;color&gt; foregrounds survive. No-op when the search is empty or a regex (the search
+        /// boxes only ever set plain substring text, so regex highlight is intentionally skipped) — the input is returned
+        /// unchanged, so the caller can wrap every row unconditionally.
+        /// 返回把当前搜索命中套上 &lt;mark=#hex&gt; 高亮后的 <paramref name="richText"/>。搜索匹配的是可见文本，无法直接按其偏移拼接：
+        /// 一次遍历富文本、跳过 &lt;...&gt; 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置
+        /// 拼入 &lt;mark&gt;/&lt;/mark&gt;。&lt;mark&gt; 只画背景，故成员 &lt;color&gt; 前景色得以保留。搜索为空或为正则时不处理（搜索框只设
+        /// 纯子串，正则高亮有意跳过）——原样返回，故调用方可无条件地对每一行套用。
+        /// </summary>
+        /// <param name="richText">The rich text to highlight. 待高亮的富文本。</param>
+        /// <param name="query">The active search query. 当前搜索查询。</param>
+        /// <param name="highlightHex">RRGGBBAA hex for the &lt;mark&gt; background (no leading '#'). &lt;mark&gt; 背景的 RRGGBBAA 十六进制（不含 '#'）。</param>
+        public static string Apply(string richText, SearchQuery query, string highlightHex)
+        {
+            if (string.IsNullOrEmpty(richText)) return richText;
+            if (query.IsEmpty || query.UseRegex) return richText;
+
+            string needle = query.Text;
+            int n = richText.Length;
+
+            // Build the visible text + a map from each visible char (and an end sentinel) to its index in richText.
+            // 构建可见文本 + 每个可见字符（含末尾哨兵）到其在 richText 中下标的映射。
+            var visible = new StringBuilder(n);
+            var richPos = new List<int>(n + 1);
+            int i = 0;
+            while (i < n)
+            {
+                char c = richText[i];
+                if (c == '<')
+                {
+                    int close = richText.IndexOf('>', i + 1);
+                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
+                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
+                    continue;
+                }
+                richPos.Add(i);
+                visible.Append(c);
+                i++;
+            }
+            richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。
+
+            string hay = visible.ToString();
+            if (hay.Length == 0 || needle.Length > hay.Length) return richText;
+
+            StringComparison cmp = query.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            string open = "<mark=#" + highlightHex + ">";
+
+            var outSb = new StringBuilder(n + 16);
+            int cursor = 0; // how far into richText we've copied. 已复制到 richText 的位置。
+            int from = 0;   // search start in the visible text. 可见文本里的搜索起点。
+            bool any = false;
+            while (true)
+            {
+                int idx = hay.IndexOf(needle, from, cmp);
+                if (idx < 0) break;
+                int ro = richPos[idx];
+                int rc = richPos[idx + needle.Length];
+                if (ro >= cursor)
+                {
+                    outSb.Append(richText, cursor, ro - cursor);
+                    outSb.Append(open);
+                    outSb.Append(richText, ro, rc - ro);
+                    outSb.Append("</mark>");
+                    cursor = rc;
+                    any = true;
+                }
+                from = idx + needle.Length;
+            }
+            if (!any) return richText;
+            outSb.Append(richText, cursor, n - cursor);
+            return outSb.ToString();
         }
     }
 }

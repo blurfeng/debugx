@@ -37,11 +37,12 @@ namespace DebugxLog.Console.Runtime
         public static readonly Color NetServerColor = new Color(0.45f, 0.75f, 1f);
         public static readonly Color NetClientColor = new Color(0.55f, 0.85f, 0.55f);
 
-        // Search-match highlight: a translucent amber background painted behind matched substrings via a rich-text
+        // Search-match highlight: a translucent blue background painted behind matched substrings via a rich-text
         // <mark> tag. Stored as an RRGGBBAA hex string because <mark=#...> takes a hex color, not a UnityEngine.Color.
-        // 搜索命中高亮：半透明琥珀色底，通过富文本 <mark> 标签绘制在命中子串后。以 RRGGBBAA 十六进制字符串存储，
-        // 因为 <mark=#...> 接收的是十六进制颜色而非 UnityEngine.Color。
-        public const string SearchHighlightHex = "FFD54F66";
+        // Kept in sync with DebugxConsoleStyle.SearchHighlightHex so both Consoles highlight matches the same blue.
+        // 搜索命中高亮：半透明蓝色底，通过富文本 <mark> 标签绘制在命中子串后。以 RRGGBBAA 十六进制字符串存储，
+        // 因为 <mark=#...> 接收的是十六进制颜色而非 UnityEngine.Color。与 DebugxConsoleStyle.SearchHighlightHex 保持一致，使两个 Console 的命中高亮为同一种蓝。
+        public const string SearchHighlightHex = "73BFFF80";
 
         // Mouse-wheel scroll step for the detail/stack ScrollView. UI Toolkit's default wheel step scrolls the detail
         // pane too far per notch; a smaller value gives gentler, near line-by-line scrolling. Tune to taste in-editor.
