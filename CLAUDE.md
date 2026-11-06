@@ -74,6 +74,7 @@ cp ~DebugxDll/Debugx/bin/Release/DebugxLog.dll ~DebugxDll/Debugx/bin/Release/Deb
 - 注释与 XML doc 全程双语（先英文后中文）——向核心文件添加内容时保持这一风格。
 - **版本号升级**：
   - **包版本**（`package.json` 的 `version` 与 `CHANGELOG.md`）每次发布都更新。
+  - **未发布的改动记入 `## [Unreleased]`**：有更新但尚未发布（不升版本号）时，也必须在 `CHANGELOG.md` 顶部的 `## [Unreleased]` 段落下记录；发布时再把该段改为 `## [x.y.z] - 日期`。
   - **DLL 版本号独立管理，仅当 DLL 实际更新（即改动 `~DebugxDll/` 核心代码并重建 DLL）时才更新**——涉及 `~DebugxDll/Debugx/Debugx.cs` 的头部注释块与 `Version:`、以及 `AssemblyInfo.cs`。只改 Unity 侧代码（不动 DLL）的发布，只需升 `package.json` + `CHANGELOG.md`，DLL 版本保持不变。
   - 版本号格式为 `major.newFeature.featureOrUpdate.bugfix`（major = 破坏性变更）。
   - 提交信息使用中文方括号标签：`【Bugfix】`、`【dll】`、`【Version】`、`【Docs】`。

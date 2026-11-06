@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Changed
+- Package description (`package.json`) rewritten as a bilingual (English / Chinese) feature list: member-based logging, auto-generated per-member log methods, project / user / runtime toggles, the Debugx Console, the in-game runtime Console UI, file logging and the zero-cost `DEBUG_X` gate.
+
 ## [2.4.3] - 2026-07-12
 ### Added
 - **Debugx Console** search now highlights the matched substring inside each list row (in both the Editor window and the in-game runtime overlay), so a row shows *why* it matched rather than just that it did.
