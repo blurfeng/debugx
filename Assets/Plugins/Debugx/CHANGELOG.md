@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.4.4] - 2026-11-07
 ### Changed
 - Package description (`package.json`) rewritten as a bilingual (English / Chinese) feature list: member-based logging, auto-generated per-member log methods, project / user / runtime toggles, the Debugx Console, the in-game runtime Console UI, file logging and the zero-cost `DEBUG_X` gate.
 

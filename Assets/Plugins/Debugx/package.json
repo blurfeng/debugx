@@ -1,7 +1,7 @@
 {
   "name": "com.blurfeng.debugx",
   "displayName": "Debugx",
-  "version": "2.4.3",
+  "version": "2.4.4",
   "unity": "2022.3",
   "description": "Member-based debug logging for Unity teams.\n- Categorize logs by member (developer / module), each with its own key, signature, color and toggle.\n- Auto-generated per-member log methods (e.g. DebugxLogger.LogBlur), no keys to remember.\n- Project / per-user / runtime toggles.\n- Dedicated Debugx Console: filter by member, type and search, collapse, timestamps, jump to call site; can replace the built-in Console.\n- In-game runtime Console UI that works in builds, touch friendly.\n- Double-click jumps to your code, not the plugin.\n- Log to local files with configurable stack traces.\n- Gated by DEBUG_X: remove it and all log calls are compiled out, zero cost.\n\n按成员管理日志的 Unity 调试插件。\n- 按成员（开发者 / 模块）分类打印，各自独立的 Key、签名、颜色与开关。\n- 自动生成成员专用 Log 方法（如 DebugxLogger.LogBlur），无需记忆 Key。\n- 项目级 / 用户本地级 / 运行时三级开关。\n- 专用 Debugx Console：按成员、类型、关键词筛选，折叠、时间戳、跳转调用处，可替代原生 Console。\n- 打包后可用的游戏内运行时 Console UI，触屏友好。\n- 双击日志直达业务代码，而非插件内部。\n- 日志输出到本地文件，可配置堆栈跟踪。\n- 由 DEBUG_X 宏门控：移除即在编译期剔除全部日志调用，零开销。",
   "keywords": ["Debugx", "debug", "log", "console", "tools"],
