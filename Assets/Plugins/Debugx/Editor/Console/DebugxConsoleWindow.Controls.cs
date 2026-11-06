@@ -186,8 +186,17 @@ namespace DebugxLog.Console.Editor
                 SavePrefs();
                 RefreshSelectedDetail();
             });
-            stackScriptOnly.style.marginBottom = 6;
             _editorPanel.Add(stackScriptOnly);
+
+            // Replace native Console: redirect any focus of Unity's Console (e.g. clicking the status-bar log) here.
+            // 替代原生 Console：把原生 Console 的任何聚焦（如点击状态栏日志）转到本窗口。
+            var redirectNative = new Toggle(L("替代原生 Console", "Replace Native Console")) { value = NativeConsoleRedirect.Enabled };
+            redirectNative.tooltip = L(
+                "开启后，原生 Console 一旦被打开（点击底部状态栏日志、Ctrl+Shift+C、菜单等）就会被关闭，并改为打开 Debugx Console；清空本窗口时也会同步清空原生日志与底部状态栏。需要用原生 Console 时请先关掉此项。仅影响本机编辑器。",
+                "When on, Unity's native Console is closed as soon as it opens (clicking the status-bar log, Ctrl+Shift+C, the menu, ...) and the Debugx Console opens instead; clearing this window also clears the native logs and the bottom status bar. Turn this off to use the native Console. Local editor only.");
+            redirectNative.RegisterValueChangedCallback(evt => NativeConsoleRedirect.Enabled = evt.newValue);
+            redirectNative.style.marginBottom = 6;
+            _editorPanel.Add(redirectNative);
 
             // Description moved to the toggle's tooltip (hover) instead of an inline hint label below it.
             // 说明移到开关的 tooltip（悬停显示），不再用其下方的行内提示标签。

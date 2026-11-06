@@ -1166,6 +1166,7 @@ namespace DebugxLog.Console.Editor
         {
             if (_store == null) return;
             _store.Clear();
+            NativeConsoleRedirect.ClearNativeIfEnabled(); // also resets the editor status-bar message. 同时重置编辑器状态栏文字。
             ResetCompileMirrorTracking(); // so a later scan can re-mirror compile messages still in the console. 便于之后重扫再镜像仍在控制台里的编译消息。
             _selectedIndex = -1;
             _listView?.ClearSelection();
@@ -1201,7 +1202,11 @@ namespace DebugxLog.Console.Editor
 
         private void OnPlayModeChanged(PlayModeStateChange state)
         {
-            if (state == PlayModeStateChange.EnteredPlayMode && _clearOnPlay)
+            // Clear when LEAVING edit mode (like the native Console), not on EnteredPlayMode: that fires after Awake/OnEnable,
+            // so clearing there wiped the play session's startup logs (and, via LogEntries.Clear, the status bar's).
+            // 在“离开编辑模式”时清空（与原生 Console 一致），而非 EnteredPlayMode：后者在 Awake/OnEnable 之后才触发，
+            // 在那里清空会抹掉本次 Play 的启动日志（且经 LogEntries.Clear 连带抹掉状态栏的）。
+            if (state == PlayModeStateChange.ExitingEditMode && _clearOnPlay)
                 ClearConsole();
 
             // Runtime source switches are only usable in Play mode; refresh their enabled state.
