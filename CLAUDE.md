@@ -12,7 +12,7 @@
 
 - 修改代码前，先简要说明思路，不要一上来就写代码
 - 存在多种实现方案时，列出选项让我选择，而不是自己替我拍板
-- 绝不自动执行任何 git 操作（commit、push、branch、reset 等）；这些由用户处理。即便没有明确指示，也不要主动代用户提议或执行
+- 绝不自动执行任何 git 操作（commit、push、branch、reset 等）；这些由用户处理。即便没有明确指示，也不要主动代用户提议或执行。**唯一例外**：用户明确说“发布”时，按下文“发布流程”执行其中列出的 git 操作
 - 绝不手写 Unity 的 `.meta` 文件；交给 Unity 自动生成。只创建/编辑源资源（如 `.cs`），再让编辑器导入
 
 ---
@@ -78,6 +78,39 @@ cp ~DebugxDll/Debugx/bin/Release/DebugxLog.dll ~DebugxDll/Debugx/bin/Release/Deb
   - **DLL 版本号独立管理，仅当 DLL 实际更新（即改动 `~DebugxDll/` 核心代码并重建 DLL）时才更新**——涉及 `~DebugxDll/Debugx/Debugx.cs` 的头部注释块与 `Version:`、以及 `AssemblyInfo.cs`。只改 Unity 侧代码（不动 DLL）的发布，只需升 `package.json` + `CHANGELOG.md`，DLL 版本保持不变。
   - 版本号格式为 `major.newFeature.featureOrUpdate.bugfix`（major = 破坏性变更）。
   - 提交信息使用中文方括号标签：`【Bugfix】`、`【dll】`、`【Version】`、`【Docs】`。
+
+## 发布流程
+
+日常开发在 `dev` 上积累，改动记入 CHANGELOG 的 `## [Unreleased]`。**只有用户明确说“发布”时才执行本流程**，不要主动提议。发布 = 定版本 → `main` 快进到 `dev` → 打 Tag → 导出 `.unitypackage` → 创建 GitHub Release。仓库 `blurfeng/debugx`，Tag 为轻量标签、名字是纯版本号（如 `2.4.4`，无 `v`）。
+
+1. **前置检查**：`git status` 干净且位于 `dev`；`## [Unreleased]` 有内容。版本号若用户没给，按上文版本号格式推断，**先向用户确认版本号后再继续**。
+2. **定版（dev）**：把 `## [Unreleased]` 改为 `## [x.y.z] - YYYY-MM-DD`；`package.json` 的 `version` 改为 `x.y.z`（DLL 版本按上文规则，未重建 DLL 就不动）。提交 `【Version】 x.y.z`。
+3. **合入 main（不切分支）**：
+   ```sh
+   git push origin dev
+   git push origin dev:main      # 非快进会被拒绝：此时停下问用户，不要强推
+   git fetch origin main:main    # 同步本地 main
+   ```
+4. **打 Tag**：`git tag x.y.z && git push origin x.y.z`（若 Tag 已存在且指向别处，停下问用户，不要重打）。
+5. **导出 `.unitypackage`**：导出 `Assets/Plugins/Debugx`（递归），文件名为 `Debugx_x.y.z.unitypackage`，放在 scratchpad 等仓库外的位置，**不进仓库**。
+   - **编辑器开着时**：用 UnityMCP 的 `execute_code` 执行 `AssetDatabase.Refresh(); AssetDatabase.ExportPackage("Assets/Plugins/Debugx", <输出路径>, ExportPackageOptions.Recurse);`，并返回文件大小。若返回 `no_unity_session`，读资源 `mcpforunity://instances`，`instance_count` 为 0 就请用户在 MCP for Unity 窗口里连接会话。
+   - **编辑器关着时**：用 Unity 命令行（编辑器开着会锁住工程，不能这样用；也不要替用户关编辑器）。编辑器版本取自 `ProjectSettings/ProjectVersion.txt`，本机 Hub 的安装目录是 `F:\Program Files\Unity\Hub\Editor\<版本>\`：
+     ```sh
+     "F:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Unity.exe" -batchmode -nographics -quit \
+       -projectPath "F:/ProjectUnity/Debugx" -exportPackage Assets/Plugins/Debugx <输出路径>/Debugx_x.y.z.unitypackage \
+       -logFile <输出路径>/export.log
+     ```
+     退出码非 0 或文件不存在时，查看 `export.log`。
+6. **发布说明**：发布说明不是只写本版本，而是**自上一个 GitHub Release 以来的所有 CHANGELOG 段**（中间可能有没单独发布的版本）。用 `gh release list -R blurfeng/debugx -L 1` 查上一个 Release，把 `CHANGELOG.md` 中从 `[x.y.z]` 到该版本之前（不含）的各段**原文照贴**（保留 `## [版本] - 日期` 标题，按版本分节），写入仓库外的临时文件。
+7. **创建 Release**：
+   ```sh
+   gh release create x.y.z -R blurfeng/debugx --verify-tag --title "Debugx vx.y.z" \
+     --notes-file <说明文件> <输出路径>/Debugx_x.y.z.unitypackage
+   ```
+   默认即为 Latest。
+8. **确认**：`gh release view x.y.z -R blurfeng/debugx` 确认附件已上传（state `uploaded`），把链接告诉用户。
+
+`gh` 使用本机 `gh auth login` 存在系统凭据库里的 OAuth token，与浏览器登录状态无关；推送用 SSH 远程 `git@github.com-blur:blurfeng/debugx.git`。
 
 ## 测试 / 运行
 
