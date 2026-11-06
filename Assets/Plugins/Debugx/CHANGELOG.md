@@ -1,21 +1,17 @@
 # Changelog
 
-## [Unreleased]
-### Added
-- **Editor Console** gets an opt-in **Replace Native Console** toggle (Editor panel > View, per-user, off by default). When on, Unity's native Console is closed whenever it opens — clicking the log in the editor's bottom status bar, `Ctrl+Shift+C`, the Window menu, or a restored layout — and the Debugx Console opens instead. Works even while the Debugx Console is closed. While on, every Debugx Console clear (manual, Clear on Play / Recompile / Build) also clears Unity's native log store, so the bottom status-bar message is reset too (compile errors stay, as with the native Clear). The status-bar message itself already shows Debugx logs, since they go through `Debug.Log`.
-### Fixed
-- **Editor Console** "Clear on Play" now clears when leaving Edit mode (as the native Console does) instead of on `EnteredPlayMode`, which fires after `Awake`/`OnEnable` and could wipe the play session's startup logs.
-
 ## [2.4.3] - 2026-07-12
 ### Added
 - **Debugx Console** search now highlights the matched substring inside each list row (in both the Editor window and the in-game runtime overlay), so a row shows *why* it matched rather than just that it did.
 - **Debugx Console** shows a centered `No results for "…"` message over the list when the search text matches nothing (in both the Editor window and the runtime overlay), instead of leaving a blank list. It appears only while the search box is non-empty; a member/type filter that empties the list still shows nothing, matching the native Console.
+- **Editor Console** gets an opt-in **Replace Native Console** toggle (Editor panel > View, per-user, off by default). When on, Unity's native Console is closed whenever it opens — clicking the log in the editor's bottom status bar, `Ctrl+Shift+C`, the Window menu, or a restored layout — and the Debugx Console opens instead. Works even while the Debugx Console is closed. While on, every Debugx Console clear (manual, Clear on Play / Recompile / Build) also clears Unity's native log store, so the bottom status-bar message is reset too (compile errors stay, as with the native Clear). The status-bar message itself already shows Debugx logs, since they go through `Debug.Log`.
 ### Changed
 - **Editor Console** display cap removed. The log ring buffer now grows on demand (doubling from 64) up to an effectively unlimited retention cap (`int.MaxValue`) instead of evicting the oldest entries at a fixed limit. Storage is still allocated lazily, so an idle console costs nothing until logs actually accumulate. The in-game runtime Console stays bounded (4000).
 - Rebuilt `DebugxLog.dll` (2.4.0.1): the log message's `ToString()` is now evaluated before the compose lock is taken (so a same-thread re-entrant log can no longer corrupt the shared `StringBuilder`), the color-tag trim uses a precompiled regex, and file recording publishes its directory path and writer under a single lock. `DebugxBurst` is now a static class.
 ### Fixed
 - **Editor Console** detail pane text color no longer breaks when the editor skin is switched. Lines without a `<color>` tag (stack frames, uncategorized / compile logs) reused a one-time-cached default text color; switching Dark/Light does not reload the script domain, so the stale color persisted (e.g. black text on the dark skin). The detail style is now rebuilt when the skin flips, and its default text color is set explicitly from the current skin. Member `<color>` messages were never affected.
 - A batch of robustness fixes: editor-skin color values are now queried live instead of cached (so they can't go stale across a skin switch), regex matching uses `CultureInvariant`, the log directory path is derived via `Directory.GetParent`, the generated `DebugxLogger` method-name de-duplication was hardened, and the `DEBUG_X` define check now matches exactly.
+- **Editor Console** "Clear on Play" now clears when leaving Edit mode (as the native Console does) instead of on `EnteredPlayMode`, which fires after `Awake`/`OnEnable` and could wipe the play session's startup logs.
 
 ## [2.4.2] - 2026-07-11
 ### Fixed
