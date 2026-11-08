@@ -18,7 +18,7 @@ public class DebugxTest : MonoBehaviour
         Debugx.LogError(1, "Test LogError Blur On Start via Debugx.");
         
         Debug.Log("Test Normal Log On Start.");
-        Debug.Log("Test Normal Log On Start.");
-        Debug.Log("Test Normal Log On Start.");
+        
+        Debug.Log("chinese test. 床前明月光，疑是地上霜。举头望明月，低头思故乡。");
     }
 }
