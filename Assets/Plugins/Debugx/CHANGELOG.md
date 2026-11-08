@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [2.4.5] - 2026-11-08
 ### Fixed
 - **Editor Console** list rows looked blurry compared to the native Console, especially Chinese text. On Unity 2022.3, UI Toolkit can only render editor text through SDF font atlases (no hinting), which smears at the 11px row size; the native Console uses IMGUI's OS-rasterized hinted glyphs. Each row's timestamp and message are now drawn with IMGUI, so they are exactly as sharp as the native Console. Search-match highlighting is kept, now drawn as a blue box behind the match (IMGUI can't render `<mark>`).
 
