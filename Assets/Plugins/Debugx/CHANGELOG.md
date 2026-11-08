@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Fixed
+- **Editor Console** list rows looked blurry compared to the native Console, especially Chinese text. On Unity 2022.3, UI Toolkit can only render editor text through SDF font atlases (no hinting), which smears at the 11px row size; the native Console uses IMGUI's OS-rasterized hinted glyphs. Each row's timestamp and message are now drawn with IMGUI, so they are exactly as sharp as the native Console. Search-match highlighting is kept, now drawn as a blue box behind the match (IMGUI can't render `<mark>`).
+
 ## [2.4.4] - 2026-11-07
 ### Changed
 - Package description (`package.json`) rewritten as a bilingual (English / Chinese) feature list: member-based logging, auto-generated per-member log methods, project / user / runtime toggles, the Debugx Console, the in-game runtime Console UI, file logging and the zero-cost `DEBUG_X` gate.

@@ -94,13 +94,12 @@ namespace DebugxLog.Console.Editor
 
         // ---- Colors ----
         /// <summary>
-        /// Search-match highlight: a translucent blue background painted behind matched substrings in the list rows via a
-        /// rich-text &lt;mark&gt; tag (see <see cref="SearchHighlighter"/>). An RRGGBBAA hex string because &lt;mark=#...&gt;
-        /// takes a hex color, not a UnityEngine.Color. Kept in sync with DebugxRuntimeConsoleStyle.SearchHighlightHex so
-        /// both Consoles highlight matches the same blue.
-        /// 搜索命中高亮：半透明蓝色底，通过富文本 &lt;mark&gt; 标签绘制在列表行的命中子串后（见 <see cref="SearchHighlighter"/>）。
-        /// 用 RRGGBBAA 十六进制字符串，因为 &lt;mark=#...&gt; 接收的是十六进制颜色而非 UnityEngine.Color。与
-        /// DebugxRuntimeConsoleStyle.SearchHighlightHex 保持一致，使两个 Console 的命中高亮为同一种蓝。
+        /// Search-match highlight: a translucent blue box drawn behind matched substrings in the list rows (IMGUI, see
+        /// DebugxConsoleWindow.DrawRowText). An RRGGBBAA hex string so it matches DebugxRuntimeConsoleStyle.SearchHighlightHex
+        /// (which feeds a &lt;mark=#...&gt; tag) — keep them in sync so both Consoles highlight matches the same blue.
+        /// 搜索命中高亮：在列表行命中子串后绘制的半透明蓝色底块（IMGUI，见 DebugxConsoleWindow.DrawRowText）。用 RRGGBBAA 十六进制
+        /// 字符串，以便与 DebugxRuntimeConsoleStyle.SearchHighlightHex（用于 &lt;mark=#...&gt; 标签）一致——两者需保持同步，
+        /// 使两个 Console 的命中高亮为同一种蓝。
         /// </summary>
         public const string SearchHighlightHex = "73BFFF80";
 

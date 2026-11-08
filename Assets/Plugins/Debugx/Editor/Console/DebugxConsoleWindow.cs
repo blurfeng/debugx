@@ -406,18 +406,17 @@ namespace DebugxLog.Console.Editor
             icon.style.marginRight = DebugxConsoleStyle.RowIconMarginRight;
             icon.style.flexShrink = 0;
 
-            var time = new Label { name = "time" }; // optional timestamp column, toggled by BindRow. 可选时间戳列，由 BindRow 显隐。
-            time.style.width = DebugxConsoleStyle.TimestampWidth;
-            time.style.flexShrink = 0;
-            time.style.color = DebugxConsoleStyle.TimestampColor;
-            time.style.unityTextAlign = TextAnchor.MiddleLeft;
-            time.style.display = DisplayStyle.None;
-
-            var msg = new Label { name = "msg", enableRichText = true };
-            msg.style.flexGrow = 1;
-            msg.style.overflow = Overflow.Hidden;
-            msg.style.whiteSpace = WhiteSpace.NoWrap;
-            msg.style.unityTextAlign = TextAnchor.MiddleLeft;
+            // Timestamp + message are drawn by IMGUI, not UIToolkit Labels: on 2022.3 UIToolkit can only render editor text
+            // through SDF font atlases (no hinting), which looks blurry at 11px — especially CJK. IMGUI uses the OS-rasterized
+            // hinted glyphs, i.e. exactly what the native Console shows. Picking is ignored so clicks / right-click reach the row.
+            // 时间戳 + 消息由 IMGUI 绘制而非 UIToolkit Label：2022.3 的 UIToolkit 只能用 SDF 字体图集（无 hinting）渲染编辑器文字，
+            // 11px 下发虚，中文尤甚；IMGUI 用系统光栅化的 hinted 字形，与原生 Console 一致。忽略拾取，使点击/右键仍落到行上。
+            var rowText = new RowText();
+            var text = new IMGUIContainer { name = "text", userData = rowText, pickingMode = PickingMode.Ignore };
+            text.onGUIHandler = () => DrawRowText(text, rowText);
+            text.style.flexGrow = 1;
+            text.style.alignSelf = Align.Stretch;
+            text.style.overflow = Overflow.Hidden;
 
             var badge = new Label { name = "badge" };
             badge.style.flexShrink = 0;
@@ -438,8 +437,7 @@ namespace DebugxLog.Console.Editor
             badge.style.borderBottomRightRadius = DebugxConsoleStyle.BadgeCornerRadius;
 
             row.Add(icon);
-            row.Add(time);
-            row.Add(msg);
+            row.Add(text);
             row.Add(badge);
             row.AddManipulator(new ContextualMenuManipulator(evt => BuildRowContextMenu(evt, row))); // right-click copy. 右键复制。
             return row;
@@ -455,15 +453,14 @@ namespace DebugxLog.Console.Editor
 
             element.Q<Image>("icon").image = IconFor(e.LogType);
 
-            var time = element.Q<Label>("time");
-            time.text = _showTimestamp ? TimestampText(e) : string.Empty;
-            time.style.display = _showTimestamp ? DisplayStyle.Flex : DisplayStyle.None;
-
-            var msg = element.Q<Label>("msg");
-            // Blue <mark> background behind search matches (list rows only; the IMGUI detail pane can't render <mark>).
-            // No-op when the search is empty, so unfiltered rows render exactly as before.
-            // 搜索命中处加蓝色 <mark> 背景（仅列表行；IMGUI 详情面板无法渲染 <mark>）。搜索为空时不处理，故未筛选的行渲染与之前完全一致。
-            msg.text = Apply(SingleLine(e.RichText), _criteria.Search, DebugxConsoleStyle.SearchHighlightHex);
+            var text = element.Q<IMGUIContainer>("text");
+            var rt = (RowText)text.userData;
+            rt.Time = _showTimestamp ? TimestampText(e) : null;
+            rt.Rich = SingleLine(e.RichText);
+            // Search matches get a blue background drawn behind them (list rows only). Empty search -> no hits.
+            // 搜索命中处在其后绘制蓝色底（仅列表行）。搜索为空 -> 无命中。
+            rt.Visible = FindHighlights(rt.Rich, _criteria.Search, rt.Hits);
+            text.MarkDirtyRepaint(); // IMGUIContainer only redraws when marked dirty. IMGUIContainer 仅在标脏后重绘。
 
             var badge = element.Q<Label>("badge");
             if (row.Count > 1)
@@ -476,6 +473,70 @@ namespace DebugxLog.Console.Editor
                 badge.style.display = DisplayStyle.None;
             }
         }
+
+        /// <summary>Per-row text bound by BindRow and drawn by DrawRowText. 由 BindRow 绑定、DrawRowText 绘制的单行文本数据。</summary>
+        private sealed class RowText
+        {
+            /// <summary>Timestamp text; null = column hidden. 时间戳文本；null = 隐藏该列。</summary>
+            public string Time;
+            /// <summary>Single-line rich message. 单行富文本消息。</summary>
+            public string Rich;
+            /// <summary>Tag-stripped message, set only when there are search hits. 去标签后的消息，仅在有搜索命中时设置。</summary>
+            public string Visible;
+            /// <summary>Search hits as (start, end) in <see cref="Visible"/>. 搜索命中区间（start, end），基于 <see cref="Visible"/>。</summary>
+            public readonly List<Vector2Int> Hits = new List<Vector2Int>();
+        }
+
+        private static GUIStyle s_rowStyle, s_rowMeasureStyle, s_rowTimeStyle;
+        private static bool s_rowStyleProSkin;
+        private static Color s_rowHighlightColor;
+
+        // Draw one row's timestamp + message with IMGUI (native-Console-sharp text), search hits as blue boxes behind it.
+        // 用 IMGUI 绘制一行的时间戳 + 消息（与原生 Console 同样清晰），搜索命中在文字后绘制蓝色底块。
+        private static void DrawRowText(IMGUIContainer container, RowText rt)
+        {
+            if (Event.current.type != EventType.Repaint || rt.Rich == null) return;
+
+            if (s_rowStyle == null || s_rowStyleProSkin != EditorGUIUtility.isProSkin)
+            {
+                s_rowStyleProSkin = EditorGUIUtility.isProSkin; // rebuild on skin switch so the text color follows. 切换皮肤时重建，使文字颜色跟随。
+                s_rowStyle = new GUIStyle(EditorStyles.label)
+                {
+                    richText = true, wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.MiddleLeft,
+                    padding = new RectOffset(2, 2, 0, 0), margin = new RectOffset(),
+                };
+                s_rowMeasureStyle = new GUIStyle(s_rowStyle) { richText = false, padding = new RectOffset() };
+                s_rowTimeStyle = new GUIStyle(s_rowMeasureStyle) { padding = s_rowStyle.padding };
+                s_rowTimeStyle.normal.textColor = DebugxConsoleStyle.TimestampColor;
+                ColorUtility.TryParseHtmlString("#" + DebugxConsoleStyle.SearchHighlightHex, out s_rowHighlightColor);
+            }
+
+            Rect r = container.contentRect;
+            if (rt.Time != null)
+            {
+                GUI.Label(new Rect(r.x, r.y, DebugxConsoleStyle.TimestampWidth, r.height), rt.Time, s_rowTimeStyle);
+                r.xMin += DebugxConsoleStyle.TimestampWidth;
+            }
+
+            if (rt.Visible != null)
+            {
+                // Hit x-offsets are measured on the tag-stripped text: exact for <color>, ~1px off after <b>/<i>.
+                // 命中横向偏移在去标签文本上测量：<color> 下精确，<b>/<i> 之后约有 1px 偏差。
+                float textX = r.x + s_rowStyle.padding.left, textRight = r.xMax - s_rowStyle.padding.right;
+                foreach (Vector2Int h in rt.Hits)
+                {
+                    float x0 = textX + MeasureRowText(rt.Visible, h.x);
+                    if (x0 >= textRight) break;
+                    float x1 = Mathf.Min(textX + MeasureRowText(rt.Visible, h.y), textRight);
+                    EditorGUI.DrawRect(new Rect(x0, r.y + 2, x1 - x0, r.height - 4), s_rowHighlightColor);
+                }
+            }
+
+            GUI.Label(r, rt.Rich, s_rowStyle);
+        }
+
+        private static float MeasureRowText(string text, int length) =>
+            length <= 0 ? 0f : s_rowMeasureStyle.CalcSize(new GUIContent(text.Substring(0, length))).x;
 
         // ---------- Detail pane ----------
 
@@ -1315,34 +1376,29 @@ namespace DebugxLog.Console.Editor
                 EditorPrefs.SetBool(PrefPrefix + "Collapse", _store.CollapseMode != LogCollapser.Mode.Off);
         }
         
-                /// <summary>
-        /// Return <paramref name="richText"/> with the active search's matches wrapped in a &lt;mark=#hex&gt; highlight.
-        /// The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich string once,
-        /// skipping &lt;...&gt; tag spans, to build the visible text plus a visible-&gt;rich index map; find the matches in
-        /// the visible text; then splice &lt;mark&gt;/&lt;/mark&gt; at the mapped rich positions. &lt;mark&gt; only paints a
-        /// background, so member &lt;color&gt; foregrounds survive. No-op when the search is empty or a regex (the search
-        /// boxes only ever set plain substring text, so regex highlight is intentionally skipped) — the input is returned
-        /// unchanged, so the caller can wrap every row unconditionally.
-        /// 返回把当前搜索命中套上 &lt;mark=#hex&gt; 高亮后的 <paramref name="richText"/>。搜索匹配的是可见文本，无法直接按其偏移拼接：
-        /// 一次遍历富文本、跳过 &lt;...&gt; 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置
-        /// 拼入 &lt;mark&gt;/&lt;/mark&gt;。&lt;mark&gt; 只画背景，故成员 &lt;color&gt; 前景色得以保留。搜索为空或为正则时不处理（搜索框只设
-        /// 纯子串，正则高亮有意跳过）——原样返回，故调用方可无条件地对每一行套用。
+        /// <summary>
+        /// Find the active search's matches in the VISIBLE (tag-stripped) text of <paramref name="richText"/>, for
+        /// DrawRowText to paint highlight boxes behind (IMGUI can't render &lt;mark&gt;). Walks the rich string once,
+        /// skipping &lt;...&gt; tag spans, then collects non-overlapping substring matches as (start, end). Returns the
+        /// visible text, or null when there's nothing to highlight (empty / regex search — the search boxes only set plain
+        /// substrings, so regex highlight is intentionally skipped — or no match).
+        /// 在 <paramref name="richText"/> 的可见（去标签）文本中查找当前搜索命中，供 DrawRowText 在其后绘制高亮底块（IMGUI 不支持
+        /// &lt;mark&gt;）。一次遍历富文本、跳过 &lt;...&gt; 标签段，再收集不重叠的子串命中 (start, end)。返回可见文本；无需高亮时
+        /// （搜索为空/为正则——搜索框只设纯子串，正则高亮有意跳过——或无命中）返回 null。
         /// </summary>
-        /// <param name="richText">The rich text to highlight. 待高亮的富文本。</param>
+        /// <param name="richText">The rich text to search. 待搜索的富文本。</param>
         /// <param name="query">The active search query. 当前搜索查询。</param>
-        /// <param name="highlightHex">RRGGBBAA hex for the &lt;mark&gt; background (no leading '#'). &lt;mark&gt; 背景的 RRGGBBAA 十六进制（不含 '#'）。</param>
-        public static string Apply(string richText, SearchQuery query, string highlightHex)
+        /// <param name="hits">Cleared, then filled with (start, end) in the returned text. 先清空，再填入基于返回文本的 (start, end)。</param>
+        private static string FindHighlights(string richText, SearchQuery query, List<Vector2Int> hits)
         {
-            if (string.IsNullOrEmpty(richText)) return richText;
-            if (query.IsEmpty || query.UseRegex) return richText;
+            hits.Clear();
+            if (string.IsNullOrEmpty(richText)) return null;
+            if (query.IsEmpty || query.UseRegex) return null;
 
             string needle = query.Text;
             int n = richText.Length;
 
-            // Build the visible text + a map from each visible char (and an end sentinel) to its index in richText.
-            // 构建可见文本 + 每个可见字符（含末尾哨兵）到其在 richText 中下标的映射。
             var visible = new StringBuilder(n);
-            var richPos = new List<int>(n + 1);
             int i = 0;
             while (i < n)
             {
@@ -1354,42 +1410,23 @@ namespace DebugxLog.Console.Editor
                     i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
                     continue;
                 }
-                richPos.Add(i);
                 visible.Append(c);
                 i++;
             }
-            richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。
 
             string hay = visible.ToString();
-            if (hay.Length == 0 || needle.Length > hay.Length) return richText;
+            if (hay.Length == 0 || needle.Length > hay.Length) return null;
 
             StringComparison cmp = query.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            string open = "<mark=#" + highlightHex + ">";
-
-            var outSb = new StringBuilder(n + 16);
-            int cursor = 0; // how far into richText we've copied. 已复制到 richText 的位置。
-            int from = 0;   // search start in the visible text. 可见文本里的搜索起点。
-            bool any = false;
+            int from = 0; // search start in the visible text. 可见文本里的搜索起点。
             while (true)
             {
                 int idx = hay.IndexOf(needle, from, cmp);
                 if (idx < 0) break;
-                int ro = richPos[idx];
-                int rc = richPos[idx + needle.Length];
-                if (ro >= cursor)
-                {
-                    outSb.Append(richText, cursor, ro - cursor);
-                    outSb.Append(open);
-                    outSb.Append(richText, ro, rc - ro);
-                    outSb.Append("</mark>");
-                    cursor = rc;
-                    any = true;
-                }
+                hits.Add(new Vector2Int(idx, idx + needle.Length));
                 from = idx + needle.Length;
             }
-            if (!any) return richText;
-            outSb.Append(richText, cursor, n - cursor);
-            return outSb.ToString();
+            return hits.Count > 0 ? hay : null;
         }
     }
 }
