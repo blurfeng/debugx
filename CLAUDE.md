@@ -55,7 +55,7 @@ cp DebugxDll~/Debugx/bin/Release/DebugxLog.dll DebugxDll~/Debugx/bin/Release/Deb
 - **`Debugx`**（DLL）—— 静态日志 API。`Log/LogWarning/LogError(int key | string signature, message, showTime, showNetTag)`。持有运行时开关状态（`enableLog`、`enableLogMember`、`logThisKeyMemberOnly`、各成员开关）。`LogAdm*` 是绕过成员开关的插件内部通道（仍受 `DEBUG_X` 门控）——不要在应用代码中使用。
 - **`DebugxProjectSettings`**（DLL）—— *真正的* 运行时配置对象。单例，惰性从 `Resources.Load("DebugxProjectSettings")` 加载；资源缺失时回退到默认实例（绝不返回 null）。也持有常量：`DebugxTag = "[Debugx]"`、预设成员键。
 - **`DebugxProjectSettingsAsset`**（Unity `ScriptableObject`，新建于项目的 `Assets/DebugxSettings/Resources/`；旧版本建在 `Assets/Plugins/Debugx/Resources/` 的也照常使用，只认 `Assets/` 下的那份）—— 可编辑、可序列化的工程配置。其 `ApplyTo(DebugxProjectSettings)` 是把资源数据拷入 DLL 运行时设置的桥梁。**设置的双重性：** 在 `Application.isEditor` 下，`ApplyTo` 的大多数值取自 `DebugxStaticData`（各用户的 `EditorPrefs`/`PlayerPrefs`）而非序列化的资源字段——于是编辑器中每个开发者的本地开关优先，而构建版使用已提交的资源值。
-- **`DebugxManager`**（`MonoBehaviour`）—— 运行时通过 `[RuntimeInitializeOnLoadMethod]` 自动创建（仅当定义了 `DEBUG_X`）。驱动 `Debugx.OnAwake/OnDestroy`，设置平台相关的 `LogOutput.DirectoryPath`（编辑器 → 工程 `Logs/`），并启停文件录制。`Create()` 为 `virtual`，供项目扩展。
+- **`DebugxManager`**（`MonoBehaviour`）—— 运行时通过 `[RuntimeInitializeOnLoadMethod]` 自动创建（仅当定义了 `DEBUG_X`）；成员开关初始化与文件录制在 `BeforeSceneLoad` 提前启动（`StartLogging`，每次运行一次），管理器本身仍在场景加载后创建，且只保留一个实例。驱动 `Debugx.OnAwake/OnDestroy`，设置平台相关的 `LogOutput.DirectoryPath`（编辑器 → 工程 `Logs/`），并启停文件录制。`Create()` 为 `virtual`，供项目扩展。
 - **`DebugxStaticData`** —— 所有编辑器/用户偏好状态（`*Prefs` = 各用户 EditorPrefs，`*Set` = 默认值）、tooltip，以及通过 `IsChineseSimplified` 提供的本地化（中/英）UI 文本。
 
 ## 成员系统

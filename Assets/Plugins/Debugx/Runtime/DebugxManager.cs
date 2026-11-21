@@ -6,8 +6,9 @@ using System.IO;
 namespace DebugxLog
 {
     /// <summary>
-    /// Debugx Debugging Function Manager. It is usually added to the GameObject used for startup.
-    /// Debugx调试功能管理器。一般添加到启动用GameObject上。
+    /// Debugx Debugging Function Manager. Created automatically at runtime when DEBUG_X is defined; there is no need to
+    /// add it to a scene.
+    /// Debugx调试功能管理器。定义了 DEBUG_X 时在运行时自动创建，无需添加到场景中。
     /// </summary>
     public class DebugxManager : MonoBehaviour
     {
@@ -36,7 +37,22 @@ namespace DebugxLog
             }
         }
 
+        // Set once logging has started (member switches initialized, file recording started); cleared in OnDestroy.
+        // 日志已启动（成员开关已初始化、文件录制已开始）时置位；在 OnDestroy 中清除。
+        private static bool _loggingStarted;
+
 #if DEBUG_X
+        // Start logging before the first scene loads, so the first scene's Awake/OnEnable logs reach the log file and its
+        // SetMemberEnable calls are not reset later. The manager itself is still created after the scene loads (below),
+        // so a manager (or subclass) placed in the first scene is found and its Create() runs.
+        // 在首个场景加载之前启动日志，使首个场景 Awake/OnEnable 中的日志能写进日志文件，其中的 SetMemberEnable 也不会在之后被重置。
+        // 管理器本身仍在场景加载后创建（见下），故放在首个场景中的管理器（或其子类）会被找到并执行其 Create()。
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        private static void StartLoggingEarly()
+        {
+            StartLogging();
+        }
+
         // It is automatically created when the game starts.
         // 游戏启动时自动创建。
         [RuntimeInitializeOnLoadMethod]
@@ -47,13 +63,54 @@ namespace DebugxLog
                 Instance.Create();
             }
         }
-        
+
         public virtual void Create() { }
 #endif
 
         private void Awake()
         {
+            // Only one manager: a second one (e.g. in a scene that is loaded again) would otherwise reset the runtime
+            // switches, and when destroyed it would stop the file recording for everyone. Only this component is removed,
+            // not the GameObject it sits on.
+            // 只保留一个管理器：否则第二个（如再次加载的场景里的那个）会重置运行时开关，销毁时还会停掉全局的文件录制。
+            // 只移除这个组件，不销毁它所在的 GameObject。
+            if (_instance && _instance != this)
+            {
+                Destroy(this);
+                return;
+            }
+
+            _instance = this;
             DontDestroyOnLoad(this);
+            StartLogging();
+
+            Debugx.LogAdm("DebugxManager --- Awake");
+
+            // 在 菜单>Edit>Preferences>Debugx 界面的 LogOutput>EnableLogOutput 开关是否输出本地log。
+            if (DebugxProjectSettings.Instance.logOutput)
+                Debugx.LogAdm($"DebugxManager --- Log output to {LogOutput.DirectoryPath}");
+
+#if UNITY_EDITOR
+            // test case.Open the console via Menu > Window > Debugx > DebugxConsole, and toggle the setting at Test > EnableAwakeTestLog to enable or disable it.
+            // 测试用。请在 菜单>Window>Debugx>DebugxConsole 打开控制台，并设置 Test>EnableAwakeTestLog 进行开关。
+            if (DebugxStaticData.EnableAwakeTestLog)
+            {
+                // Try to print. It can be annotated. The member information with the corresponding key will be printed.
+                // 试打印，可注释。有对应key的成员信息时才会被打印。
+                Debugx.Log(1, "Key 1 Print Test (Awake)");
+                Debugx.Log(2, "Key 2 Print Test (Awake)");
+                Debugx.Log(999, "Key 999 Print Test (Awake)");
+            }
+#endif
+        }
+
+        // Initialize the member switches and start the log file, once per session.
+        // 初始化成员开关并开始写日志文件，每次运行只做一次。
+        private static void StartLogging()
+        {
+            if (_loggingStarted) return;
+            _loggingStarted = true;
+
             Debugx.OnAwake();
 
 #if UNITY_EDITOR
@@ -77,25 +134,6 @@ namespace DebugxLog
 #endif
 
             LogOutput.RecordStart();
-
-            Debugx.LogAdm("DebugxManager --- Awake");
-
-            // 在 菜单>Edit>Preferences>Debugx 界面的 LogOutput>EnableLogOutput 开关是否输出本地log。
-            if (DebugxProjectSettings.Instance.logOutput)
-                Debugx.LogAdm($"DebugxManager --- Log output to {LogOutput.DirectoryPath}");
-
-#if UNITY_EDITOR
-            // test case.Open the console via Menu > Window > Debugx > DebugxConsole, and toggle the setting at Test > EnableAwakeTestLog to enable or disable it.
-            // 测试用。请在 菜单>Window>Debugx>DebugxConsole 打开控制台，并设置 Test>EnableAwakeTestLog 进行开关。
-            if (DebugxStaticData.EnableAwakeTestLog)
-            {
-                // Try to print. It can be annotated. The member information with the corresponding key will be printed.
-                // 试打印，可注释。有对应key的成员信息时才会被打印。
-                Debugx.Log(1, "Key 1 Print Test (Awake)");
-                Debugx.Log(2, "Key 2 Print Test (Awake)");
-                Debugx.Log(999, "Key 999 Print Test (Awake)");
-            }
-#endif
         }
 
         private void Start()
@@ -132,8 +170,11 @@ namespace DebugxLog
 
         private void OnDestroy()
         {
+            if (_instance != this) return; // a duplicate removed in Awake. 在 Awake 中被移除的重复实例。
+
             Debugx.OnDestroy();
             LogOutput.RecordOver();
+            _loggingStarted = false;
         }
 
         /// <summary>
