@@ -15,7 +15,11 @@ namespace DebugxLog.Editor
         private static FadeArea _faMemberConfigSetting;
         private static bool _isInitGUI;
         private static bool _assetIsDirty;
-        
+
+        // Unsaved changes. The static flag is lost on a domain reload (e.g. saving a script); the asset's own dirty flag is not.
+        // 是否有未保存的修改。静态标记会在域重载（如保存脚本）后丢失，资源自身的脏标记不会。
+        private static bool HasUnsavedChanges => _assetIsDirty || (SettingsAsset && EditorUtility.IsDirty(SettingsAsset));
+
         private const float ButtonWidth1 = 100f;
         private const float ButtonWidth2 = 150f;
         private const float ButtonWidth3 = 200f;
@@ -37,6 +41,18 @@ namespace DebugxLog.Editor
             }
 
             return _settingsProvider;
+        }
+
+        // Registered once (not per page open): an undo can happen after the settings page is closed.
+        // 只注册一次（不随页面打开）：撤销可能在设置页关闭之后发生。
+        [InitializeOnLoadMethod]
+        private static void RegisterUndo() => Undo.undoRedoPerformed += OnUndoRedo;
+
+        // Undo/redo only restores the asset in memory; save it, re-apply it and regenerate DebugxLogger like any other edit.
+        // 撤销/重做只在内存中还原资源；像其他修改一样保存、重新应用并重新生成 DebugxLogger。
+        private static void OnUndoRedo()
+        {
+            if (SettingsAsset && EditorUtility.IsDirty(SettingsAsset)) SaveCheck();
         }
 
         private static void Enable(string searchContext, VisualElement rootElement)
@@ -92,7 +108,7 @@ namespace DebugxLog.Editor
                     ? "自动保存配置资源，自动保存时在修改内容时会有卡顿。"
                     : "Automatically save configuration assets. There may be a lag during automatic saving when content is being modified.",
                 DebugxStaticDataEditor.AutoSave);
-            EditorGUI.BeginDisabledGroup(!_assetIsDirty);
+            EditorGUI.BeginDisabledGroup(!HasUnsavedChanges);
             if (GUILayoutEx.ButtonGreen("Save Asset", GUILayout.Width(ButtonWidth1))) 
                 Apply();
             EditorGUI.EndDisabledGroup();
@@ -358,7 +374,12 @@ namespace DebugxLog.Editor
                         GUILayout.BeginHorizontal();
                         faTemp.Header(string.IsNullOrEmpty(mInfo.signature) ? $"Member {mInfo.key}" : mInfo.signature, 320);
                         GUILayout.FlexibleSpace(); // Push the button to the right side. // 将按钮推到右侧。
-                        if (GUILayoutEx.ButtonRed("Delete Member", GUILayout.Width(ButtonWidth1)))
+                        string memberName = string.IsNullOrEmpty(mInfo.signature) ? $"Member {mInfo.key}" : mInfo.signature;
+                        if (GUILayoutEx.ButtonRed("Delete Member", GUILayout.Width(ButtonWidth1))
+                            && ConfirmDialog(
+                                "Delete Member",
+                                $"确认要删除成员 {memberName} 吗？它在 DebugxLogger 中的方法会被删除，调用这些方法的代码将无法编译。",
+                                $"Delete member {memberName}? Its DebugxLogger methods are removed, so code that calls them will no longer compile."))
                         {
                             removeIndex = i;
                         }
@@ -611,7 +632,7 @@ namespace DebugxLog.Editor
             // 因此不应触发落盘 + ApplyTo + 重生成代码。只有 asset 数据真正变更（_assetIsDirty）时才做重活。
             // Fold/expand only changes UI state (stored in PlayerPrefs), not asset data, so it must not trigger
             // a disk write + ApplyTo + codegen. Only do the heavy work when asset data actually changed.
-            bool assetChanged = _assetIsDirty;
+            bool assetChanged = HasUnsavedChanges;
             _assetIsDirty = false;
 
             if (!assetChanged) return false;

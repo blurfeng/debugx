@@ -36,6 +36,7 @@ MonoBehaviour:
     key: 1
     header: 
     color: {r: 0.7843, g: 0.941, b: 1, a: 1}
+  lastIssuedMemberKey: 0
   logOutput: 0
   enableLogStackTrace: 0
   enableWarningStackTrace: 0
