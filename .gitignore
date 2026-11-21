@@ -129,3 +129,7 @@ InitTestScene*.unity*
 
 # 3. 忽略 OS 生成的临时文件
 **/DebugxDll~/.DS_Store
+
+# 4. 上面的 *.csproj / *.sln 规则会连 DLL 工程文件一起忽略；工程文件必须入库，克隆后才能重建 DLL
+!/DebugxDll~/Debugx/Debugx.csproj
+!/DebugxDll~/Debugx.sln

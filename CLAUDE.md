@@ -27,25 +27,25 @@ Debugx 是一个通过 UPM 分发的 Unity 调试日志插件（`com.blurfeng.de
 
 - `Assets/Plugins/Debugx/` —— UPM 包（这是发布物）。`Runtime/` + `Editor/` asmdef、`Resources/DebugxProjectSettings.asset`、`package.json`、`CHANGELOG.md`。
 - `Assets/Source/DebugxTest.cs` —— 手动的 MonoBehaviour 冒烟测试；不属于包。
-- `~DebugxDll/Debugx/` —— **独立的 C# 类库工程**，唯一产物是 `DebugxLog.dll`。这是核心日志类的真源（source of truth）。见下文“DLL 工作流”——这是编辑核心逻辑前最需要理解的一点。
-- 根目录的 `Assembly-CSharp*.csproj`、`Unity.*.csproj`、`Debugx.sln`、`Library/`、`obj/` —— Unity 生成，绝不手改。`~DebugxDll/` 文件夹以 `~` 前缀命名，故 Unity 会忽略它。
+- `DebugxDll~/Debugx/` —— **独立的 C# 类库工程**，唯一产物是 `DebugxLog.dll`。这是核心日志类的真源（source of truth）。见下文“DLL 工作流”——这是编辑核心逻辑前最需要理解的一点。
+- 根目录的 `Assembly-CSharp*.csproj`、`Unity.*.csproj`、`Debugx.sln`、`Library/`、`obj/` —— Unity 生成，绝不手改。`DebugxDll~/` 文件夹以 `~` 结尾命名，故 Unity 会忽略它。
 - `Documents/` —— 用户手册（cn/en/ja）。`README*.md` 是同一内容的翻译。
 
 ## DLL 工作流（关键）
 
-核心日志类型（`Debugx`、`DebugxProjectSettings`、`DebugxMemberInfo`、`DebugxBurst`、`LogOutput`、`IDebugxProjectSettingsAsset`）**不由 Unity 编译**。它们由 `~DebugxDll/Debugx/` 工程编译进 `DebugxLog.dll`，构建产物提交在 `Assets/Plugins/Debugx/Runtime/DebugxLog.dll`。
+核心日志类型（`Debugx`、`DebugxProjectSettings`、`DebugxMemberInfo`、`DebugxBurst`、`LogOutput`、`IDebugxProjectSettingsAsset`）**不由 Unity 编译**。它们由 `DebugxDll~/Debugx/` 工程编译进 `DebugxLog.dll`，构建产物提交在 `Assets/Plugins/Debugx/Runtime/DebugxLog.dll`。
 
-**为什么：** 让 Unity 的 Console 堆栈在 `Debugx.Log(...)` 处停下，而不是步进到插件内部。由于调用发生在预编译的 DLL 内，双击日志会跳转到 *调用方* 的业务逻辑。（这与生成的 `DebugxLogger` 类名以 `Logger` 结尾、以及 `[HideInCallstack]` 配合，服务于同一个“停在正确帧”的目标。）若你改动了 `~DebugxDll/` 下的任何 `.cs`，**必须**重建并重新拷贝 DLL，否则改动在 Unity 中不生效。
+**为什么：** 让 Unity 的 Console 堆栈在 `Debugx.Log(...)` 处停下，而不是步进到插件内部。由于调用发生在预编译的 DLL 内，双击日志会跳转到 *调用方* 的业务逻辑。（这与生成的 `DebugxLogger` 类名以 `Logger` 结尾、以及 `[HideInCallstack]` 配合，服务于同一个“停在正确帧”的目标。）若你改动了 `DebugxDll~/` 下的任何 `.cs`，**必须**重建并重新拷贝 DLL，否则改动在 Unity 中不生效。
 
 编辑核心文件后重建：
 ```sh
-# 在 ~DebugxDll/ 下执行 —— 目标框架 .NET Framework 3.5，引用 UnityEngine.dll
+# 在 DebugxDll~/ 下执行 —— 目标框架 .NET Framework 3.5，引用 UnityEngine.dll
 msbuild Debugx.sln /p:Configuration=Release
 # 然后把两个产物都拷进包的 Runtime 文件夹：
-cp ~DebugxDll/Debugx/bin/Release/DebugxLog.dll ~DebugxDll/Debugx/bin/Release/DebugxLog.xml \
+cp DebugxDll~/Debugx/bin/Release/DebugxLog.dll DebugxDll~/Debugx/bin/Release/DebugxLog.xml \
    Assets/Plugins/Debugx/Runtime/
 ```
-注意：`~DebugxDll/Debugx/Debugx.csproj` 硬编码了 `UnityEngine.dll` 的 HintPath（`D:\Engine\Unity\2021.3.6f1\...`）——若构建无法解析 `UnityEngine`，请改成本地 Unity 安装路径。没有构建后自动拷贝步骤；拷贝是手动的。
+注意：`DebugxDll~/Debugx/Debugx.csproj` 硬编码了 `UnityEngine.dll` 的 HintPath（`D:\Engine\Unity\2021.3.6f1\...`）——若构建无法解析 `UnityEngine`，请改成本地 Unity 安装路径。没有构建后自动拷贝步骤；拷贝是手动的。
 
 ## 运行时架构
 
@@ -75,7 +75,7 @@ cp ~DebugxDll/Debugx/bin/Release/DebugxLog.dll ~DebugxDll/Debugx/bin/Release/Deb
 - **版本号升级**：
   - **包版本**（`package.json` 的 `version` 与 `CHANGELOG.md`）每次发布都更新。
   - **未发布的改动记入 `## [Unreleased]`**：有更新但尚未发布（不升版本号）时，也必须在 `CHANGELOG.md` 顶部的 `## [Unreleased]` 段落下记录；发布时再把该段改为 `## [x.y.z] - 日期`。
-  - **DLL 版本号独立管理，仅当 DLL 实际更新（即改动 `~DebugxDll/` 核心代码并重建 DLL）时才更新**——涉及 `~DebugxDll/Debugx/Debugx.cs` 的头部注释块与 `Version:`、以及 `AssemblyInfo.cs`。只改 Unity 侧代码（不动 DLL）的发布，只需升 `package.json` + `CHANGELOG.md`，DLL 版本保持不变。
+  - **DLL 版本号独立管理，仅当 DLL 实际更新（即改动 `DebugxDll~/` 核心代码并重建 DLL）时才更新**——涉及 `DebugxDll~/Debugx/Debugx.cs` 的头部注释块与 `Version:`、以及 `AssemblyInfo.cs`。只改 Unity 侧代码（不动 DLL）的发布，只需升 `package.json` + `CHANGELOG.md`，DLL 版本保持不变。
   - 版本号格式为 `major.newFeature.featureOrUpdate.bugfix`（major = 破坏性变更）。
   - 提交信息使用中文方括号标签：`【Bugfix】`、`【dll】`、`【Version】`、`【Docs】`。
 
