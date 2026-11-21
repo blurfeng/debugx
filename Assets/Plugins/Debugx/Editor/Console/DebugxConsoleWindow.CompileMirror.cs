@@ -18,8 +18,8 @@ namespace DebugxLog.Console.Editor
     ///    matching the native console).
     ///  - A compile-looking live entry that is NOT in LogEntries at all (a false positive, or one still being flushed) is
     ///    left as a normal Uncategorized log — shown, never dropped; absorbed later if/when it becomes authoritative.
-    /// Reconciliation runs every editor-update tick inside a short window after each trigger (enable / compilationFinished
-    /// / Clear), which closes the LogEntries async-flush race that previously made compile errors "sometimes" go missing.
+    /// Reconciliation runs a few spaced passes after each trigger (enable / compilationFinished / Clear), which closes the
+    /// LogEntries async-flush race that previously made compile errors "sometimes" go missing.
     /// All reflection lives in <see cref="EditorLogEntriesMirror"/>; this half is the wiring + buffer reconciliation.
     /// Debugx Console —— 编译日志镜像（对账模型）。脚本编译消息是唯一与 live 日志通道有出入的场景：它们被直接注入内部编辑器控制台
     /// （<c>UnityEditor.LogEntries</c>），且只有“部分”也会出现在 <c>Application.logMessageReceived(Threaded)</c> 上。
@@ -29,7 +29,7 @@ namespace DebugxLog.Console.Editor
     ///    <see cref="LogEntryCategory.Compile"/> 各注入一次。由此把 live 副本“吸收”进唯一的、可随重编译替换的 Compile 表示
     ///    （不重复，修复后旧编译错误也不滞留——与原生一致）。
     ///  - 根本不在 LogEntries 里的“像编译消息”的 live 条目（误判，或正在刷入中）保留为普通“未分类”日志——显示、不丢；之后若成为权威再被吸收。
-    /// 对账在每次触发（启用 / compilationFinished / Clear）后的一小段窗口内逐帧执行，堵住此前令编译错误“偶尔”缺失的 LogEntries 异步刷入竞态。
+    /// 对账在每次触发（启用 / compilationFinished / Clear）后间隔执行数次，堵住此前令编译错误“偶尔”缺失的 LogEntries 异步刷入竞态。
     /// 反射都在 <see cref="EditorLogEntriesMirror"/> 里；这半边是接线 + 缓冲对账。
     /// </summary>
     public partial class DebugxConsoleWindow
@@ -41,17 +41,15 @@ namespace DebugxLog.Console.Editor
         // Clear 时重置；域重载后自然清空（新窗口实例）。
         private readonly HashSet<string> _mirroredCompileKeys = new HashSet<string>();
 
-        // Reconcile on every editor-update tick until this EditorApplication.timeSinceStartup. Opened/extended on
-        // enable / compilationFinished / Clear so a short window of per-tick reconciliation absorbs both late-flushed
-        // LogEntries and just-arrived live copies. Outside the window PumpCompileMirror is a single cheap comparison.
-        // 逐帧对账直到此 EditorApplication.timeSinceStartup。启用 / compilationFinished / Clear 时打开/延长，用一小段逐帧对账窗口
-        // 吸收“LogEntries 晚刷入”与“刚到达的 live 副本”。窗口外 PumpCompileMirror 只是一次廉价比较。
-        private double _compileRescanUntil;
-
-        // Length of the post-trigger reconciliation window (seconds). Generous enough to cover LogEntries' async flush
-        // after a compile finishes; only active right after a trigger, so the cost is negligible.
-        // 触发后对账窗口时长（秒）。足以覆盖编译完成后 LogEntries 的异步刷入；仅在触发后短暂生效，开销可忽略。
-        private const double CompileRescanWindowSeconds = 1.0;
+        // Reconcile passes left after a trigger (enable / compilationFinished / Clear), spaced apart so LogEntries' async
+        // flush has time to land and the native store isn't re-read every tick. Counted rather than timed: after a domain
+        // reload an import can block editor updates for seconds, which used to let a 1 s deadline expire with no pass.
+        // 触发（启用 / compilationFinished / Clear）后剩余的对账次数，相互间隔，使 LogEntries 的异步刷入有时间落地、也不必每帧
+        // 重读原生存储。按次数而非时长计：域重载后的导入可能让编辑器更新停顿数秒，过去 1 秒的期限会在一次都没扫时就过期。
+        private int _compileRescanPassesLeft;
+        private double _nextCompileRescanTime;
+        private const int CompileRescanPasses = 5;
+        private const double CompileRescanSpacingSeconds = 0.25;
 
         private void EnableCompileMirror()
         {
@@ -72,17 +70,25 @@ namespace DebugxLog.Console.Editor
 
         private void OnCompilationFinishedForMirror(object context) => RequestCompileRescan();
 
-        // Open (or extend) the per-tick reconciliation window. 打开（或延长）逐帧对账窗口。
+        // (Re)arm the spaced reconciliation passes; the first runs on the next tick. 重新安排间隔对账，首次在下一帧执行。
         private void RequestCompileRescan()
-            => _compileRescanUntil = EditorApplication.timeSinceStartup + CompileRescanWindowSeconds;
+        {
+            _compileRescanPassesLeft = CompileRescanPasses;
+            _nextCompileRescanTime = 0;
+        }
 
         // Called from OnEditorUpdate (main thread) BEFORE _store.Pump(), so entries injected by a reconcile are drained
-        // the same tick. Reconciles only inside the active window; outside it this is a single comparison.
-        // 在 OnEditorUpdate（主线程）中、_store.Pump() 之前调用，使对账注入的条目在同一帧被排空。仅在活动窗口内对账；窗口外只是一次比较。
+        // the same tick. With no passes left this is a single comparison.
+        // 在 OnEditorUpdate（主线程）中、_store.Pump() 之前调用，使对账注入的条目在同一帧被排空。没有剩余次数时只是一次比较。
         private void PumpCompileMirror()
         {
-            if (_store == null) return;
-            if (EditorApplication.timeSinceStartup > _compileRescanUntil) return;
+            if (_store == null || _compileRescanPassesLeft <= 0) return;
+
+            double now = EditorApplication.timeSinceStartup;
+            if (now < _nextCompileRescanTime) return;
+
+            _nextCompileRescanTime = now + CompileRescanSpacingSeconds;
+            _compileRescanPassesLeft--;
             ReconcileCompileEntries();
         }
 
@@ -107,7 +113,7 @@ namespace DebugxLog.Console.Editor
             // 任何“文本匹配权威集”的 live（未分类）编译类条目，都在等待被吸收。
             bool hasAbsorbable = false;
             LogRingBuffer buf = _store.Buffer;
-            for (int i = 0; i < buf.Count; i++)
+            for (int i = 0; authTexts.Count > 0 && i < buf.Count; i++) // nothing can match an empty set. 空集无可匹配。
             {
                 DebugxLogEntry e = buf[i];
                 if (IsAbsorbableLiveCompile(e, authTexts)) { hasAbsorbable = true; break; }
@@ -143,11 +149,13 @@ namespace DebugxLog.Console.Editor
         // entry NOT in the authoritative set is deliberately excluded (kept as a normal log).
         // 一条 live（未分类）条目，文本像编译消息且匹配权威集——即真实编译消息的 live 副本，应被吸收进 Compile 表示。
         // “像编译消息但不在权威集”的 live 条目被有意排除（保留为普通日志）。
+        // The set lookup runs before the regex: it is cheaper and rejects almost every entry.
+        // 先查集合再跑正则：前者更便宜，且几乎能排除所有条目。
         private static bool IsAbsorbableLiveCompile(DebugxLogEntry e, HashSet<string> authTexts)
             => e != null
                && e.Category == LogEntryCategory.Uncategorized
-               && EditorLogEntriesMirror.LooksLikeCompileMessage(e.PlainText)
-               && authTexts.Contains(NormalizeCompileText(e.PlainText));
+               && authTexts.Contains(NormalizeCompileText(e.PlainText))
+               && EditorLogEntriesMirror.LooksLikeCompileMessage(e.PlainText);
 
         // Normalized text key for matching the same compile message across the two sources (live condition vs LogEntries
         // message). They are the same underlying diagnostic string; trimming absorbs trailing whitespace/newline differences.

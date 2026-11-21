@@ -73,6 +73,13 @@ namespace DebugxLog.Console.Editor
         private static FieldInfo _fFile;      // string file
         private static FieldInfo _fLine;      // int line
         private static FieldInfo _fMode;      // int mode
+        private static PropertyInfo _consoleFlags;     // int consoleFlags (native Console filter toggles; optional)
+        private static MethodInfo _getFilteringText;   // string GetFilteringText() (native Console search; optional)
+        private static MethodInfo _setFilteringText;   // void SetFilteringText(string) (optional)
+
+        // ConsoleWindow.ConsoleFlags LogLevelWarning | LogLevelError: the native Console only lists those rows when set.
+        // ConsoleWindow.ConsoleFlags 的 LogLevelWarning | LogLevelError：原生 Console 仅在置位时才列出这两类行。
+        private const int ShowWarningsAndErrors = (1 << 8) | (1 << 9);
 
         private static void Resolve()
         {
@@ -98,6 +105,10 @@ namespace DebugxLog.Console.Editor
                 _fFile = _logEntryType.GetField("file", IFlags);
                 _fLine = _logEntryType.GetField("line", IFlags);
                 _fMode = _logEntryType.GetField("mode", IFlags);
+
+                _consoleFlags = logEntries.GetProperty("consoleFlags", SFlags);
+                _getFilteringText = logEntries.GetMethod("GetFilteringText", SFlags, null, Type.EmptyTypes, null);
+                _setFilteringText = logEntries.GetMethod("SetFilteringText", SFlags, null, new[] { typeof(string) }, null);
 
                 _available = _start != null && _end != null && _getEntry != null &&
                              _fMessage != null && _fMode != null;
@@ -139,9 +150,34 @@ namespace DebugxLog.Console.Editor
             if (!_available) return result;
 
             bool started = false;
+            int? savedFlags = null;
+            string savedFilter = null;
             try
             {
                 object logEntry = Activator.CreateInstance(_logEntryType, nonPublic: true);
+
+                // StartGettingEntries returns the native Console's FILTERED rows: its Warning/Error toggles and search text
+                // (both persist while that window is closed) would hide compile messages. Unfilter for the scan; restored below.
+                // StartGettingEntries 返回原生 Console 过滤后的行：它的 Warning/Error 开关与搜索文字（原生窗口关着也持续生效）
+                // 会把编译消息藏起来。扫描时去掉过滤，下方 finally 中恢复。
+                if (_consoleFlags != null)
+                {
+                    int flags = Convert.ToInt32(_consoleFlags.GetValue(null));
+                    if ((flags & ShowWarningsAndErrors) != ShowWarningsAndErrors)
+                    {
+                        savedFlags = flags;
+                        _consoleFlags.SetValue(null, flags | ShowWarningsAndErrors);
+                    }
+                }
+                if (_getFilteringText != null && _setFilteringText != null)
+                {
+                    string filter = _getFilteringText.Invoke(null, null) as string;
+                    if (!string.IsNullOrEmpty(filter))
+                    {
+                        savedFilter = filter;
+                        _setFilteringText.Invoke(null, new object[] { string.Empty });
+                    }
+                }
 
                 object startRet = _start.Invoke(null, null);
                 started = true;
@@ -180,6 +216,14 @@ namespace DebugxLog.Console.Editor
                     try { _end.Invoke(null, null); }
                     catch { /* best-effort unlock. 尽力解锁。 */ }
                 }
+
+                // Restore the native Console's own filter. 恢复原生 Console 自己的过滤。
+                try
+                {
+                    if (savedFlags.HasValue) _consoleFlags.SetValue(null, savedFlags.Value);
+                    if (savedFilter != null) _setFilteringText.Invoke(null, new object[] { savedFilter });
+                }
+                catch { /* best-effort restore. 尽力恢复。 */ }
             }
 
             return result;
