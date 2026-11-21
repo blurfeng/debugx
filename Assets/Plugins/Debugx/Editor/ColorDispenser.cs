@@ -17,6 +17,13 @@ namespace DebugxLog.Editor
         private const float SLight = 0.75f;
         private const float VLight = 0.17f;
 
+        // Master's hue (degrees). Other members are kept away from it. Master 的色相（度）。其他成员会避开它。
+        private const int MasterHue = 5;
+
+        // Below this saturation a color is treated as achromatic (white / gray / black): it has no meaningful hue.
+        // 饱和度低于此值视为无彩色（白/灰/黑）：没有有意义的色相。
+        private const float AchromaticSaturation = 0.01f;
+
         /// <summary>
         /// HSV color model. Values range from 0 to 1.
         /// HSV颜色模型。值为0-1。
@@ -66,11 +73,11 @@ namespace DebugxLog.Editor
 
         private static Color GetMasterMemberColor()
         {
-            ColorHSV colorHSV = new(5f / HDimension);
+            ColorHSV colorHSV = new(MasterHue * 1f / HDimension);
 
             return Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
         }
-        
+
         /// <summary>
         /// Get an HSV color’s Hue (H) value that is the least similar (most distant) to the H values of the existing members’ colors.
         /// 获取一个HSV颜色的H值，此值是和当前存在的Member的Color最不接近的值。
@@ -80,46 +87,18 @@ namespace DebugxLog.Editor
         {
             if (SettingsAsset == null) return 0;
 
-            int useLength = SettingsAsset.CustomMemberAssetsLength;
-            if (useLength == 0) return Random.Range(0, 361);
-            else if (useLength == 1)
-            {
-                int num = GetColorH360(SettingsAsset.customMemberAssets[0].color);
-                num += 180;
-                if (num > HDimension) num -= HDimension;
-                return num;
-            }
-            else if (useLength == 2)
-            {
-                int num1 = GetColorH360(SettingsAsset.customMemberAssets[0].color);
-                int num2 = GetColorH360(SettingsAsset.customMemberAssets[1].color);
-                bool compare = num1 < num2;
-                int left2 = compare ? num1 : num2;
-                int right2 = compare ? num2 : num1;
-                int line1 = right2 - left2;
-                if (line1 > 180)
-                {
-                    return left2 + Mathf.FloorToInt(line1 * 0.5f);
-                }
-                else
-                {
-                    int num = right2 + Mathf.FloorToInt((HDimension - line1) * 0.5f);
-                    if (num > HDimension) num -= HDimension;
-                    return num;
-                }
-            }
+            // Hues in use: the custom members plus the chromatic default members (Master), so a new member never lands
+            // next to Master. Achromatic colors (Normal's white / black) have no hue and are skipped.
+            // 已用色相：自定义成员加上有彩色的默认成员（Master），使新成员不会紧挨着 Master。无彩色（Normal 的白/黑）没有色相，跳过。
+            List<int> colorHArray = new List<int>();
+            AddHues(SettingsAsset.defaultMemberAssets, colorHArray);
+            AddHues(SettingsAsset.customMemberAssets, colorHArray);
+            if (colorHArray.Count == 0) return Random.Range(0, HDimension);
 
             // Define the HSV Hue (H) value in the range 0 to dimension, and record all used colors' corresponding H values. Treat each pair of adjacent H values as a line segment, find the longest segment, and use its midpoint as the new H.
             // Saturation (S) and Value (V) will automatically adjust based on whether the editor skin is Dark or Light.
             // 定义HSV的H值为0-dimension，记录所有已经使用的Color对应的H。设定两个H之间为一个线段，找到长度最长的线段，并获取线段的中点作为新的H。
-            // S和V会根据编辑器皮肤Dark或者Light自动适应。
-
-            List<int> colorHArray = new List<int>(useLength);
-            for (int i = 0; i < useLength; i++)
-            {
-                int num = GetColorH360(SettingsAsset.customMemberAssets[i].color);
-                if (colorHArray.Count == 0 || !colorHArray.Contains(num)) colorHArray.Add(num);
-            }
+            // S和V会根据编辑器皮肤Dark或者Light自动适应。（只有一个色相时，环绕线段长 360，取到的正是对面的色相。）
 
             colorHArray.Sort();
             int min = colorHArray[0], max = colorHArray[colorHArray.Count - 1];
@@ -152,16 +131,17 @@ namespace DebugxLog.Editor
             return colorH;
         }
         
-        /// <summary>
-        /// Get the Hue (H) value of a color in HSV and map it to the 0–dimension range.
-        /// 获取Color对应的HSV的H值，并映射到0-dimension区间。
-        /// </summary>
-        /// <param name="color"></param>
-        /// <returns></returns>
-        private static int GetColorH360(Color color)
+        // Add the 0–dimension hues of the chromatic member colors (deduplicated). 添加有彩色成员颜色的 0-dimension 色相（去重）。
+        private static void AddHues(DebugxMemberInfoAsset[] members, List<int> hues)
         {
-            Color.RGBToHSV(color, out float h, out _, out _);
-            return Mathf.FloorToInt(h * HDimension);
+            if (members == null) return;
+            foreach (DebugxMemberInfoAsset m in members)
+            {
+                Color.RGBToHSV(m.color, out float h, out float s, out _);
+                if (s < AchromaticSaturation) continue;
+                int hue = Mathf.FloorToInt(h * HDimension);
+                if (!hues.Contains(hue)) hues.Add(hue);
+            }
         }
 
         /// <summary>
@@ -176,10 +156,12 @@ namespace DebugxLog.Editor
             if (length == 0) return;
 
             int step = HDimension / SettingsAsset.CustomMemberAssetsLength;
-            int h = 0;
+            // Start half a step past Master's hue, so no custom member sits on (or right next to) Master's color.
+            // 从 Master 色相再偏移半步开始，使自定义成员不会落在 Master 颜色上（或紧挨着它）。
+            int h = MasterHue + step / 2;
             for (int i = 0; i < length; i++)
             {
-                ColorHSV colorHSV = new(h * 1f / HDimension);
+                ColorHSV colorHSV = new(h % HDimension * 1f / HDimension);
                 SettingsAsset.customMemberAssets[i].color = Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
                 h += step;
             }
@@ -203,37 +185,36 @@ namespace DebugxLog.Editor
         {
             if (debugxMemberInfoAsset == null || debugxMemberInfoAsset.Length == 0) return false;
 
-            bool isDark = EditorGUIUtility.isProSkin;
             bool change = false;
-            int length = debugxMemberInfoAsset.Length;
-
-            for (int i = 0; i < length; i++)
+            for (int i = 0; i < debugxMemberInfoAsset.Length; i++)
             {
                 var mInfo = debugxMemberInfoAsset[i];
+                Color adapted = GetMemberColorByEditorSkin(mInfo.color);
+                if (adapted == mInfo.color) continue;
 
-                Color color = mInfo.color;
-                Color.RGBToHSV(color, out float h, out float s, out float v);
-
-                if (Mathf.Approximately(s, (isDark ? SDark : SLight)) && Mathf.Approximately(v, (isDark ? VDark : VLight))) continue;
                 change = true;
-
-                var colorHSV = new ColorHSV(h);
-                mInfo.color = Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
+                mInfo.color = adapted;
                 debugxMemberInfoAsset[i] = mInfo;
             }
 
             return change;
         }
 
+        /// <summary>
+        /// The color re-tinted for the current editor skin, keeping its hue. Achromatic colors (white / gray / black, e.g.
+        /// Normal) have no hue — RGBToHSV reports 0, i.e. red — so they become plain white (Dark skin) / black (Light skin).
+        /// 按当前编辑器皮肤重新调整后的颜色，保留色相。无彩色（白/灰/黑，如 Normal）没有色相——RGBToHSV 会报为 0 即红色——
+        /// 故变为纯白（暗色皮肤）/ 纯黑（亮色皮肤）。
+        /// </summary>
         public static Color GetMemberColorByEditorSkin(Color color)
         {
             Color.RGBToHSV(color, out float h, out float s, out float v);
             bool isDark = EditorGUIUtility.isProSkin;
+            if (s < AchromaticSaturation) return isDark ? Color.white : Color.black;
             if (Mathf.Approximately(s, (isDark ? SDark : SLight)) && Mathf.Approximately(v, (isDark ? VDark : VLight))) return color;
 
             var colorHSV = new ColorHSV(h);
-            color = Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
-            return color;
+            return Color.HSVToRGB(colorHSV.h, colorHSV.s, colorHSV.v);
         }
     }
 }
