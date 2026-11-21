@@ -176,7 +176,9 @@ namespace DebugxLog.Console
         // Debugx's own generated forwarder type. Hidden even when reflection cannot resolve it (e.g. aggressive AOT
         // stripping), so the plugin's own plumbing never leaks into the stack regardless of platform.
         // Debugx 自身生成的转发类。即使反射无法解析（如激进的 AOT 裁剪）也隐藏它，使插件自身的转发帧无论平台都不泄漏进堆栈。
-        private const string DebugxLoggerTypeName = "DebugxLog.DebugxLogger";
+        // The generator emits it in the global namespace, so its stack frames read "DebugxLogger:LogXxx (...)".
+        // 生成器把它放在全局命名空间，故其堆栈帧形如 "DebugxLogger:LogXxx (...)"。
+        private const string DebugxLoggerTypeName = "DebugxLogger";
 
         // Decide whether the frame described by <paramref name="symbol"/> should be hidden. Result is cached per method.
         // 判定 <paramref name="symbol"/> 所描述的帧是否应被隐藏。结果按方法缓存。
