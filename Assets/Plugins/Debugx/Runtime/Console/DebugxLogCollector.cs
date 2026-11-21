@@ -221,7 +221,11 @@ namespace DebugxLog.Console
             }
 
             NetTag netTag = !raw.NetTagShown ? NetTag.None : (raw.IsServer ? NetTag.Server : NetTag.Client);
-            string plain = raw.RawMessage != null ? raw.RawMessage.ToString() : string.Empty;
+            // Strip the caller's own rich-text tags too, the same rule as non-Debugx logs, so "<b>Boss</b> spawned" is found
+            // by searching "Boss spawned" and collapses with the same text logged without tags.
+            // 调用方自己写的富文本标签也剥掉，与非 Debugx 日志同一规则，使 "<b>Boss</b> spawned" 能被 "Boss spawned" 搜到，
+            // 并与不带标签的同一文本折叠在一起。
+            string plain = raw.RawMessage != null ? ConsoleTextUtil.StripRichText(raw.RawMessage.ToString()) : string.Empty;
 
             return new DebugxLogEntry(
                 raw.LogType, raw.FinalText, plain, stackTrace,
