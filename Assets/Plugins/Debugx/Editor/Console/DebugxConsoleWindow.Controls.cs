@@ -238,7 +238,9 @@ namespace DebugxLog.Console.Editor
             enableLogMember.RegisterValueChangedCallback(evt => Debugx.enableLogMember = evt.newValue);
             runtimeGroup.Add(enableLogMember);
 
-            var onlyKey = new IntegerField(L("仅打印此 Key (LogThisKeyMemberOnly)", "Only this key (LogThisKeyMemberOnly)")) { value = Debugx.logThisKeyMemberOnly };
+            // isDelayed: applied on Enter / focus loss, so intermediate keys typed on the way don't take effect.
+            // isDelayed：按回车/失焦才生效，避免输入过程中途经的 key 生效。
+            var onlyKey = new IntegerField(L("仅打印此 Key (LogThisKeyMemberOnly)", "Only this key (LogThisKeyMemberOnly)")) { value = Debugx.logThisKeyMemberOnly, isDelayed = true };
             onlyKey.RegisterValueChangedCallback(evt => Debugx.logThisKeyMemberOnly = evt.newValue);
             runtimeGroup.Add(onlyKey);
 

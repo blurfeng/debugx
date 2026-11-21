@@ -124,7 +124,9 @@ namespace DebugxLog.Console.Runtime
             // Compact fixed width instead of flexGrow: the field only holds a small member key, so a narrow box fits the
             // 260px popup and no longer stretches across the whole row.
             // 用紧凑定宽替代 flexGrow：这里只填一个不大的成员 key，窄框即可贴合 260px 弹层，不再撑满整行。
-            var onlyField = new IntegerField { value = Debugx.logThisKeyMemberOnly };
+            // isDelayed: applied on Enter / focus loss, so typing "12" doesn't pass through key 1 and mute everyone else.
+            // isDelayed：按回车/失焦才生效，避免输入 "12" 时途经 key 1 而让其他成员的日志被屏蔽。
+            var onlyField = new IntegerField { value = Debugx.logThisKeyMemberOnly, isDelayed = true };
             onlyField.style.width = 64;
             onlyField.RegisterValueChangedCallback(evt => Debugx.logThisKeyMemberOnly = evt.newValue);
 
@@ -179,7 +181,10 @@ namespace DebugxLog.Console.Runtime
             capLabel.style.marginRight = 6;
 
             int currentCap = _store != null ? _store.Capacity : DebugxStaticData.RuntimeConsoleBufferCapacity;
-            var capField = new IntegerField { value = currentCap };
+            // isDelayed: applied on Enter / focus loss — otherwise typing "8000" over "4000" first sets the capacity to 8
+            // and permanently drops all but 8 entries. isDelayed：按回车/失焦才生效——否则把 "4000" 改成 "8000" 时，
+            // 第一个键就把容量设为 8，永久丢掉除 8 条以外的全部日志。
+            var capField = new IntegerField { value = currentCap, isDelayed = true };
             capField.style.width = 64;
             capField.RegisterValueChangedCallback(evt =>
             {
