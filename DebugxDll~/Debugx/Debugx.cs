@@ -3,7 +3,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Author: Blur Feng
 // Time: 20230109
-// Version: 2.4.0.1
+// Version: 2.4.0.2
 // Description:
 // The debug log is managed according to its members.use macro "DEBUG_X" open the functional.
 // 此插件用于以成员的方式管理调试日志。使用宏"DEBUG_X"来开启功能。
@@ -105,6 +105,11 @@
 // 3.LogOutput 裁剪颜色标签的正则改为匹配任意 <color=...> 标签（含 8 位 RGBA 与命名颜色），不再只认 6 位十六进制。
 // 4.性能：日志拼串改为链式 Append 去插值临时串；tag 存在性判定由正则改为 Ordinal IndexOf；文件名/时间戳用 InvariantCulture；DateTime.Now 仅在需要时取值。
 // 5.整理：DebugxBurst 改为 static class；ContainsMemberKey 简化；LogCallBack 移除不可达的 File.AppendText 回退分支；_regexMessageCut 加 RegexOptions.Compiled。
+////////////////////
+// Version: 2.4.0.2
+// 1.DLL 工程定义 DEBUG_X 宏。此前 DLL 构建未定义该宏，DLL 内部对 [Conditional("DEBUG_X")] 方法的调用全被编译剔除：DebugxBurst 的 Log/LogWarning/LogError 为空方法，"找不到成员 key/签名"等内部警告从不出现。
+// 2.未注册 key/签名与成员配置缺失的警告改为同一条消息只警告一次（OnAwake 时清空），避免缺失的成员让它的每条日志都多一条警告。
+// 3.LogOutput 录制结束的 "logOutput over" 提示由 Warning 改为普通 Log。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
@@ -147,6 +152,11 @@ namespace DebugxLog
         // 保护 _memberEnables：后台线程可能在产生日志（读 MemberIsEnable）的同时，主线程经 OnAwake / SetMemberEnable /
         // ResetToDefault 修改此表。Dictionary 非线程安全，并发读遇到扩容/清空可能抛异常或读到撕裂值。
         private static readonly object _memberEnablesLocker = new object();
+
+        // "Not found" warnings already printed this run. Each distinct message is reported once, so a missing member
+        // doesn't add a warning to every one of its logs. Cleared in OnAwake; also used as its own lock.
+        // 本次运行已打印过的"找不到"类警告。同一条消息只报一次，避免缺失的成员让它的每条日志都多一条警告。在 OnAwake 时清空，同时用作自身的锁。
+        private static readonly HashSet<string> _warnedOnce = new HashSet<string>();
 
         /// <summary>
         /// Master switch for logging.
@@ -213,6 +223,11 @@ namespace DebugxLog
         public static void OnAwake()
         {
             ResetToDefault();
+
+            lock (_warnedOnce)
+            {
+                _warnedOnce.Clear();
+            }
 
             if (Settings != null && Settings.members != null)
             {
@@ -380,21 +395,21 @@ namespace DebugxLog
 
             if (Settings == null)
             {
-                LogAdmWarning(
+                LogAdmWarningOnce(
                     $"Debugx.GetMemberInfo: The initial configuration is not performed.Settings is null. 未成功初始化配置，Settings为空。");
                 return false;
             }
 
             if (Settings.members == null)
             {
-                LogAdmWarning(
+                LogAdmWarningOnce(
                     $"Debugx.GetMemberInfo: The initial configuration is not performed.Settings.members is null. 未初始化配置，Settings.members为空。");
                 return false;
             }
 
             if (Settings.members.Length == 0)
             {
-                LogAdmWarning(
+                LogAdmWarningOnce(
                     $"Debugx.GetMemberInfo: There are no members available.Settings.members.Length is 0. 没有任何可用的成员，Settings.members.Length为0。");
                 return false;
             }
@@ -578,7 +593,7 @@ namespace DebugxLog
             }
             else
             {
-                LogAdmWarning($"Debugx.LogCreator: cant find memberInfo by key:{key}. 无法找到Key为{key}的成员信息。");
+                LogAdmWarningOnce($"Debugx.LogCreator: cant find memberInfo by key:{key}. 无法找到Key为{key}的成员信息。");
                 if (!allowUnregisteredMember) return;
             }
 
@@ -602,7 +617,7 @@ namespace DebugxLog
             }
             else
             {
-                LogAdmWarning(
+                LogAdmWarningOnce(
                     $"Debugx.LogCreator: cant find memberInfo by signature:{signature}. 无法找到Signature为{signature}的成员信息。");
                 if (!allowUnregisteredMember) return;
             }
@@ -814,6 +829,19 @@ namespace DebugxLog
         private static void LogAdm(LogType type, object message, bool showTime = false, bool showNetTag = true)
         {
             LogCreator(type, AdminInfo, message, showTime, showNetTag);
+        }
+
+        // Admin warning printed only the first time this exact message is seen. Thread-safe (logs can come from any
+        // thread); the warning itself is emitted outside the lock.
+        // 仅在首次遇到这条消息时打印的管理警告。线程安全（日志可能来自任意线程）；警告本身在锁外打印。
+        private static void LogAdmWarningOnce(string message)
+        {
+            lock (_warnedOnce)
+            {
+                if (!_warnedOnce.Add(message)) return;
+            }
+
+            LogAdmWarning(message);
         }
         #endregion
     }

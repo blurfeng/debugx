@@ -171,7 +171,7 @@ namespace DebugxLog.Tools
                         suffix++;
                     }
 
-                    Debugx.LogAdmWarning($"logOutput over, file path : {filePath}");
+                    Debugx.LogAdm($"logOutput over, file path : {filePath}");
                     File.Move(savePath, filePath);
                 }
             }

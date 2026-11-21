@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+### Fixed
+- Rebuilt `DebugxLog.dll` (2.4.0.2) with `DEBUG_X` defined. It had been compiled without it, so every call the DLL made to its own `[Conditional("DEBUG_X")]` methods was stripped: `DebugxBurst.Log` / `LogWarning` / `LogError` did nothing, and Debugx's own warnings (unknown member key or signature, `SetMemberEnable` called too early) never appeared. The unknown key / signature warnings are now printed once per distinct message (reset when `Debugx.OnAwake` runs), so a missing member doesn't add a warning to every one of its logs. The "logOutput over" notice is now a plain log instead of a warning.
+
 ## [2.4.5] - 2026-11-08
 ### Fixed
 - **Editor Console** list rows looked blurry compared to the native Console, especially Chinese text. On Unity 2022.3, UI Toolkit can only render editor text through SDF font atlases (no hinting), which smears at the 11px row size; the native Console uses IMGUI's OS-rasterized hinted glyphs. Each row's timestamp and message are now drawn with IMGUI, so they are exactly as sharp as the native Console. Search-match highlighting is kept, now drawn as a blue box behind the match (IMGUI can't render `<mark>`).
