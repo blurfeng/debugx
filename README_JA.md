@@ -269,7 +269,7 @@ Debugx にはいくつかの固定プリセットメンバーが組み込まれ�
    - **実機 / ビルド版**：エディターのチェックは**ビルドに引き継がれません**。ゲームコードで `DebugxStaticData.RuntimeConsoleEnabled = true` を設定する必要があります（ビルド版の `PlayerPrefs` は初期状態が空で、既定でオフ）。
 
 > [!NOTE]
-> オーバーレイには `Resources` 配下にある `Console` という名前の UI Toolkit Panel Settings アセットが必要です。**プラグインにこのアセットは同梱済み**（`Resources/Console`）なので通常は追加操作は不要です。もし欠落している（除去 / 削除された）場合、オーバーレイは有効化されず Console にヒントを出力します。その場合は任意の `Resources` フォルダーに `Console` という名前の Panel Settings を新規作成すれば OK です。
+> オーバーレイには UI Toolkit Panel Settings アセット `Resources/Debugx/Console` が必要です。**プラグインにこのアセットは同梱済み**なので通常は追加操作は不要です。もし欠落している（除去 / 削除された）場合、オーバーレイは有効化されず Console にヒントを出力します。その場合は任意の `Resources` フォルダー内の `Debugx` サブフォルダーに `Console` という名前の Panel Settings を新規作成すれば OK です（旧バージョンのように `Resources` 直下に置いた `Console` も引き続き認識されます）。
 
 条件を満たすと、オーバーレイは最初のシーン読み込み後に自動生成され（`DontDestroyOnLoad`）、既定では非表示です。**呼び出し / 収納の方法：**
 - デスクトップ：**バッククォートキー**（`` ` `` / `BackQuote`）を押す。

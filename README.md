@@ -269,7 +269,7 @@ Debugx 内置了几个固定的预设成员，它们的 Key 已保留，请勿�
    - **真机 / 打包版本**：编辑器里的勾选**不会带进构建**，需在游戏代码中设置 `DebugxStaticData.RuntimeConsoleEnabled = true`（打包版 `PlayerPrefs` 初始为空，默认关闭）。
 
 > [!NOTE]
-> 叠层需要一个位于 `Resources` 下、名为 `Console` 的 UI Toolkit Panel Settings 资源。**插件已内置该资源**（`Resources/Console`），通常无需额外操作；若它缺失（被裁剪 / 删除），叠层不会启用并会在 Console 打印提示，此时在任意 `Resources` 目录新建一个命名为 `Console` 的 Panel Settings 即可。
+> 叠层需要一个 UI Toolkit Panel Settings 资源 `Resources/Debugx/Console`。**插件已内置该资源**，通常无需额外操作；若它缺失（被裁剪 / 删除），叠层不会启用并会在 Console 打印提示，此时在任意 `Resources` 目录下的 `Debugx` 子目录里新建一个命名为 `Console` 的 Panel Settings 即可（旧版本直接放在 `Resources` 下的 `Console` 仍可识别）。
 
 满足条件后，叠层会在首个场景加载后自动创建（`DontDestroyOnLoad`），默认隐藏。**唤出 / 收起方式：**
 - 桌面端：按**反引号键**（`` ` `` / `BackQuote`）。

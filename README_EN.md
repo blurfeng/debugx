@@ -269,7 +269,7 @@ Click **Editor** in the toolbar to expand it. This panel gathers the view option
    - **Device / builds**: the editor checkbox **is not carried into builds**; you must set `DebugxStaticData.RuntimeConsoleEnabled = true` in your game code (a build's `PlayerPrefs` starts empty, off by default).
 
 > [!NOTE]
-> The overlay needs a UI Toolkit Panel Settings asset named `Console` located under `Resources`. **The plugin already bundles this asset** (`Resources/Console`), so usually no extra action is needed; if it's missing (stripped / deleted), the overlay won't enable and prints a hint in the Console — in that case just create a Panel Settings named `Console` in any `Resources` folder.
+> The overlay needs a UI Toolkit Panel Settings asset at `Resources/Debugx/Console`. **The plugin already bundles this asset**, so usually no extra action is needed; if it's missing (stripped / deleted), the overlay won't enable and prints a hint in the Console — in that case just create a Panel Settings named `Console` in a `Debugx` subfolder of any `Resources` folder (a `Console` placed directly under `Resources`, as older versions asked for, is still recognized).
 
 Once the conditions are met, the overlay auto-creates after the first scene loads (`DontDestroyOnLoad`), hidden by default. **How to summon / dismiss:**
 - Desktop: press the **backquote key** (`` ` `` / `BackQuote`).

@@ -146,12 +146,12 @@ namespace DebugxLog.Console.Editor
             // built-in console icons if a Resources file is missing. Gray "_g" variants are shown when a count is 0.
             // 严重级别图标改用插件 Resources（与运行时 Console 共用）；Resources 缺失时回退到 Unity 内置控制台图标。
             // 计数为 0 时显示灰色 "_g" 变体。
-            _iconLog = LoadSeverityIcon("icon_info", "console.infoicon.sml");
-            _iconWarn = LoadSeverityIcon("icon_warning", "console.warnicon.sml");
-            _iconError = LoadSeverityIcon("icon_error", "console.erroricon.sml");
-            _iconLogGray = Resources.Load<Texture2D>("icon_info_g");
-            _iconWarnGray = Resources.Load<Texture2D>("icon_warning_g");
-            _iconErrorGray = Resources.Load<Texture2D>("icon_error_g");
+            _iconLog = LoadSeverityIcon("Debugx/icon_info", "console.infoicon.sml");
+            _iconWarn = LoadSeverityIcon("Debugx/icon_warning", "console.warnicon.sml");
+            _iconError = LoadSeverityIcon("Debugx/icon_error", "console.erroricon.sml");
+            _iconLogGray = Resources.Load<Texture2D>("Debugx/icon_info_g");
+            _iconWarnGray = Resources.Load<Texture2D>("Debugx/icon_warning_g");
+            _iconErrorGray = Resources.Load<Texture2D>("Debugx/icon_error_g");
 
             VisualElement root = rootVisualElement;
             root.Add(BuildToolbar());

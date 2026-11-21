@@ -28,16 +28,20 @@ namespace DebugxLog.Console.Runtime
     [DisallowMultipleComponent]
     public partial class DebugxRuntimeConsole : MonoBehaviour
     {
-        // The PanelSettings asset name, loaded from any Resources folder (user-authored: Resources/Console.asset).
-        // PanelSettings 资源名，从任意 Resources 目录加载（用户创建：Resources/Console.asset）。
-        private const string PanelSettingsResource = "Console";
+        // The PanelSettings asset, loaded from Resources. The package ships it under a "Debugx" subfolder so a game's own
+        // Resources asset called "Console" can't be picked instead; a plain "Console" (what older docs told users to create
+        // when it was missing) is still accepted as a fallback.
+        // PanelSettings 资源，从 Resources 加载。随包的那份放在 "Debugx" 子目录，避免游戏自己名为 "Console" 的 Resources 资源被误用；
+        // 仍兼容旧文档让用户在缺失时自建的同名 "Console"。
+        private const string PanelSettingsResource = "Debugx/Console";
+        private const string LegacyPanelSettingsResource = "Console";
 
-        // The bundled fallback ThemeStyleSheet name (package-internal: Resources/DebugxRuntimeTheme.tss). Assigned to
-        // the PanelSettings when it has no theme set — e.g. the authored theme lived outside the package and wasn't
-        // shipped as UPM. Loaded by name, so no cross-package GUID reference is involved.
-        // 包内自带的回退主题名（包内部：Resources/DebugxRuntimeTheme.tss）。当 PanelSettings 未设置主题时赋给它——例如原
-        // 主题在包外、未随 UPM 发布。按名加载，不涉及任何跨包 GUID 引用。
-        private const string ThemeResource = "DebugxRuntimeTheme";
+        // The bundled fallback ThemeStyleSheet (package-internal: Resources/Debugx/DebugxRuntimeTheme.tss). Assigned to
+        // the PanelSettings when it has no theme set — e.g. a user-created PanelSettings. Loaded by name, so no
+        // cross-package GUID reference is involved.
+        // 包内自带的回退主题（包内部：Resources/Debugx/DebugxRuntimeTheme.tss）。当 PanelSettings 未设置主题时赋给它——例如用户
+        // 自建的 PanelSettings。按名加载，不涉及任何跨包 GUID 引用。
+        private const string ThemeResource = "Debugx/DebugxRuntimeTheme";
 
         private static DebugxRuntimeConsole _instance;
 
@@ -83,7 +87,8 @@ namespace DebugxLog.Console.Runtime
             // “启用游戏内运行时 Console” 关闭：关闭时不自建。此处读取一次，故改动在下次进入 Play 生效。
             if (!DebugxStaticData.RuntimeConsoleEnabled) return;
 
-            PanelSettings panelSettings = Resources.Load<PanelSettings>(PanelSettingsResource);
+            PanelSettings panelSettings = Resources.Load<PanelSettings>(PanelSettingsResource)
+                                          ?? Resources.Load<PanelSettings>(LegacyPanelSettingsResource);
             if (panelSettings == null)
             {
                 // No console will be created, so release the early-capture subscription (see EarlyCapture) — otherwise it
@@ -93,7 +98,8 @@ namespace DebugxLog.Console.Runtime
                 _earlyStore = null;
                 Debug.LogWarning(
                     $"[Debugx] 运行时 Console 未启用：未找到 PanelSettings 'Resources/{PanelSettingsResource}'。" +
-                    " 请在任意 Resources 目录下创建 UI Toolkit > Panel Settings Asset 并命名为 Console。");
+                    " 请在任意 Resources 目录的 Debugx 子目录下创建 UI Toolkit > Panel Settings Asset 并命名为 Console。" +
+                    $" Runtime Console disabled: PanelSettings 'Resources/{PanelSettingsResource}' not found; create a UI Toolkit Panel Settings Asset named Console in a Resources/Debugx folder.");
                 return;
             }
 
