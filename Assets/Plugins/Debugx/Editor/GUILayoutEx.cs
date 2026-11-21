@@ -7,6 +7,23 @@ namespace DebugxLog.Editor
 {
     public static class GUILayoutEx
     {
+        /// <summary>
+        /// Warn when DEBUG_X is not defined. Checked at compile time: the editor compiles with the ACTIVE platform's defines,
+        /// so this matches exactly whether Debugx works in the editor right now (reading another platform's defines didn't).
+        /// 未定义 DEBUG_X 时给出警告。在编译期判断：编辑器按【当前激活平台】的宏编译，因此与 Debugx 此刻在编辑器中是否工作完全一致
+        /// （读取其他平台的宏则不一致）。
+        /// </summary>
+        public static void DebugxDefineMissingWarning()
+        {
+#if !DEBUG_X
+            EditorGUILayout.HelpBox(
+                DebugxStaticData.IsChineseSimplified
+                    ? "当前平台未定义宏 \"DEBUG_X\"，Debugx 不会工作。请在 Project Settings > Player > Scripting Define Symbols 中为当前平台添加。"
+                    : "The macro \"DEBUG_X\" is not defined for the current platform, so Debugx will not function. Add it under Project Settings > Player > Scripting Define Symbols for the current platform.",
+                MessageType.Warning);
+#endif
+        }
+
         #region Button
 
         public static bool ButtonGreen(string text, string tooltip = "", params GUILayoutOption[] options)
