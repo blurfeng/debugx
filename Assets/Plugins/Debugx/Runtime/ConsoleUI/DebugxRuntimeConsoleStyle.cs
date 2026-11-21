@@ -57,10 +57,10 @@ namespace DebugxLog.Console.Runtime
 
         // Sizing. 尺寸。
         public const float ListItemHeight = 22f;
-        // Fixed height of the bottom detail/stack pane. Roomy enough to read a message plus a few stack frames without
-        // squeezing the list (the panel is enlarged to match — see BuildPanel).
-        // 底部详情/堆栈面板的固定高度。足够读一条消息加几帧堆栈而不挤压列表（面板整体也相应放大——见 BuildPanel）。
-        public const float DetailPaneHeight = 200f;
+        // Height of the bottom detail/stack pane as a percentage of the panel. A share rather than fixed pixels, so on a
+        // high-DPI phone (logical height can be under 200 px in landscape) the list keeps room.
+        // 底部详情/堆栈面板占面板高度的百分比。用比例而非固定像素，使高 DPI 手机上（横屏逻辑高度可能不足 200）列表仍有空间。
+        public const float DetailPaneHeightPercent = 35f;
         public const float SeverityBarWidth = 4f;
         public const float TimestampWidth = 56f;
         public const int CountOverflowThreshold = 999;

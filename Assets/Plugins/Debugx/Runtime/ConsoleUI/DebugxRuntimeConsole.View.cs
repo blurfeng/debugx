@@ -117,7 +117,8 @@ namespace DebugxLog.Console.Runtime
             panel.style.top = 8;
             panel.style.width = Length.Percent(66);
             panel.style.height = Length.Percent(66);
-            panel.style.minWidth = 320;
+            // No fixed minimum width: at phone DPIs the screen can be under 320 logical px wide (the toolbar wraps instead).
+            // 不设固定最小宽度：在手机 DPI 下屏幕逻辑宽度可能不足 320（工具栏会换行）。
             panel.style.backgroundColor = DebugxRuntimeConsoleStyle.PanelBg;
             panel.style.flexDirection = FlexDirection.Column;
             panel.style.overflow = Overflow.Hidden; // clip any stray child overflow so nothing spills past the panel/window. 裁剪子元素溢出，杜绝越出面板/窗口。
@@ -142,7 +143,7 @@ namespace DebugxLog.Console.Runtime
             VisualElement detailPane = BuildDetailPane();
             detailPane.style.flexGrow = 0;
             detailPane.style.flexShrink = 0;
-            detailPane.style.height = DebugxRuntimeConsoleStyle.DetailPaneHeight;
+            detailPane.style.height = Length.Percent(DebugxRuntimeConsoleStyle.DetailPaneHeightPercent);
 
             panel.Add(listPane);
             panel.Add(divider);

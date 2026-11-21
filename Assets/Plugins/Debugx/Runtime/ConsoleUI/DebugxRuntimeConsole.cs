@@ -39,10 +39,6 @@ namespace DebugxLog.Console.Runtime
         // 主题在包外、未随 UPM 发布。按名加载，不涉及任何跨包 GUID 引用。
         private const string ThemeResource = "DebugxRuntimeTheme";
 
-        // High sorting order so the console renders above the game's own runtime UI panels.
-        // 高排序序，使 Console 渲染在游戏自身运行时 UI 面板之上。
-        private const float PanelSortingOrder = 30000f;
-
         private static DebugxRuntimeConsole _instance;
 
         // Early-capture store, created at BeforeSceneLoad — i.e. BEFORE DebugxManager's AfterSceneLoad Awake — so logs
@@ -133,8 +129,11 @@ namespace DebugxLog.Console.Runtime
             DontDestroyOnLoad(go);
 
             var doc = go.AddComponent<UIDocument>();
+            // Draw order against the game's own UI Toolkit panels comes from PanelSettings.sortingOrder (30000 on the shipped
+            // Console.asset); UIDocument.sortingOrder only orders documents within one panel.
+            // 相对游戏自身 UI Toolkit 面板的绘制顺序取决于 PanelSettings.sortingOrder（随包的 Console.asset 为 30000）；
+            // UIDocument.sortingOrder 只在同一个面板内部排序。
             doc.panelSettings = panelSettings;
-            doc.sortingOrder = PanelSortingOrder;
 
             _instance = go.AddComponent<DebugxRuntimeConsole>();
             _instance._document = doc;
