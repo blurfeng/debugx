@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -65,22 +64,7 @@ namespace DebugxLog.Console.Editor
         private static void CopyEntries(List<DebugxLogEntry> entries, bool withStack)
         {
             if (entries == null || entries.Count == 0) return;
-
-            var sb = new StringBuilder();
-            for (int i = 0; i < entries.Count; i++)
-            {
-                if (i > 0) sb.Append('\n');
-                DebugxLogEntry e = entries[i];
-                sb.Append(e.PlainText);
-                if (withStack)
-                {
-                    // Strip [HideInCallstack] frames so the clipboard matches the visible stack. 剔除 [HideInCallstack] 帧，使剪贴板与可见堆栈一致。
-                    string stack = StackTraceParser.StripHiddenFrames(e.StackTrace);
-                    if (!string.IsNullOrEmpty(stack))
-                        sb.Append('\n').Append(stack).Append('\n'); // trailing blank line separates stacked entries. 结尾空行分隔多条带堆栈的条目。
-                }
-            }
-            EditorGUIUtility.systemCopyBuffer = sb.ToString().TrimEnd('\n');
+            EditorGUIUtility.systemCopyBuffer = ConsoleTextUtil.FormatEntriesForCopy(entries, withStack);
         }
     }
 }

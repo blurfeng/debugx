@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace DebugxLog.Console
@@ -49,6 +53,37 @@ namespace DebugxLog.Console
             if (string.IsNullOrEmpty(text) || index < 0 || index >= text.Length || text[index] != '<') return 0;
             Match m = _richTagAtRegex.Match(text, index);
             return m.Success ? m.Length : 0;
+        }
+
+        /// <summary>
+        /// Row timestamp text, culture-invariant ("HH:mm:ss"), shared by the Editor and runtime Consoles.
+        /// 行时间戳文本（与区域无关的 "HH:mm:ss"），Editor 与运行时 Console 共用。
+        /// </summary>
+        public static string FormatTime(DateTime time) => time.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+
+        /// <summary>
+        /// Clipboard text for copied entries: each plain message, optionally followed by its stack with Debugx's own
+        /// [HideInCallstack] forwarder frames removed (matching the visible stack); a blank line separates stacked entries.
+        /// 复制条目的剪贴板文本：每条为纯文本消息，可选附上堆栈（剔除 Debugx 自身的 [HideInCallstack] 转发帧，与可见堆栈一致）；
+        /// 带堆栈的多条之间以空行分隔。
+        /// </summary>
+        public static string FormatEntriesForCopy(IReadOnlyList<DebugxLogEntry> entries, bool withStack)
+        {
+            if (entries == null || entries.Count == 0) return string.Empty;
+
+            var sb = new StringBuilder();
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                DebugxLogEntry e = entries[i];
+                sb.Append(e.PlainText);
+                if (!withStack) continue;
+
+                string stack = StackTraceParser.StripHiddenFrames(e.StackTrace);
+                if (!string.IsNullOrEmpty(stack))
+                    sb.Append('\n').Append(stack).Append('\n');
+            }
+            return sb.ToString().TrimEnd('\n');
         }
     }
 }

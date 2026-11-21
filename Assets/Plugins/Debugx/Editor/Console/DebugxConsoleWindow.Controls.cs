@@ -84,22 +84,9 @@ namespace DebugxLog.Console.Editor
             OnCriteriaChanged();
         }
 
-        private static HashSet<int> BuildAllMemberKeySet()
-        {
-            var set = new HashSet<int>();
-            DebugxProjectSettings settings = DebugxProjectSettings.Instance;
-            if (settings != null && settings.members != null)
-            {
-                foreach (DebugxMemberInfo m in settings.members)
-                    if (m != null) set.Add(m.key);
-            }
-            // Pseudo-members that also appear as entries but are not in the configured list — see ShowMemberMenu.
-            // 同样会作为条目出现、但不在配置列表里的伪成员——见 ShowMemberMenu。
-            if (settings != null && settings.AdminInfo != null) set.Add(settings.AdminInfo.key);
-            set.Add(DebugxRawLog.UnregisteredKey);
-            set.Add(DebugxLogEntry.UncategorizedKey);
-            return set;
-        }
+        // Shared with the runtime Console so both narrow the same member universe (pseudo-members included).
+        // 与运行时 Console 共用，使两边收窄的是同一个成员全集（含伪成员）。
+        private static HashSet<int> BuildAllMemberKeySet() => LogFilterCriteria.CreateAllMemberKeySet();
 
         // ---------- Clear dropdown (native-style Clear-on options) ----------
 

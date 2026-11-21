@@ -1,4 +1,3 @@
-using System.Globalization;
 using UnityEditor;
 using UnityEditor.UIElements;
 using UnityEngine;
@@ -24,7 +23,7 @@ namespace DebugxLog.Console.Editor
 
         // InvariantCulture 固定 ':' 分隔符：否则部分系统区域的 TimeSeparator 会把时间戳显示成 12.34.56。
         // InvariantCulture pins the ':' separator; otherwise some locales' TimeSeparator renders it as 12.34.56.
-        private static string TimestampText(DebugxLogEntry e) => e.Timestamp.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+        private static string TimestampText(DebugxLogEntry e) => ConsoleTextUtil.FormatTime(e.Timestamp);
 
         // Whether a stack frame is shown under the current Script-Only / Full mode.
         // 当前“仅脚本/完整”模式下是否显示某堆栈帧。

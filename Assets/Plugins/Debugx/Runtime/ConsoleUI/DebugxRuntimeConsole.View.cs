@@ -435,7 +435,7 @@ namespace DebugxLog.Console.Runtime
             var time = element.Q<Label>("time");
             if (_showTimestamp)
             {
-                time.text = e.Timestamp.ToString("HH:mm:ss");
+                time.text = ConsoleTextUtil.FormatTime(e.Timestamp);
                 time.style.display = DisplayStyle.Flex;
             }
             else
@@ -577,7 +577,6 @@ namespace DebugxLog.Console.Runtime
 
             _listView.RefreshItems();
             UpdateCounts();
-            ReapplyMemberFilterOnDrift(); // keep a new member visible under an active partial filter. 让新成员在启用部分过滤时仍可见。
             ReconcileSelection(selectedSeqs, primarySeq);
 
             // Tail: auto-scroll to newest only while stuck to the bottom (scrolling up pauses it). 贴底时才自动滚到最新（上滚暂停）。
@@ -871,22 +870,12 @@ namespace DebugxLog.Console.Runtime
             return list;
         }
 
-        // Plain message + raw stack per entry; a trailing blank line separates stacked entries. GUIUtility.systemCopyBuffer
-        // works at runtime. 每条为纯文本消息 + 原始堆栈；带堆栈的多条之间用空行分隔。GUIUtility.systemCopyBuffer 运行时可用。
+        // Same clipboard format as the Editor Console (shared ConsoleTextUtil). GUIUtility.systemCopyBuffer works at runtime.
+        // 与 Editor 版 Console 相同的剪贴板格式（共享的 ConsoleTextUtil）。GUIUtility.systemCopyBuffer 运行时可用。
         private static void CopyEntries(List<DebugxLogEntry> entries, bool withStack)
         {
             if (entries == null || entries.Count == 0) return;
-
-            var sb = new StringBuilder();
-            for (int i = 0; i < entries.Count; i++)
-            {
-                if (i > 0) sb.Append('\n');
-                DebugxLogEntry e = entries[i];
-                sb.Append(e.PlainText);
-                if (withStack && !string.IsNullOrEmpty(e.StackTrace))
-                    sb.Append('\n').Append(e.StackTrace).Append('\n');
-            }
-            GUIUtility.systemCopyBuffer = sb.ToString().TrimEnd('\n');
+            GUIUtility.systemCopyBuffer = ConsoleTextUtil.FormatEntriesForCopy(entries, withStack);
         }
 
         private void CycleNetTag()
@@ -955,9 +944,9 @@ namespace DebugxLog.Console.Runtime
             return text.Replace('\r', ' ').Replace('\n', ' ');
         }
 
-        // Wrap the active search's matches with a <mark> highlight, delegating to the shared, UI-agnostic
-        // SearchHighlighter so the Editor Console and this runtime Console paint matches identically.
-        // 给当前搜索命中套上 <mark> 高亮，委托给共享、与 UI 无关的 SearchHighlighter，使 Editor 版与本运行时版 Console 的命中着色一致。
+        // Wrap the active search's matches with a <mark> highlight (see Apply; tags are recognized by the shared
+        // ConsoleTextUtil, the same rule the Editor Console uses).
+        // 给当前搜索命中套上 <mark> 高亮（见 Apply；标签由共享的 ConsoleTextUtil 识别，与 Editor 版 Console 规则相同）。
         private string ApplySearchHighlight(string richText) =>
             Apply(richText, _criteria.Search, DebugxRuntimeConsoleStyle.SearchHighlightHex);
 

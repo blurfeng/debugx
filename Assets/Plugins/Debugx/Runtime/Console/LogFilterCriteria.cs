@@ -69,5 +69,27 @@ namespace DebugxLog.Console
         /// are unaffected). 网络标签过滤。<see cref="NetTagFilterMode.All"/> 表示不过滤（默认值，故从不设置它的 Console 不受影响）。
         /// </summary>
         public NetTagFilterMode NetTagMode = NetTagFilterMode.All;
+
+        /// <summary>
+        /// Every member key an entry can carry: the configured members plus the pseudo-members Admin (LogAdm, key 0),
+        /// Unregistered and Uncategorized. Used to turn "all members" into an explicit set before narrowing it, so a
+        /// member that hasn't logged yet is covered too.
+        /// 条目可能携带的全部成员 key：配置的成员，加上伪成员 Admin（LogAdm，key 0）、未注册与未分类。用于在收窄之前把
+        /// “全部成员”具体化为显式集合，从而也覆盖尚未打印过的成员。
+        /// </summary>
+        public static HashSet<int> CreateAllMemberKeySet()
+        {
+            var set = new HashSet<int>();
+            DebugxProjectSettings settings = DebugxProjectSettings.Instance;
+            if (settings != null && settings.members != null)
+            {
+                foreach (DebugxMemberInfo m in settings.members)
+                    if (m != null) set.Add(m.key);
+            }
+            if (settings != null && settings.AdminInfo != null) set.Add(settings.AdminInfo.key);
+            set.Add(DebugxRawLog.UnregisteredKey);
+            set.Add(DebugxLogEntry.UncategorizedKey);
+            return set;
+        }
     }
 }
