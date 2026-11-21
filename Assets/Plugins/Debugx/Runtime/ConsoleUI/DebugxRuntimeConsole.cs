@@ -1,7 +1,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
-#if ENABLE_INPUT_SYSTEM
+// ENABLE_INPUT_SYSTEM only reflects the Player setting "Active Input Handling"; DEBUGX_INPUT_SYSTEM (asmdef versionDefines)
+// says the Input System package is actually installed. Both are required, or a project set to New/Both without the
+// package would fail to compile here.
+// ENABLE_INPUT_SYSTEM 只反映 Player 设置 "Active Input Handling"；DEBUGX_INPUT_SYSTEM（asmdef versionDefines）表示确实安装了
+// Input System 包。两者都需满足，否则设为 New/Both 却没装包的项目会在这里编译失败。
+#if ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
 
@@ -161,7 +166,7 @@ namespace DebugxLog.Console.Runtime
         private const float RebuildInterval = 0.1f;
         private float _lastRebuildTime;
 
-#if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
+#if (ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM) || ENABLE_LEGACY_INPUT_MANAGER
         // Multi-finger tap debounce: fires once when the finger count first reaches the threshold, re-armed only after
         // every finger lifts (so holding fingers down or adjusting them doesn't retoggle). Shared by both input backends;
         // guarded so it isn't an unused field (CS0414) when neither input backend is compiled in.
@@ -254,7 +259,7 @@ namespace DebugxLog.Console.Runtime
             // enabled compiles only the new path and never toggles twice in one frame (open→close); a project with only
             // the legacy Input Manager falls back to it. 反引号键在桌面端开合 Console；触屏端多指点击开合（外加悬浮按钮）。
             // 用 #if/#elif 让新输入系统优先：同时启用两套输入（Both）的工程只编译新输入分支，不会同一帧开→关抵消；仅旧输入的工程回退到旧输入。
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM
             if (ReadToggleInputSystem())
                 SetPanelVisible(!_visible);
 #elif ENABLE_LEGACY_INPUT_MANAGER
@@ -263,7 +268,7 @@ namespace DebugxLog.Console.Runtime
 #endif
         }
 
-#if ENABLE_INPUT_SYSTEM
+#if ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM
         // New Input System reader: backquote key + multi-finger tap. Keyboard/Touchscreen can be null when the matching
         // device is absent, so both are null-checked. Active fingers are those whose press is held this frame.
         // 新输入系统读取：反引号键 + 多指点击。无对应设备时 Keyboard/Touchscreen 可能为 null，故判空。活跃手指即本帧处于按下状态的触点。
@@ -289,7 +294,7 @@ namespace DebugxLog.Console.Runtime
         }
 #endif
 
-#if ENABLE_LEGACY_INPUT_MANAGER && !ENABLE_INPUT_SYSTEM
+#if ENABLE_LEGACY_INPUT_MANAGER && !(ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM)
         // Legacy Input Manager reader: backquote key + multi-finger tap. Compiled only when the new Input System is not
         // active (Both routes through the new path above). 旧 Input Manager 读取：反引号键 + 多指点击。仅在未启用新输入系统时编译
         // （Both 走上面的新输入分支）。
@@ -302,7 +307,7 @@ namespace DebugxLog.Console.Runtime
         }
 #endif
 
-#if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
+#if (ENABLE_INPUT_SYSTEM && DEBUGX_INPUT_SYSTEM) || ENABLE_LEGACY_INPUT_MANAGER
         // Multi-finger tap debounce: returns true once when the active-finger count first reaches the threshold, re-armed
         // only after every finger lifts. Shared by both input backends. 多指点击防抖：活跃手指数首次达到阈值时返回一次 true，
         // 仅在全部手指抬起后重新武装。新旧输入系统共用。
