@@ -39,6 +39,19 @@ namespace DebugxLog.Editor
         /// </summary>
         public static void GenerateDebugxLoggerClass()
         {
+            // Writing the file during Play triggers a script recompile (with "Recompile And Continue Playing", a domain
+            // reload mid-session), so generate once Play has ended instead.
+            // Play 期间写文件会触发脚本重编译（若设为 "Recompile And Continue Playing" 还会在运行中途重载脚本域），故改为退出 Play 后再生成。
+            if (EditorApplication.isPlaying)
+            {
+                if (!_generateAfterPlay)
+                {
+                    _generateAfterPlay = true;
+                    EditorApplication.playModeStateChanged += GenerateAfterPlay;
+                }
+                return;
+            }
+
             var settingsAsset = DebugxProjectSettingsAsset.Instance;
             if (!settingsAsset)
             {
@@ -138,6 +151,17 @@ namespace DebugxLog.Editor
 
             AssetDatabase.Refresh();
             Debug.Log($"[DebugxCodeGenerator] {DebugxClassPath} generated successfully.");
+        }
+
+        private static bool _generateAfterPlay;
+
+        private static void GenerateAfterPlay(PlayModeStateChange state)
+        {
+            if (state != PlayModeStateChange.EnteredEditMode) return;
+
+            EditorApplication.playModeStateChanged -= GenerateAfterPlay;
+            _generateAfterPlay = false;
+            GenerateDebugxLoggerClass();
         }
 
         /// <summary>

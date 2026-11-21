@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using DebugxLog.Tools;
 
@@ -143,6 +144,22 @@ namespace DebugxLog
         {
             if (settings == null) return;
 
+            // Re-applying during Play (an edit on the settings / preferences page) must keep the runtime switches set from
+            // the Console panel or with SetMemberEnable; they are captured here and restored after OnAwake below. A first
+            // load has no members yet, so it starts from the defaults as before.
+            // Play 期间重新应用设置（在设置页/偏好页修改）时，必须保留通过 Console 面板或 SetMemberEnable 设置的运行时开关；
+            // 在此记下，并在下方 OnAwake 之后恢复。首次加载时尚无成员，照旧从默认值开始。
+            bool keepRuntimeSwitches = Application.isPlaying && settings.members != null;
+            bool runtimeEnableLog = Debugx.enableLog;
+            bool runtimeEnableLogMember = Debugx.enableLogMember;
+            int runtimeOnlyKey = Debugx.logThisKeyMemberOnly;
+            var runtimeMemberEnables = new Dictionary<int, bool>();
+            if (keepRuntimeSwitches)
+            {
+                foreach (DebugxMemberInfo member in settings.members)
+                    if (member != null) runtimeMemberEnables[member.key] = Debugx.MemberIsEnable(member.key);
+            }
+
             if (Application.isEditor)
             {
                 settings.enableLogDefault = DebugxStaticData.EnableLogDefaultPrefs;
@@ -202,6 +219,17 @@ namespace DebugxLog
             // Use OnAwake instead of ResetToDefault: the latter only clears _memberEnables without rebuilding, which makes
             // runtime member switches silently break after applying settings. OnAwake rebuilds the switch dictionary from members.
             Debugx.OnAwake();
+
+            if (keepRuntimeSwitches)
+            {
+                Debugx.enableLog = runtimeEnableLog;
+                Debugx.enableLogMember = runtimeEnableLogMember;
+                Debugx.logThisKeyMemberOnly = runtimeOnlyKey;
+                // Members added meanwhile keep their defaults; members that were removed are skipped.
+                // 期间新增的成员保持其默认值；已移除的成员跳过。
+                foreach (KeyValuePair<int, bool> pair in runtimeMemberEnables)
+                    if (Debugx.ContainsMemberKey(pair.Key)) Debugx.SetMemberEnable(pair.Key, pair.Value);
+            }
 
             OnApplyTo.Invoke();
         }
