@@ -3,6 +3,7 @@
 ## [Unreleased]
 ### Fixed
 - Rebuilt `DebugxLog.dll` (2.4.0.2) with `DEBUG_X` defined. It had been compiled without it, so every call the DLL made to its own `[Conditional("DEBUG_X")]` methods was stripped: `DebugxBurst.Log` / `LogWarning` / `LogError` did nothing, and Debugx's own warnings (unknown member key or signature, `SetMemberEnable` called too early) never appeared. The unknown key / signature warnings are now printed once per distinct message (reset when `Debugx.OnAwake` runs), so a missing member doesn't add a warning to every one of its logs. The "logOutput over" notice is now a plain log instead of a warning.
+- **Log file output** no longer wipes the previous session's log. When a session never reached `RecordOver` (a crash, an editor crash, or the OS killing the app on mobile), the next start opened `DebugxLog.log` with `FileMode.Create` and truncated it. The leftover file is now archived first, named after its last write time; if it can't be moved (for example another game instance holds it), the new session appends to it instead of truncating it.
 
 ## [2.4.5] - 2026-11-08
 ### Fixed

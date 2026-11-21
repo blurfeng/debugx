@@ -94,8 +94,24 @@ namespace DebugxLog.Tools
                         _writer = null;
                     }
 
+                    // A log left by a session that never reached RecordOver (crash, killed process) would be wiped by
+                    // FileMode.Create: archive it first, named after its last write time (about when that session ended).
+                    // If it can't be moved (e.g. held by another game instance), append to it instead of truncating it.
+                    // 未走到 RecordOver 的会话（崩溃、进程被杀）留下的日志会被 FileMode.Create 清空：先按其最后写入时间
+                    // （约为该会话结束的时间）存档。若无法移动（如被另一个游戏实例占用），改为追加写入而不是清空。
+                    FileMode mode = FileMode.Create;
+                    try
+                    {
+                        ArchiveLogFile(savePath, File.GetLastWriteTime(savePath));
+                    }
+                    catch (Exception ex)
+                    {
+                        mode = FileMode.Append;
+                        UnityEngine.Debug.LogError("[Debugx] LogOutput.RecordStart 无法存档上次的日志，改为追加写入。" + ex.Message);
+                    }
+
                     // 保持文件流常驻，减少每条日志的打开/关闭开销。
-                    FileStream fs = new FileStream(savePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+                    FileStream fs = new FileStream(savePath, mode, FileAccess.Write, FileShare.ReadWrite);
                     _writer = new StreamWriter(fs, new UTF8Encoding(false));
                     // 关闭自动刷盘，避免每条日志一次同步磁盘写；Log 级别缓冲，Warning/Error 及 RecordOver 时显式 Flush。
                     // Disable auto-flush to avoid a sync disk write per line; plain logs buffer, warnings/errors and RecordOver flush explicitly.
@@ -146,39 +162,47 @@ namespace DebugxLog.Tools
                 _savePath = null;
             }
 
-            if (string.IsNullOrEmpty(savePath) || !File.Exists(savePath))
-            {
-                return;
-            }
-
             try
             {
-                FileInfo fileInfo = new FileInfo(savePath);
-                if (fileInfo.Length == 0)
-                {
-                    fileInfo.Delete();
-                }
-                else
-                {
-                    // Rename the printed file.
-                    // 将打印的文件重命名。
-                    string stamp = DateTime.Now.ToString("yyyy.MM.dd-HH.mm.ss", CultureInfo.InvariantCulture);
-                    string filePath = Path.Combine(_directoryPath, $"{FileName}-{stamp}{FileType}");
-                    int suffix = 1;
-                    while (File.Exists(filePath))
-                    {
-                        filePath = Path.Combine(_directoryPath, $"{FileName}-{stamp}-{suffix}{FileType}");
-                        suffix++;
-                    }
-
-                    Debugx.LogAdm($"logOutput over, file path : {filePath}");
-                    File.Move(savePath, filePath);
-                }
+                // Rename the printed file so a later session can't overwrite it.
+                // 将打印的文件重命名，避免之后的会话覆盖它。
+                string archivedPath = ArchiveLogFile(savePath, DateTime.Now);
+                if (archivedPath != null)
+                    Debugx.LogAdm($"logOutput over, file path : {archivedPath}");
             }
             catch (Exception ex)
             {
                 UnityEngine.Debug.LogError("[Debugx] LogOutput.RecordOver 执行失败。" + ex.Message);
             }
+        }
+
+        // Move a finished log to a timestamped name in the same folder so a later session can't overwrite it; an empty
+        // file is deleted instead. Returns the archived path, or null when there was nothing to keep. Throws on I/O errors.
+        // 将已结束的日志改名为同目录下带时间戳的文件，避免之后的会话覆盖它；空文件直接删除。返回存档路径，无需保留时返回 null。
+        // I/O 出错时抛出异常。
+        private static string ArchiveLogFile(string logPath, DateTime stamp)
+        {
+            if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath)) return null;
+
+            FileInfo fileInfo = new FileInfo(logPath);
+            if (fileInfo.Length == 0)
+            {
+                fileInfo.Delete();
+                return null;
+            }
+
+            string directory = fileInfo.DirectoryName;
+            string stampText = stamp.ToString("yyyy.MM.dd-HH.mm.ss", CultureInfo.InvariantCulture);
+            string archivedPath = Path.Combine(directory, $"{FileName}-{stampText}{FileType}");
+            int suffix = 1;
+            while (File.Exists(archivedPath))
+            {
+                archivedPath = Path.Combine(directory, $"{FileName}-{stampText}-{suffix}{FileType}");
+                suffix++;
+            }
+
+            File.Move(logPath, archivedPath);
+            return archivedPath;
         }
 
         private static void LogCallBack(string message, string stackTrace, LogType type)

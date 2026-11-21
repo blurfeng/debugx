@@ -110,6 +110,7 @@
 // 1.DLL 工程定义 DEBUG_X 宏。此前 DLL 构建未定义该宏，DLL 内部对 [Conditional("DEBUG_X")] 方法的调用全被编译剔除：DebugxBurst 的 Log/LogWarning/LogError 为空方法，"找不到成员 key/签名"等内部警告从不出现。
 // 2.未注册 key/签名与成员配置缺失的警告改为同一条消息只警告一次（OnAwake 时清空），避免缺失的成员让它的每条日志都多一条警告。
 // 3.LogOutput 录制结束的 "logOutput over" 提示由 Warning 改为普通 Log。
+// 4.LogOutput.RecordStart 先存档上次会话遗留的非空 DebugxLog.log（崩溃、进程被杀时 RecordOver 未执行），以其最后写入时间命名，不再被 FileMode.Create 清空；无法存档时改为追加写入。存档逻辑与 RecordOver 共用 ArchiveLogFile。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
