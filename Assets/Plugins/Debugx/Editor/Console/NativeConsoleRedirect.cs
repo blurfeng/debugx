@@ -67,6 +67,12 @@ namespace DebugxLog.Console.Editor
                 ? InstanceField.GetValue(null) as EditorWindow
                 : EditorWindow.focusedWindow; // fallback if the field is renamed. 字段改名时的回退。
             if (native == null || native.GetType() != NativeConsoleType) return;
+
+            // Only while a Debugx Console window is open: it captures logs only while open, so replacing the native
+            // Console while it is closed would hide every log produced meanwhile (the native store would be the only copy).
+            // 仅在 Debugx Console 窗口打开时替换：它只在打开期间采集日志，关着时替换会让期间产生的日志都看不到（只剩原生存储里有）。
+            if (!EditorWindow.HasOpenInstances<DebugxConsoleWindow>()) return;
+
             native.Close();
             DebugxConsoleWindow.Open();
         }
