@@ -6,10 +6,14 @@ namespace DebugxLog.Editor
     public static class DebugxStaticDataEditor
     {
         #region ProjectSettings
+        // Stored per project through DebugxStaticData (these EditorPrefs keys used to be machine-wide, so toggling them in
+        // one project changed every project); the old machine-wide value is the default until it is set here.
+        // 经 DebugxStaticData 按项目存储（这些 EditorPrefs 键以前是全机共享的，在一个项目里切换会改到所有项目）；在此设置之前以旧的全机值为默认。
         public static bool FaMemberConfigSettingOpen
         {
-            get => EditorPrefs.GetBool("DebugxStaticData.FAMemberConfigSettingOpen", true);
-            set => EditorPrefs.SetBool("DebugxStaticData.FAMemberConfigSettingOpen", value);
+            get => DebugxStaticData.PlayerPrefsGetBool("DebugxStaticData.FAMemberConfigSettingOpen",
+                EditorPrefs.GetBool("DebugxStaticData.FAMemberConfigSettingOpen", true));
+            set => DebugxStaticData.PlayerPrefsSetBool("DebugxStaticData.FAMemberConfigSettingOpen", value);
         }
 
         public static readonly ActionHandler<bool> OnAutoSaveChange = new ActionHandler<bool>();
@@ -22,7 +26,8 @@ namespace DebugxLog.Editor
             {
                 if (_autoSaveByte == 0)
                 {
-                    _autoSaveByte = (byte)(EditorPrefs.GetBool("DebugxStaticData.AutoSave", true) ? 1 : 2);
+                    _autoSaveByte = (byte)(DebugxStaticData.PlayerPrefsGetBool("DebugxStaticData.AutoSave",
+                        EditorPrefs.GetBool("DebugxStaticData.AutoSave", true)) ? 1 : 2);
                 }
 
                 return _autoSaveByte == 1;
@@ -31,7 +36,7 @@ namespace DebugxLog.Editor
             {
                 if (value != (_autoSaveByte == 1))
                 {
-                    EditorPrefs.SetBool("DebugxStaticData.AutoSave", value);
+                    DebugxStaticData.PlayerPrefsSetBool("DebugxStaticData.AutoSave", value);
                     _autoSaveByte = (byte)(value ? 1 : 2);
 
                     OnAutoSaveChange.Invoke(AutoSave);

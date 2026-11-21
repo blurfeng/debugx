@@ -39,18 +39,88 @@ namespace DebugxLog
 
         #region Tools
 
+        // Per-user settings store. In the editor it is EditorPrefs scoped to this project, not PlayerPrefs: the editor's
+        // PlayerPrefs are the game's own, so a game calling PlayerPrefs.DeleteAll() (a typical "reset save") wiped every
+        // Debugx setting; EditorPrefs is shared by all projects on the machine, hence the project prefix. A value saved
+        // by an older version in PlayerPrefs is still read until it is overwritten. Builds keep using PlayerPrefs.
+        // Editor values are cached so the settings pages, which write fold states on every GUI event, don't hit the
+        // registry each repaint.
+        // 个人设置存储。编辑器中为按项目区分的 EditorPrefs，而非 PlayerPrefs：编辑器里的 PlayerPrefs 就是游戏自己的存储，
+        // 游戏调用 PlayerPrefs.DeleteAll()（常见的“重置存档”）会清掉 Debugx 的全部设置；EditorPrefs 由本机所有项目共享，故加项目前缀。
+        // 旧版本存在 PlayerPrefs 里的值在被覆盖前仍会读取。打包版本仍用 PlayerPrefs。编辑器中的值有内存缓存，避免设置页每个 GUI
+        // 事件都写折叠状态时反复读写注册表。
+#if UNITY_EDITOR
+        private static string _editorKeyPrefix;
+        private static readonly Dictionary<string, int> _editorIntCache = new Dictionary<string, int>();
+
+        private static string EditorKey(string key)
+        {
+            if (_editorKeyPrefix == null) _editorKeyPrefix = "Debugx[" + Application.dataPath + "].";
+            return _editorKeyPrefix + key;
+        }
+#endif
+
+        private static int PrefsGetInt(string key, int defaultValue)
+        {
+#if UNITY_EDITOR
+            if (_editorIntCache.TryGetValue(key, out int cached)) return cached;
+            string editorKey = EditorKey(key);
+            int value = UnityEditor.EditorPrefs.HasKey(editorKey)
+                ? UnityEditor.EditorPrefs.GetInt(editorKey, defaultValue)
+                : PlayerPrefs.GetInt(key, defaultValue);
+            _editorIntCache[key] = value;
+            return value;
+#else
+            return PlayerPrefs.GetInt(key, defaultValue);
+#endif
+        }
+
+        private static void PrefsSetInt(string key, int value)
+        {
+#if UNITY_EDITOR
+            if (_editorIntCache.TryGetValue(key, out int cached) && cached == value) return;
+            _editorIntCache[key] = value;
+            UnityEditor.EditorPrefs.SetInt(EditorKey(key), value);
+#else
+            PlayerPrefs.SetInt(key, value);
+#endif
+        }
+
+        private static string PrefsGetString(string key)
+        {
+#if UNITY_EDITOR
+            string editorKey = EditorKey(key);
+            if (UnityEditor.EditorPrefs.HasKey(editorKey)) return UnityEditor.EditorPrefs.GetString(editorKey);
+#endif
+            return PlayerPrefs.GetString(key);
+        }
+
+        private static void PrefsSetString(string key, string value)
+        {
+#if UNITY_EDITOR
+            UnityEditor.EditorPrefs.SetString(EditorKey(key), value);
+#else
+            PlayerPrefs.SetString(key, value);
+            PlayerPrefs.Save(); // EditorPrefs write through; PlayerPrefs need an explicit save. EditorPrefs 直接落盘；PlayerPrefs 需显式保存。
+#endif
+        }
+
         public static bool PlayerPrefsGetBool(string key, bool defaultValue)
         {
-            return PlayerPrefs.GetInt(key, defaultValue ? 1 : 2) == 1;
+            return PrefsGetInt(key, defaultValue ? 1 : 2) == 1;
         }
 
         public static void PlayerPrefsSetBool(string key, bool value)
         {
-            PlayerPrefs.SetInt(key, value ? 1 : 2);
+            PrefsSetInt(key, value ? 1 : 2);
         }
 
         public static void PlayerPrefsDeleteKey(string key)
         {
+#if UNITY_EDITOR
+            _editorIntCache.Remove(key);
+            UnityEditor.EditorPrefs.DeleteKey(EditorKey(key));
+#endif
             PlayerPrefs.DeleteKey(key);
         }
 
@@ -115,8 +185,8 @@ namespace DebugxLog
         public const int RuntimeConsoleBufferCapacityDefault = 4000;
         public static int RuntimeConsoleBufferCapacity
         {
-            get => Mathf.Max(1, PlayerPrefs.GetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", RuntimeConsoleBufferCapacityDefault));
-            set => PlayerPrefs.SetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", Mathf.Max(1, value));
+            get => Mathf.Max(1, PrefsGetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", RuntimeConsoleBufferCapacityDefault));
+            set => PrefsSetInt("DebugxStaticData.RuntimeConsoleBufferCapacity", Mathf.Max(1, value));
         }
 
         #region Text
@@ -180,8 +250,7 @@ namespace DebugxLog
         public static void ResetPreferencesMembers()
         {
             MemberEnableDefaultDicPrefs.Clear();
-            PlayerPrefs.DeleteKey("DebugxStaticData.MemberEnableDefaultDic");
-            PlayerPrefs.Save();
+            PlayerPrefsDeleteKey("DebugxStaticData.MemberEnableDefaultDic");
         }
 
         public static bool EnableLogDefaultPrefs
@@ -204,8 +273,8 @@ namespace DebugxLog
 
         public static int LogThisKeyMemberOnlyDefaultPrefs
         {
-            get => PlayerPrefs.GetInt("DebugxStaticData.LogThisKeyMemberOnlyDefault", DebugxStaticData.LogThisKeyMemberOnlyDefaultSet);
-            set => PlayerPrefs.SetInt("DebugxStaticData.LogThisKeyMemberOnlyDefault", value);
+            get => PrefsGetInt("DebugxStaticData.LogThisKeyMemberOnlyDefault", DebugxStaticData.LogThisKeyMemberOnlyDefaultSet);
+            set => PrefsSetInt("DebugxStaticData.LogThisKeyMemberOnlyDefault", value);
         }
 
         private static Dictionary<int, bool> _memberEnableDefaultDicPrefs;
@@ -217,7 +286,7 @@ namespace DebugxLog
                 {
                     _memberEnableDefaultDicPrefs = new Dictionary<int, bool>();
 
-                    string data = PlayerPrefs.GetString("DebugxStaticData.MemberEnableDefaultDic");
+                    string data = PrefsGetString("DebugxStaticData.MemberEnableDefaultDic");
                     if (!string.IsNullOrEmpty(data))
                     {
                         string[] dataArray = data.Split(';');
@@ -254,10 +323,7 @@ namespace DebugxLog
                     sb.Append($"{item.Key},{item.Value}");
                     if (counter != _memberEnableDefaultDicPrefs.Count) sb.Append(";");
                 }
-                PlayerPrefs.SetString("DebugxStaticData.MemberEnableDefaultDic", sb.ToString());
-                // 显式落盘，避免编辑器异常退出丢失成员开关偏好。
-                // Persist to disk so member-switch prefs survive an abnormal editor exit.
-                PlayerPrefs.Save();
+                PrefsSetString("DebugxStaticData.MemberEnableDefaultDic", sb.ToString());
             }
         }
 
