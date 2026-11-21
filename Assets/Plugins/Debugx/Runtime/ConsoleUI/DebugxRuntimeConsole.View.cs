@@ -457,7 +457,7 @@ namespace DebugxLog.Console.Runtime
                 net.style.display = DisplayStyle.None;
             }
 
-            element.Q<Label>("msg").text = ApplySearchHighlight(SingleLine(e.RichText));
+            element.Q<Label>("msg").text = ApplySearchHighlight(ConsoleTextUtil.Truncate(SingleLine(e.RichText), ConsoleTextUtil.RowTextMaxLength));
 
             var badge = element.Q<Label>("badge");
             if (row.Count > 1)
@@ -510,7 +510,7 @@ namespace DebugxLog.Console.Runtime
                 return;
             }
 
-            _detailMessage.text = ApplySearchHighlight(e.RichText);
+            _detailMessage.text = ApplySearchHighlight(ConsoleTextUtil.Truncate(e.RichText, ConsoleTextUtil.DetailTextMaxLength));
 
             List<StackFrameInfo> frames = StackTraceParser.Parse(e.StackTrace);
             foreach (StackFrameInfo frame in frames)

@@ -55,6 +55,29 @@ namespace DebugxLog.Console
             return m.Success ? m.Length : 0;
         }
 
+        /// <summary>Max characters shown in a list row (it only ever shows one line). 列表行最多显示的字符数（行只显示一行）。</summary>
+        public const int RowTextMaxLength = 512;
+
+        /// <summary>Max characters shown in the detail pane; Copy still copies the full text. 详情面板最多显示的字符数；Copy 仍复制全文。</summary>
+        public const int DetailTextMaxLength = 10000;
+
+        /// <summary>
+        /// At most <paramref name="maxLength"/> characters of <paramref name="richText"/> (plus "…" when cut), never cutting
+        /// through a rich-text tag. A log carrying a huge payload (JSON, a dump) would otherwise become one giant label that
+        /// is rebuilt on every bind / repaint (and past ~16k glyphs exceeds UI Toolkit's per-element vertex limit).
+        /// 最多保留 <paramref name="richText"/> 的 <paramref name="maxLength"/> 个字符（截断时加 "…"），不会从富文本标签中间截断。
+        /// 否则携带超大内容（JSON、转储）的日志会变成一个巨型标签，每次绑定/重绘都要重建（超过约 1.6 万字形还会超出 UI Toolkit 单元素顶点上限）。
+        /// </summary>
+        public static string Truncate(string richText, int maxLength)
+        {
+            if (string.IsNullOrEmpty(richText) || richText.Length <= maxLength) return richText;
+
+            int cut = maxLength;
+            int open = richText.LastIndexOf('<', cut - 1);
+            if (open >= 0 && richText.IndexOf('>', open) >= cut) cut = open; // don't cut a tag in half. 不把标签截成两半。
+            return richText.Substring(0, cut) + "…";
+        }
+
         /// <summary>
         /// Row timestamp text, culture-invariant ("HH:mm:ss"), shared by the Editor and runtime Consoles.
         /// 行时间戳文本（与区域无关的 "HH:mm:ss"），Editor 与运行时 Console 共用。

@@ -472,7 +472,7 @@ namespace DebugxLog.Console.Editor
             var text = element.Q<IMGUIContainer>("text");
             var rt = (RowText)text.userData;
             rt.Time = _showTimestamp ? TimestampText(e) : null;
-            rt.Rich = SingleLine(e.RichText);
+            rt.Rich = ConsoleTextUtil.Truncate(SingleLine(e.RichText), ConsoleTextUtil.RowTextMaxLength);
             // Search matches get a blue background drawn behind them (list rows only). Empty search -> no hits.
             // 搜索命中处在其后绘制蓝色底（仅列表行）。搜索为空 -> 无命中。
             rt.Visible = FindHighlights(rt.Rich, _criteria.Search, rt.Hits);
