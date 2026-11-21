@@ -64,8 +64,7 @@ namespace DebugxLog.Console.Editor
         private static bool _resolved;
         private static bool _available;
 
-        private static MethodInfo _start;     // int StartGettingEntries()  (returns row count on most versions)
-        private static MethodInfo _getCount;  // int GetCount()             (fallback count source)
+        private static MethodInfo _start;     // int StartGettingEntries()  (returns the row count)
         private static MethodInfo _end;       // void EndGettingEntries()
         private static MethodInfo _getEntry;  // bool GetEntryInternal(int, LogEntry)
         private static Type _logEntryType;    // UnityEditor.LogEntry
@@ -97,7 +96,6 @@ namespace DebugxLog.Console.Editor
 
                 _start = logEntries.GetMethod("StartGettingEntries", SFlags, null, Type.EmptyTypes, null);
                 _end = logEntries.GetMethod("EndGettingEntries", SFlags, null, Type.EmptyTypes, null);
-                _getCount = logEntries.GetMethod("GetCount", SFlags, null, Type.EmptyTypes, null);
                 _getEntry = logEntries.GetMethod("GetEntryInternal", SFlags, null,
                     new[] { typeof(int), _logEntryType }, null);
 
@@ -110,7 +108,7 @@ namespace DebugxLog.Console.Editor
                 _getFilteringText = logEntries.GetMethod("GetFilteringText", SFlags, null, Type.EmptyTypes, null);
                 _setFilteringText = logEntries.GetMethod("SetFilteringText", SFlags, null, new[] { typeof(string) }, null);
 
-                _available = _start != null && _end != null && _getEntry != null &&
+                _available = _start != null && _start.ReturnType == typeof(int) && _end != null && _getEntry != null &&
                              _fMessage != null && _fMode != null;
             }
             catch (Exception ex)
@@ -120,10 +118,7 @@ namespace DebugxLog.Console.Editor
             }
         }
 
-        /// <summary>Whether the reflection into UnityEditor.LogEntries resolved successfully. 反射进 UnityEditor.LogEntries 是否解析成功。</summary>
-        internal static bool Available => _available;
-
-        /// <summary>Resolve (once) and report availability. Call on the main thread before relying on <see cref="Available"/>. 解析（一次）并返回可用性。依赖 <see cref="Available"/> 前在主线程调用。</summary>
+        /// <summary>Resolve (once) and report whether the reflection into UnityEditor.LogEntries succeeded. Main thread only. 解析（一次）并返回反射进 UnityEditor.LogEntries 是否成功。仅主线程。</summary>
         internal static bool EnsureAvailable()
         {
             Resolve();
@@ -179,10 +174,8 @@ namespace DebugxLog.Console.Editor
                     }
                 }
 
-                object startRet = _start.Invoke(null, null);
+                int count = (int)_start.Invoke(null, null);
                 started = true;
-                int count = startRet is int c ? c
-                    : (_getCount != null ? Convert.ToInt32(_getCount.Invoke(null, null)) : 0);
 
                 var args = new object[2];
                 for (int i = 0; i < count; i++)

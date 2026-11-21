@@ -7,21 +7,11 @@ namespace DebugxLog.Editor
         [InitializeOnLoadMethod]
         static void InitializeOnLoadMethod()
         {
-            EditorApplication.delayCall += () => 
+            EditorApplication.delayCall += () =>
             {
                 DebugxProjectSettingsAssetEditor.OnInitializeOnLoadMethod();
                 ColorDispenser.OnInitializeOnLoadMethod();
-
-                EditorApplication.wantsToQuit += Quit;
             };
-        }
-
-        static bool Quit()
-        {
-            ColorDispenser.OnQuit();
-
-            EditorApplication.wantsToQuit -= Quit;
-            return true;
         }
     }
 }

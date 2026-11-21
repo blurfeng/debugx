@@ -30,12 +30,6 @@ namespace DebugxLog.Editor
         private static int _editorSkinCached = -1;
 
         /// <summary>
-        /// 标题风格1级。
-        /// </summary>
-        public static GUIStyle TitleStyle1 => Instance._titleStyle1;
-        private readonly GUIStyle _titleStyle1;
-
-        /// <summary>
         /// 标题风格2级。
         /// </summary>
         public static GUIStyle TitleStyle2 => Instance._titleStyle2;
@@ -58,18 +52,9 @@ namespace DebugxLog.Editor
         /// </summary>
         public static GUIStyle LabelStyleFadeAreaHeader => Instance._labelStyleFadeAreaHeader;
         private readonly GUIStyle _labelStyleFadeAreaHeader;
-        
-        /// <summary>
-        /// 背景纹理。
-        /// </summary>
-        public Texture2D BackgroundTex => Instance._backgroundTex;
+
+        // Background texture of AreaStyle1. AreaStyle1 的背景纹理。
         private readonly Texture2D _backgroundTex;
-
-        #region Colors
-
-        public static Color ColorGg = IsDarkSkin ? new(0.2509f, 0.2509f, 0.2509f) : new(0.8117f, 0.8117f, 0.8117f);
-
-        #endregion
 
         private GUIStyleEx()
         {
@@ -107,18 +92,6 @@ namespace DebugxLog.Editor
                 }
             }
             _backgroundTex.Apply();
-
-            // 一级标题风格。
-            _titleStyle1 = new GUIStyle
-            {
-                fontSize = 16,
-                alignment = TextAnchor.UpperCenter,
-                fontStyle = FontStyle.Bold,
-                normal = new GUIStyleState
-                {
-                    textColor = IsDarkSkin ? colorLightGray : colorDark
-                }
-            };
 
             // 二级标题风格。
             _titleStyle2 = new GUIStyle

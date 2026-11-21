@@ -47,15 +47,6 @@ namespace DebugxLog.Editor
             DebugxProjectSettingsAsset.GetMasterMemberColor += GetMasterMemberColor;
         }
 
-        public static void OnQuit()
-        {
-            // 三个订阅对称退订，避免残留回调（此前只退订了 GetRandomColorForMember）。
-            // Unsubscribe all three symmetrically (previously only GetRandomColorForMember was removed).
-            DebugxProjectSettingsAsset.GetRandomColorForMember -= GetRandomColorForMember;
-            DebugxProjectSettingsAsset.GetNormalMemberColor -= GetNormalMemberColor;
-            DebugxProjectSettingsAsset.GetMasterMemberColor -= GetMasterMemberColor;
-        }
-
         /// <summary>
         /// Get a random color for a member.
         /// 为成员获取一个随机颜色。

@@ -125,11 +125,9 @@ namespace DebugxLog
             LogOutput.DirectoryPath = Application.dataPath;
 #elif UNITY_ANDROID
             LogOutput.DirectoryPath = $"{Application.persistentDataPath}/Log";
-#elif UNITY_IPHONE
-            LogOutput.DirectoryPath = Application.persistentDataPath;
 #else
-            // OSX/Linux/WebGL 等其余平台的兜底，避免 DirectoryPath 未设置。
-            // Fallback for OSX/Linux/WebGL and any other platform so DirectoryPath is never left unset.
+            // iOS/OSX/Linux/WebGL 等其余平台：persistentDataPath，避免 DirectoryPath 未设置。
+            // iOS/OSX/Linux/WebGL and any other platform: persistentDataPath, so DirectoryPath is never left unset.
             LogOutput.DirectoryPath = Application.persistentDataPath;
 #endif
 

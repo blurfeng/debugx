@@ -9,29 +9,6 @@ namespace DebugxLog.Editor
     {
         #region Button
 
-        public static bool ButtonColor(string text, Color color, bool? showColor = null, string tooltip = "",
-            params GUILayoutOption[] options)
-        {
-            if (showColor != null && showColor.Value)
-                GUIUtilityEx.PushTintBg(color);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
-            if (showColor != null && showColor.Value)
-                GUIUtilityEx.PopTintBg();
-
-            return press;
-        }
-
-        public static bool ButtonColor(Rect rect, string text, Color color, bool? showColor = null, string tooltip = "")
-        {
-            if (showColor != null && showColor.Value)
-                GUIUtilityEx.PushTintBg(color);
-            bool press = GUI.Button(rect, new GUIContent(text, tooltip));
-            if (showColor != null && showColor.Value)
-                GUIUtilityEx.PopTintBg();
-
-            return press;
-        }
-
         public static bool ButtonGreen(string text, string tooltip = "", params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.green);
@@ -55,11 +32,6 @@ namespace DebugxLog.Editor
             return press;
         }
 
-        public static bool ButtonYellow(string text, params GUILayoutOption[] options)
-        {
-            return ButtonYellow(text, "", options);
-        }
-        
         public static bool ButtonRed(GUIContent content, GUIStyle style = null, params GUILayoutOption[] options)
         {
             GUIUtilityEx.PushTintBg(Color.red);
@@ -71,22 +43,6 @@ namespace DebugxLog.Editor
             return press;
         }
 
-        public static bool ButtonRed(Rect rect, GUIContent content, GUIStyle style = null)
-        {
-            GUIUtilityEx.PushTintBg(Color.red);
-            if (style == null)
-                style = GUI.skin.button;
-            bool press = GUI.Button(rect, content, style);
-            GUIUtilityEx.PopTintBg();
-
-            return press;
-        }
-
-        public static bool ButtonRed(Rect rect, string text, GUIStyle style = null)
-        {
-            return ButtonRed(rect, new GUIContent(text, ""), style);
-        }
-
         public static bool ButtonRed(string text, string tooltip = "", params GUILayoutOption[] options)
         {
             return ButtonRed(new GUIContent(text, tooltip), null, options);
@@ -95,39 +51,6 @@ namespace DebugxLog.Editor
         public static bool ButtonRed(string text, params GUILayoutOption[] options)
         {
             return ButtonRed(text, "", options);
-        }
-
-        public static bool ButtonRed(string text, GUIStyle style = null, params GUILayoutOption[] options)
-        {
-            return ButtonRed(new GUIContent(text, ""), style, options);
-        }
-
-        public static bool ButtonCyan(string text, string tooltip = "", params GUILayoutOption[] options)
-        {
-            GUIUtilityEx.PushTintBg(Color.cyan);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
-            GUIUtilityEx.PopTintBg();
-
-            return press;
-        }
-
-        public static bool ButtonCyan(string text, params GUILayoutOption[] options)
-        {
-            return ButtonCyan(text, "", options);
-        }
-
-        public static bool ButtonGray(string text, string tooltip = "", params GUILayoutOption[] options)
-        {
-            GUIUtilityEx.PushTintBg(Color.gray);
-            bool press = GUILayout.Button(new GUIContent(text, tooltip), options);
-            GUIUtilityEx.PopTintBg();
-
-            return press;
-        }
-
-        public static bool ButtonGray(string text, params GUILayoutOption[] options)
-        {
-            return ButtonGray(text, "", options);
         }
 
         #endregion
@@ -141,23 +64,6 @@ namespace DebugxLog.Editor
             params GUILayoutOption[] options)
         {
             bool change = Toggle(label, tooltip, value, options);
-            if (change != value)
-            {
-                Undo.RecordObject(undoObject, undoName);
-            }
-
-            return change;
-        }
-
-        public static bool ToggleLeft(string label, string tooltip, bool value, params GUILayoutOption[] options)
-        {
-            return EditorGUILayout.ToggleLeft(new GUIContent(label, tooltip), value, options);
-        }
-
-        public static bool ToggleLeftUndo(string label, string tooltip, bool value, Object undoObject, string undoName,
-            params GUILayoutOption[] options)
-        {
-            bool change = ToggleLeft(label, tooltip, value, options);
             if (change != value)
             {
                 Undo.RecordObject(undoObject, undoName);
@@ -225,7 +131,6 @@ namespace DebugxLog.Editor
     public static class GUIUtilityEx
     {
         private static readonly Stack<Color> _colorsBg = new Stack<Color>();
-        private static readonly Stack<Color> _colors = new Stack<Color>();
 
         public static void PushTintBg(Color tint)
         {
@@ -238,17 +143,6 @@ namespace DebugxLog.Editor
         public static void PopTintBg()
         {
             GUI.backgroundColor = _colorsBg.Pop();
-        }
-
-        public static void PushTint(Color tint)
-        {
-            _colors.Push(GUI.color);
-            GUI.color = tint;
-        }
-
-        public static void PopTint()
-        {
-            GUI.color = _colors.Pop();
         }
     }
 
@@ -271,7 +165,6 @@ namespace DebugxLog.Editor
         private readonly GUIStyle _labelStyle;
         private readonly GUIStyle _areaStyle;
         private bool _visible;
-        private readonly EditorWindow _editorWindow;
         private readonly SettingsProvider _settingsProvider;
         private readonly bool _immediately;
         private bool _changedCached;
@@ -287,52 +180,7 @@ namespace DebugxLog.Editor
         /// </summary>
         private bool _open;
 
-        /// <summary>Animate dropdowns when they open and close</summary>
-        private const bool FancyEffects = true;
-
         private const float AnimationSpeed = 100f;
-
-        public FadeArea(EditorWindow editor, GUIStyle areaStyle, GUIStyle labelStyle, bool open, float beginSpace = 1f,
-            bool immediately = false, bool changedExcludeHeaderClick = true)
-        {
-            this._editorWindow = editor;
-
-            this._areaStyle = areaStyle;
-            this._labelStyle = labelStyle;
-            _visible = this._open = open;
-            _value = open ? 1 : 0;
-            this._beginSpace = beginSpace;
-            this._immediately = immediately;
-            this._changedExcludeHeaderClick = changedExcludeHeaderClick;
-        }
-
-        public FadeArea(EditorWindow editor, bool open = false, float beginSpace = 1f, bool immediately = false,
-            bool changedExcludeHeaderClick = true)
-        {
-            this._editorWindow = editor;
-
-            this._areaStyle = GUIStyleEx.AreaStyle1;
-            this._labelStyle = GUIStyleEx.LabelStyleFadeAreaHeader;
-            _visible = this._open = open;
-            _value = open ? 1 : 0;
-            this._beginSpace = beginSpace;
-            this._immediately = immediately;
-            this._changedExcludeHeaderClick = changedExcludeHeaderClick;
-        }
-
-        public FadeArea(SettingsProvider settingsProvider, GUIStyle areaStyle, GUIStyle labelStyle, bool open,
-            float beginSpace = 1f, bool immediately = false, bool changedExcludeHeaderClick = true)
-        {
-            this._settingsProvider = settingsProvider;
-
-            this._areaStyle = areaStyle;
-            this._labelStyle = labelStyle;
-            _visible = this._open = open;
-            _value = open ? 1 : 0;
-            this._beginSpace = beginSpace;
-            this._immediately = immediately;
-            this._changedExcludeHeaderClick = changedExcludeHeaderClick;
-        }
 
         public FadeArea(SettingsProvider settingsProvider, bool open = false, float beginSpace = 1f,
             bool immediately = false, bool changedExcludeHeaderClick = true)
@@ -373,12 +221,6 @@ namespace DebugxLog.Editor
                     _value = Mathf.Clamp01(_value);
 
                     _settingsProvider?.Repaint();
-                    _editorWindow?.Repaint();
-
-                    // if (!FancyEffects)
-                    // {
-                    //     _value = targetValue;
-                    // }
                 }
                 else
                 {
@@ -398,11 +240,6 @@ namespace DebugxLog.Editor
         public bool Header(string label, string tooltip = "")
         {
             return Header(label, ref _open, tooltip);
-        }
-
-        public bool Header(string label, string tooltip, int width)
-        {
-            return Header(label, ref _open, tooltip, width);
         }
 
         public bool Header(string label, int width)
@@ -437,7 +274,6 @@ namespace DebugxLog.Editor
             {
                 open = !open;
                 _settingsProvider?.Repaint();
-                _editorWindow?.Repaint();
             }
 
             this._open = open;
