@@ -67,6 +67,10 @@ namespace DebugxLog
         [Tooltip(DebugxStaticData.ToolTipCustomDebugxMemberAssets)]
         public DebugxMemberInfoAsset[] customMemberAssets;
         public int CustomMemberAssetsLength => customMemberAssets == null ? 0 : customMemberAssets.Length;
+
+        // Highest member key ever issued. New members get the next one, so a deleted member's key is never handed out again.
+        // 已发放过的最大成员 key。新成员取下一个，因此已删除成员的 key 不会再被发放。
+        [HideInInspector] public int lastIssuedMemberKey;
         
 
 

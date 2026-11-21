@@ -167,6 +167,16 @@ namespace DebugxLog.Editor
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Member Settings", GUIStyleEx.TitleStyle2);
 
+            string duplicateKeys = DebugxProjectSettingsAssetEditor.DescribeDuplicateMemberKeys(SettingsAsset);
+            if (duplicateKeys != null)
+            {
+                EditorGUILayout.HelpBox(
+                    DebugxStaticData.IsChineseSimplified
+                        ? $"成员 Key 重复：{duplicateKeys}。共用 Key 的成员会显示成同一个成员、一起开关。请为每个成员设置不同的 Key（修好之前不会重新生成 DebugxLogger）。"
+                        : $"Duplicate member keys: {duplicateKeys}. Members sharing a key print as the same member and are toggled together. Give each member its own key (DebugxLogger is not regenerated until then).",
+                    MessageType.Error);
+            }
+
             _faMemberConfigSetting.Begin();
             _faMemberConfigSetting.Header("Members");
 
@@ -432,8 +442,8 @@ namespace DebugxLog.Editor
 
                 bool setKey = true;
 
-                // Confirm whether the key is duplicated. If duplicated, it will automatically start using the smallest available key.
-                // 确认Key是否重复，重复时自动从最小可用Key开始使用。
+                // An invalid or duplicated key is replaced by a newly issued one (see AutoGetMemberKey).
+                // Key 非法或重复时，改用新发放的 key（见 AutoGetMemberKey）。
                 if (!DebugxProjectSettings.KeyValid(changeKey) || CheckMemberKeyRepetition(changeKey, mInfo.key))
                 {
                     if (!AutoGetMemberKey(out changeKey, mInfo.key))
@@ -707,25 +717,28 @@ namespace DebugxLog.Editor
         }
 
         /// <summary>
-        /// Obtain a unique Key.
-        /// 获取一个不重复的Key。
+        /// Issue a new member key: one above the highest key ever issued or in use, never a freed one — otherwise a
+        /// deleted member's leftover Debugx.Log(key) calls and teammates' per-key mutes would silently apply to the new member.
+        /// 发放一个新的成员 Key：比曾发放过或正在使用的最大 key 大 1，绝不复用空出来的 key——否则已删除成员残留的
+        /// Debugx.Log(key) 调用与队友按 key 的静音设置会悄悄落到新成员头上。
         /// </summary>
-        /// <param name="key"></param>
-        /// <param name="withoutKey"></param>
-        /// <returns></returns>
+        /// <param name="key">The new key. 新 key。</param>
+        /// <param name="withoutKey">A key to ignore (the member being edited). 忽略的 key（正在编辑的成员）。</param>
+        /// <returns>False when no key is left. 没有可用 key 时返回 false。</returns>
         private static bool AutoGetMemberKey(out int key, int withoutKey = 0)
         {
-            key = 1;
-            while (CheckMemberKeyRepetition(key, withoutKey))
+            int highest = SettingsAsset.lastIssuedMemberKey;
+            for (int i = 0; i < SettingsAsset.CustomMemberAssetsLength; i++)
             {
-                if (key >= int.MaxValue)
-                {
-                    return false;
-                }
-
-                key++;
+                int k = SettingsAsset.customMemberAssets[i].key;
+                if (k != withoutKey && k > highest) highest = k;
             }
 
+            key = 0;
+            if (highest == int.MaxValue) return false;
+
+            key = highest + 1;
+            SettingsAsset.lastIssuedMemberKey = key;
             return true;
         }
 

@@ -46,6 +46,15 @@ namespace DebugxLog.Editor
                 return;
             }
 
+            // Members sharing a key would get methods that all print as the same member; keep the previous file until fixed.
+            // 共用 key 的成员生成的方法都会打印成同一个成员；修好之前保留之前生成的文件。
+            string duplicateKeys = DebugxProjectSettingsAssetEditor.DescribeDuplicateMemberKeys(settingsAsset);
+            if (duplicateKeys != null)
+            {
+                Debug.LogError($"[DebugxCodeGenerator] Duplicate member keys: {duplicateKeys}. DebugxLogger was not regenerated; give each member its own key. 成员 Key 重复，DebugxLogger 未重新生成，请为每个成员设置不同的 Key。");
+                return;
+            }
+
             StringBuilder sb = new StringBuilder();
             // Holds the FINAL method names already emitted (Log*/LogWarning*/LogError*), not just suffixes, so
             // dedup catches cross-family collisions (see GetUniqueMethodSuffix).

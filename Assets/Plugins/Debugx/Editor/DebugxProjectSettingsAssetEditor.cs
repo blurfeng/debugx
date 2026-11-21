@@ -42,6 +42,41 @@ namespace DebugxLog.Editor
             //项目启动时确认配置资源是否存在
             CheckDebugxProjectSettingsAsset();
             DebugxLoggerCodeGenerator.MigrateLegacyLocation();
+
+            // Duplicate keys typically arrive through a merge, without anyone opening the settings page, so report on load.
+            // 重复 key 通常来自合并分支，没人会去打开设置页，故在加载时报告。
+            string duplicateKeys = DescribeDuplicateMemberKeys(DebugxProjectSettingsAsset.Instance);
+            if (duplicateKeys != null)
+                Debug.LogWarning($"[Debugx] Duplicate member keys: {duplicateKeys}. Give each member its own key in Project Settings > Debugx. 成员 Key 重复，请在 Project Settings > Debugx 中为每个成员设置不同的 Key。");
+        }
+
+        /// <summary>
+        /// Describe the member keys used by more than one member, e.g. "2 (Alice, Bob)"; null when every key is unique.
+        /// 描述被多个成员共用的 key，如 "2 (Alice, Bob)"；全部唯一时返回 null。
+        /// </summary>
+        public static string DescribeDuplicateMemberKeys(DebugxProjectSettingsAsset asset)
+        {
+            if (!asset) return null;
+
+            var namesByKey = new Dictionary<int, List<string>>();
+            void Collect(DebugxMemberInfoAsset[] members)
+            {
+                if (members == null) return;
+                foreach (DebugxMemberInfoAsset m in members)
+                {
+                    if (!namesByKey.TryGetValue(m.key, out List<string> names)) namesByKey[m.key] = names = new List<string>();
+                    names.Add(string.IsNullOrEmpty(m.signature) ? $"Member {m.key}" : m.signature);
+                }
+            }
+
+            Collect(asset.defaultMemberAssets);
+            Collect(asset.customMemberAssets);
+
+            var parts = new List<string>();
+            foreach (KeyValuePair<int, List<string>> pair in namesByKey)
+                if (pair.Value.Count > 1) parts.Add($"{pair.Key} ({string.Join(", ", pair.Value)})");
+
+            return parts.Count == 0 ? null : string.Join("; ", parts);
         }
         
         /// <summary>
