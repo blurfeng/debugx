@@ -798,25 +798,28 @@ namespace DebugxLog.Console.Editor
 
         // Reused across refreshes to avoid per-refresh allocation while preserving the FULL multi-selection.
         // 跨刷新复用，既避免每次刷新分配，又能保留【完整】的多选。
-        private readonly HashSet<long> _selectedSeqScratch = new HashSet<long>();
+        private readonly HashSet<object> _selectedIdScratch = new HashSet<object>();
         private readonly List<int> _selectedIndexScratch = new List<int>();
 
         private void RefreshView()
         {
-            // Remember ALL selected entries by their stable ids BEFORE rebuilding rows (multi-select), plus the primary:
+            // Remember ALL selected rows by a stable identity BEFORE rebuilding rows (multi-select), plus the primary:
             // eviction/filtering shifts positional indices, so plain indices would point at different entries AND a
-            // multi-selection would collapse to a single row (wrong detail / silent Ctrl+C data loss).
-            // 重建行列表前按稳定 id 记住【全部】选中条目（多选）与主选中项：淘汰/过滤会让位置索引偏移，仅凭索引之后会指向
-            // 别的条目，且多选会被压成单选（详情错位 / Ctrl+C 静默丢数据）。
-            _selectedSeqScratch.Clear();
+            // multi-selection would collapse to a single row (wrong detail / silent Ctrl+C data loss). The identity is the
+            // entry, or its group when collapsing (LogCollapser.RowIdentity), computed with the current mode on both sides.
+            // 重建行列表前按稳定标识记住【全部】选中行（多选）与主选中项：淘汰/过滤会让位置索引偏移，仅凭索引之后会指向
+            // 别的条目，且多选会被压成单选（详情错位 / Ctrl+C 静默丢数据）。标识为条目本身，折叠时为其所属组（LogCollapser.RowIdentity），
+            // 前后两侧都按当前模式计算。
+            LogCollapser.Mode mode = _store.CollapseMode;
+            _selectedIdScratch.Clear();
             foreach (int idx in _listView.selectedIndices)
             {
                 if (idx >= 0 && idx < _rows.Count && _rows[idx].Entry != null)
-                    _selectedSeqScratch.Add(_rows[idx].Entry.SequenceId);
+                    _selectedIdScratch.Add(LogCollapser.RowIdentity(_rows[idx].Entry, mode));
             }
-            long primarySeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
-                ? _rows[_selectedIndex].Entry.SequenceId
-                : -1;
+            object primaryId = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+                ? LogCollapser.RowIdentity(_rows[_selectedIndex].Entry, mode)
+                : null;
 
             _rows.Clear();
             IReadOnlyList<CollapsedRow> src = _store.Rows;
@@ -826,7 +829,7 @@ namespace DebugxLog.Console.Editor
             _listView.RefreshItems();
             HideListEmptyLabel();
             UpdateCounts();
-            ReconcileSelection(primarySeq);
+            ReconcileSelection(primaryId, mode);
 
             // Tail: auto-scroll to the newest entry only while the list is stuck to the bottom (native behaviour).
             // Scrolling up pauses the tail; scrolling back to the bottom resumes it (see OnListScrolled).
@@ -838,16 +841,16 @@ namespace DebugxLog.Console.Editor
             UpdateNoResultsLabel();
         }
 
-        // Re-align the ENTIRE selection (all selected SequenceIds captured in _selectedSeqScratch, plus the primary) with
+        // Re-align the ENTIRE selection (all row identities captured in _selectedIdScratch, plus the primary) with
         // the entries they pointed at before the rebuild, so the highlight, the detail pane and Copy keep referring to the
         // SAME entries after eviction/filtering shifts the rows; surviving rows keep their multi-selection instead of being
         // collapsed to one. Clears when none survive. SetSelectionWithoutNotify avoids re-firing OnSelectionChanged.
-        // 按 SequenceId 把【整份】选中（_selectedSeqScratch 中的全部 id 与主选中）重新对齐到重建前所指条目，使淘汰/过滤导致
+        // 按行标识把【整份】选中（_selectedIdScratch 中的全部标识与主选中）重新对齐到重建前所指的行，使淘汰/过滤导致
         // 行偏移后，高亮、详情与 Copy 仍指向同一批条目；幸存行保留多选而非被压成单选；全部消失时清除。
         // SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
-        private void ReconcileSelection(long primarySeq)
+        private void ReconcileSelection(object primaryId, LogCollapser.Mode mode)
         {
-            if (_selectedSeqScratch.Count == 0) return; // nothing was selected. 原本无选中。
+            if (_selectedIdScratch.Count == 0) return; // nothing was selected. 原本无选中。
 
             _selectedIndexScratch.Clear();
             int primaryIndex = -1;
@@ -855,10 +858,11 @@ namespace DebugxLog.Console.Editor
             {
                 DebugxLogEntry e = _rows[i].Entry;
                 if (e == null) continue;
-                if (_selectedSeqScratch.Contains(e.SequenceId))
+                object id = LogCollapser.RowIdentity(e, mode);
+                if (_selectedIdScratch.Contains(id))
                 {
                     _selectedIndexScratch.Add(i);
-                    if (e.SequenceId == primarySeq) primaryIndex = i;
+                    if (Equals(id, primaryId)) primaryIndex = i;
                 }
             }
 

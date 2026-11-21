@@ -71,8 +71,7 @@ namespace DebugxLog.Console
                 DebugxLogEntry e = visible[i];
                 if (e == null) continue;
 
-                int memberKey = mode == Mode.ByMemberAndMessage ? e.MemberKey : 0;
-                var key = (e.LogType, memberKey, e.PlainText ?? string.Empty);
+                var key = GroupKey(e, mode);
 
                 if (_index.TryGetValue(key, out int rowIndex))
                 {
@@ -87,5 +86,18 @@ namespace DebugxLog.Console
                 }
             }
         }
+
+        private static (LogType, int, string) GroupKey(DebugxLogEntry e, Mode mode)
+            => (e.LogType, mode == Mode.ByMemberAndMessage ? e.MemberKey : 0, e.PlainText ?? string.Empty);
+
+        /// <summary>
+        /// Identity of the row that shows <paramref name="e"/> under <paramref name="mode"/>: the entry itself when not
+        /// collapsing, otherwise its group. Lets a UI keep its selection across rebuilds — a collapsed row's representative
+        /// (its oldest entry) changes whenever that entry is evicted from the buffer.
+        /// 在 <paramref name="mode"/> 下显示 <paramref name="e"/> 的那一行的标识：不折叠时就是条目本身，否则是它所属的组。
+        /// 使 UI 能跨重建保持选中——折叠行的代表条目（组内最旧的条目）被挤出缓冲时就会改变。
+        /// </summary>
+        public static object RowIdentity(DebugxLogEntry e, Mode mode)
+            => mode == Mode.Off ? (object)e.SequenceId : GroupKey(e, mode);
     }
 }

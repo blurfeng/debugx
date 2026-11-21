@@ -562,13 +562,17 @@ namespace DebugxLog.Console.Runtime
             // is captured too so it stays the driver after the rebuild.
             // 重建行列表前按稳定 SequenceId 记住整份选择：淘汰/过滤会让位置索引偏移，原索引之后会指向别的条目。primarySeq
             //（详情面板所指行）一并记住，使其在重建后仍是驱动项。
-            long primarySeq = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
-                ? _rows[_selectedIndex].Entry.SequenceId
-                : -1;
-            var selectedSeqs = new List<long>();
+            // The identity is the entry, or its group when collapsing (a collapsed row's representative changes when its
+            // oldest entry is evicted); both sides use the current mode. 标识为条目本身，折叠时为其所属组（组内最旧条目被淘汰时
+            // 折叠行的代表条目会变）；前后两侧都按当前模式计算。
+            LogCollapser.Mode mode = _store.CollapseMode;
+            object primaryId = (_selectedIndex >= 0 && _selectedIndex < _rows.Count && _rows[_selectedIndex].Entry != null)
+                ? LogCollapser.RowIdentity(_rows[_selectedIndex].Entry, mode)
+                : null;
+            var selectedIds = new List<object>();
             foreach (int i in _listView.selectedIndices)
                 if (i >= 0 && i < _rows.Count && _rows[i].Entry != null)
-                    selectedSeqs.Add(_rows[i].Entry.SequenceId);
+                    selectedIds.Add(LogCollapser.RowIdentity(_rows[i].Entry, mode));
 
             _rows.Clear();
             IReadOnlyList<CollapsedRow> src = _store.Rows;
@@ -577,7 +581,7 @@ namespace DebugxLog.Console.Runtime
 
             _listView.RefreshItems();
             UpdateCounts();
-            ReconcileSelection(selectedSeqs, primarySeq);
+            ReconcileSelection(selectedIds, primaryId, mode);
 
             // Tail: auto-scroll to newest only while stuck to the bottom (scrolling up pauses it). 贴底时才自动滚到最新（上滚暂停）。
             EnsureListScrollHook();
@@ -609,26 +613,28 @@ namespace DebugxLog.Console.Runtime
             _noResultsLabel.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        // Re-align the ListView selection with the entries it held before the rebuild, keyed by SequenceId. Restores the
+        // Re-align the ListView selection with the rows it held before the rebuild, keyed by row identity. Restores the
         // WHOLE multi-selection (highlight + Copy targets) after eviction/filtering shifts the rows, and keeps the detail
         // pane on the primary row (or promotes the first survivor if the primary is gone). SetSelectionWithoutNotify
         // avoids re-firing OnSelectionChanged. Clears everything when all selected entries are gone.
-        // 按 SequenceId 把 ListView 选中项重新对齐到重建前所持有的条目：淘汰/过滤导致行偏移后恢复整份多选（高亮 + Copy 目标），
+        // 按行标识把 ListView 选中项重新对齐到重建前所持有的行：淘汰/过滤导致行偏移后恢复整份多选（高亮 + Copy 目标），
         // 并让详情面板保持在主行（主行消失则提升第一个仍存活项）。SetSelectionWithoutNotify 避免再次触发 OnSelectionChanged。
         // 全部选中条目都消失时清空。
-        private void ReconcileSelection(List<long> selectedSeqs, long primarySeq)
+        private void ReconcileSelection(List<object> selectedIds, object primaryId, LogCollapser.Mode mode)
         {
-            if (selectedSeqs.Count == 0) return; // nothing was selected. 原本无选中。
+            if (selectedIds.Count == 0) return; // nothing was selected. 原本无选中。
 
-            var seqSet = new HashSet<long>(selectedSeqs);
+            var idSet = new HashSet<object>(selectedIds);
             var newIndices = new List<int>();
             int primaryIndex = -1;
             for (int i = 0; i < _rows.Count; i++)
             {
                 DebugxLogEntry e = _rows[i].Entry;
-                if (e == null || !seqSet.Contains(e.SequenceId)) continue;
+                if (e == null) continue;
+                object id = LogCollapser.RowIdentity(e, mode);
+                if (!idSet.Contains(id)) continue;
                 newIndices.Add(i);
-                if (e.SequenceId == primarySeq) primaryIndex = i;
+                if (Equals(id, primaryId)) primaryIndex = i;
             }
 
             if (newIndices.Count == 0)
