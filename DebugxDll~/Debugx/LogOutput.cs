@@ -3,6 +3,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using UnityEngine;
 
 namespace DebugxLog.Tools
@@ -39,6 +40,9 @@ namespace DebugxLog.Tools
         private static readonly StringBuilder _logBuilder = new StringBuilder();
         private static StreamWriter _writer;
         private static bool _isSubscribed;
+        // Set in RecordStart (main thread). Time.frameCount may only be read there; other threads' lines get "-".
+        // 在 RecordStart（主线程）中记录。Time.frameCount 只能在主线程读取；其他线程的行写 "-"。
+        private static int _mainThreadId;
 
         // Regular expression used to trim color code.
         // 用于裁剪color代码的正则表达式。
@@ -125,9 +129,14 @@ namespace DebugxLog.Tools
                 return;
             }
 
+            _mainThreadId = Thread.CurrentThread.ManagedThreadId;
+
+            // The threaded event also carries logs from worker threads; Application.logMessageReceived only fires for
+            // main-thread logs, so worker-thread logs never reached the file.
+            // threaded 事件也会带上子线程的日志；Application.logMessageReceived 只在主线程触发，子线程日志此前进不了文件。
             if (!_isSubscribed)
             {
-                Application.logMessageReceived += LogCallBack;
+                Application.logMessageReceivedThreaded += LogCallBack;
                 _isSubscribed = true;
             }
         }
@@ -140,7 +149,7 @@ namespace DebugxLog.Tools
         {
             if (_isSubscribed)
             {
-                Application.logMessageReceived -= LogCallBack;
+                Application.logMessageReceivedThreaded -= LogCallBack;
                 _isSubscribed = false;
             }
 
@@ -223,7 +232,10 @@ namespace DebugxLog.Tools
                 message = _regexMessageCut.Replace(message, "");
 
                 string strTime = DateTime.Now.ToString("MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-                _logBuilder.Append('[').Append(strTime).Append("][").Append(Time.frameCount).Append(']').Append(message);
+                _logBuilder.Append('[').Append(strTime).Append("][");
+                if (Thread.CurrentThread.ManagedThreadId == _mainThreadId) _logBuilder.Append(Time.frameCount);
+                else _logBuilder.Append('-');
+                _logBuilder.Append(']').Append(message);
 
                 // Whether to log battle tracking.
                 // 是否记录对战跟踪。
