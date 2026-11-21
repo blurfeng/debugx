@@ -171,7 +171,9 @@ namespace DebugxLog.Console.Runtime
             // console was enabled after BeforeSceneLoad). Start() is idempotent, so reusing an already-started store is safe.
             // 复用提前采集的 store（在 BeforeSceneLoad 订阅），使本 GameObject 存在之前的日志——如 DebugxManager.Awake——不丢失。
             // 若提前采集未运行（如在 BeforeSceneLoad 之后才启用 Console）则退回新建。Start() 幂等，复用已启动的 store 也安全。
-            _store = _earlyStore ?? new DebugxLogStore(DebugxStaticData.RuntimeConsoleBufferCapacity);
+            // On a re-enable (the GameObject was deactivated and activated again) keep the existing store and its logs.
+            // 重新启用时（GameObject 被停用后再激活）沿用已有的 store 及其日志。
+            if (_store == null) _store = _earlyStore ?? new DebugxLogStore(DebugxStaticData.RuntimeConsoleBufferCapacity);
             _earlyStore = null;
             _store.Start();
 
@@ -185,6 +187,14 @@ namespace DebugxLog.Console.Runtime
         {
             SaveViewPrefs(); // persist toolbar state on teardown (play exit / GameObject destroy). 拆卸时（退出 Play/销毁）持久化工具栏状态。
             _store?.Stop();
+
+            // UIDocument drops its root when disabled and creates a fresh, empty one when enabled again, so the panel must
+            // be rebuilt on that new root (and its scroll view hooked again) — otherwise the overlay stays invisible.
+            // UIDocument 停用时丢弃根元素，再次启用时新建一个空的根元素，因此必须在新根上重建面板（并重新挂接滚动视图）——否则叠层一直不可见。
+            _uiBuilt = false;
+            _listScroll = null;
+            _memberPopupOpen = false;
+            _sourcePopupOpen = false;
         }
 
         // Also persist when the app is paused, so a backgrounded-then-killed mobile app keeps its toolbar state (OnDisable
