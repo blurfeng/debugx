@@ -274,17 +274,17 @@ Click **Editor** in the toolbar to expand it. This panel gathers the view option
 Once the conditions are met, the overlay auto-creates after the first scene loads (`DontDestroyOnLoad`), hidden by default. **How to summon / dismiss:**
 - Desktop: press the **backquote key** (`` ` `` / `BackQuote`).
 - Touch: **tap with three fingers** simultaneously on the screen.
-- Universal: the floating **Debugx** button in the corner of the screen; or call `DebugxRuntimeConsole.SetVisible(true/false)` in your game code to bind your own gesture / hotkey.
+- Universal: the floating **Debugx** button in the corner of the screen; or call `DebugxRuntimeConsole.SetVisible(true/false)` (namespace `DebugxLog.Console.Runtime`) in your game code to bind your own gesture / hotkey.
 
 > [!NOTE]
-> The backquote key and three-finger gesture rely on the legacy **Input Manager**. If your project only enables the new **Input System**, summon it via the floating button or the `SetVisible(...)` API instead.
+> The backquote key and three-finger gesture work with both the legacy **Input Manager** and the new **Input System**. If your project only enables the new Input System, the scene needs an `EventSystem` (with an Input System UI Input Module); otherwise the overlay's buttons don't receive clicks.
 
-The overlay's features are largely the same as the editor version (adapted for touch): `Clear`, `Copy`, `Collapse`, `Debugx Only`, `Members` member filtering, `Time` timestamps, `Net` network tag (cycles All / Server / Client), `Log / Warning / Error` type filtering with counts, and search (matched substrings highlighted). In addition, the **Source** popup provides runtime switches (`EnableLog` / `EnableLogMember` / `Only Key` plus per-member switches), directly rewriting real print behavior. Selecting a log shows its message and stack text below (source navigation is not supported at runtime).  
+The overlay's features are largely the same as the editor version (adapted for touch): `Clear`, `Copy`, `Collapse`, `Debugx Only`, `Members` member filtering, `Time` timestamps, `Net` network tag (cycles All / Server / Client), `Log / Warning / Error` type filtering with counts, and search (matched substrings highlighted). `Clear` has to be held for one second (guards against accidental clears). In addition, the **Settings** popup provides runtime switches (`EnableLog` / `EnableLogMember` / `Only Key` plus per-member switches, directly rewriting real print behavior) and the buffer capacity. Selecting a log shows its message and stack text below (source navigation is not supported at runtime).  
 ![](Documents/console_ingame_1.png)
 <!-- Screenshot placeholder: the in-game runtime overlay on device / in Play mode (toolbar + log list + detail) -->
 
 > [!TIP]
-> The runtime overlay's ring buffer defaults to a capacity of 1000 entries (mobile-friendly).
+> The runtime overlay's ring buffer defaults to 4000 entries; change it under **Settings** > `Capacity` (applies on Enter).
 
 ## 🧩 DebugxManager
 `DebugxManager` is **created automatically** at runtime and usually needs no manual management. Its main job is to handle `LogOutput` operations (start/stop recording, set the output path, etc.).  

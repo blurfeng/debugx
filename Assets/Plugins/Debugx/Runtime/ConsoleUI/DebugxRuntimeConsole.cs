@@ -240,10 +240,10 @@ namespace DebugxLog.Console.Runtime
             // 用 #if/#elif 让新输入系统优先：同时启用两套输入（Both）的工程只编译新输入分支，不会同一帧开→关抵消；仅旧输入的工程回退到旧输入。
 #if ENABLE_INPUT_SYSTEM
             if (ReadToggleInputSystem())
-                SetVisible(!_visible);
+                SetPanelVisible(!_visible);
 #elif ENABLE_LEGACY_INPUT_MANAGER
             if (ReadToggleLegacy())
-                SetVisible(!_visible);
+                SetPanelVisible(!_visible);
 #endif
         }
 
@@ -310,10 +310,18 @@ namespace DebugxLog.Console.Runtime
 #endif
 
         /// <summary>
-        /// Show or hide the console panel. Public so game code can bind its own gesture / hotkey (e.g. shake-to-open).
-        /// 显示或隐藏 Console 面板。public 以便游戏代码绑定自己的手势/热键（如摇一摇唤出）。
+        /// Show or hide the in-game console panel, e.g. from your own gesture / hotkey (shake-to-open). Does nothing while
+        /// the console isn't running (disabled via DebugxStaticData.RuntimeConsoleEnabled, DEBUG_X not defined, or before
+        /// the first scene has loaded).
+        /// 显示或隐藏游戏内 Console 面板，例如绑定到自己的手势/热键（摇一摇唤出）。Console 未运行时（通过
+        /// DebugxStaticData.RuntimeConsoleEnabled 关闭、未定义 DEBUG_X，或首个场景加载之前）不做任何事。
         /// </summary>
-        public void SetVisible(bool visible)
+        public static void SetVisible(bool visible)
+        {
+            if (_instance != null) _instance.SetPanelVisible(visible);
+        }
+
+        private void SetPanelVisible(bool visible)
         {
             _visible = visible;
             ApplyVisible();

@@ -274,17 +274,17 @@ Debugx にはいくつかの固定プリセットメンバーが組み込まれ�
 条件を満たすと、オーバーレイは最初のシーン読み込み後に自動生成され（`DontDestroyOnLoad`）、既定では非表示です。**呼び出し / 収納の方法：**
 - デスクトップ：**バッククォートキー**（`` ` `` / `BackQuote`）を押す。
 - タッチ：画面を**3 本指で同時にタップ**。
-- 共通：画面隅のフローティング **Debugx** ボタン。または、ゲームコードで `DebugxRuntimeConsole.SetVisible(true/false)` を呼び、独自のジェスチャー / ホットキーに紐付け。
+- 共通：画面隅のフローティング **Debugx** ボタン。または、ゲームコードで `DebugxRuntimeConsole.SetVisible(true/false)`（名前空間 `DebugxLog.Console.Runtime`）を呼び、独自のジェスチャー / ホットキーに紐付け。
 
 > [!NOTE]
-> バッククォートキーと 3 本指ジェスチャーは旧 **Input Manager** に依存します。プロジェクトが新 **Input System** のみを有効にしている場合は、フローティングボタンまたは `SetVisible(...)` API で呼び出してください。
+> バッククォートキーと 3 本指ジェスチャーは旧 **Input Manager** と新 **Input System** のどちらでも使えます。新 Input System のみを有効にしている場合は、シーンに `EventSystem`（Input System UI Input Module 付き）が必要です。ないとオーバーレイのボタンがクリックを受け取りません。
 
-オーバーレイの機能はエディター版とほぼ同じです（タッチ対応）：`Clear`、`Copy`、`Collapse`、`Debugx Only`、`Members` メンバーフィルター、`Time` タイムスタンプ、`Net` ネットワークタグ（All / Server / Client を循環）、`Log / Warning / Error` のタイプフィルターとカウント、および検索（ヒットした部分文字列をハイライト）。さらに **Source** ポップアップは実行時スイッチ（`EnableLog` / `EnableLogMember` / `Only Key` と各メンバースイッチ）を提供し、実際の出力挙動を直接書き換えます。あるログを選択すると、下部にメッセージとスタックテキストを表示できます（実行時はソースジャンプ非対応）。  
+オーバーレイの機能はエディター版とほぼ同じです（タッチ対応）：`Clear`、`Copy`、`Collapse`、`Debugx Only`、`Members` メンバーフィルター、`Time` タイムスタンプ、`Net` ネットワークタグ（All / Server / Client を循環）、`Log / Warning / Error` のタイプフィルターとカウント、および検索（ヒットした部分文字列をハイライト）。`Clear` は誤操作防止のため 1 秒長押しで実行されます。さらに **Settings** ポップアップは実行時スイッチ（`EnableLog` / `EnableLogMember` / `Only Key` と各メンバースイッチ。実際の出力挙動を直接書き換えます）とバッファ容量の設定を提供します。あるログを選択すると、下部にメッセージとスタックテキストを表示できます（実行時はソースジャンプ非対応）。  
 ![](Documents/console_ingame_1.png)
 <!-- スクリーンショット占位：実機 / Play モードでのゲーム内実行時オーバーレイ（ツールバー + ログリスト + 詳細） -->
 
 > [!TIP]
-> 実行時オーバーレイのリングバッファは既定で 1000 件の容量です（モバイルにやさしい）。
+> 実行時オーバーレイのリングバッファは既定で 4000 件です。**Settings** ポップアップの `Capacity` で変更できます（Enter で確定）。
 
 ## 🧩 DebugxManager マネージャー
 `DebugxManager` はゲーム実行時に**自動生成**され、通常は手動管理は不要です。主な役割は `LogOutput` 関連の処理（記録の開始 / 終了、出力パスの設定など）です。  

@@ -274,17 +274,17 @@ Debugx 内置了几个固定的预设成员，它们的 Key 已保留，请勿�
 满足条件后，叠层会在首个场景加载后自动创建（`DontDestroyOnLoad`），默认隐藏。**唤出 / 收起方式：**
 - 桌面端：按**反引号键**（`` ` `` / `BackQuote`）。
 - 触屏端：**三指同时点击**屏幕。
-- 通用：屏幕角落的悬浮 **Debugx** 按钮；或在游戏代码中调用 `DebugxRuntimeConsole.SetVisible(true/false)` 绑定你自己的手势 / 热键。
+- 通用：屏幕角落的悬浮 **Debugx** 按钮；或在游戏代码中调用 `DebugxRuntimeConsole.SetVisible(true/false)`（命名空间 `DebugxLog.Console.Runtime`）绑定你自己的手势 / 热键。
 
 > [!NOTE]
-> 反引号键与三指手势依赖旧版 **Input Manager**。若项目仅启用了新 **Input System**，请改用悬浮按钮或 `SetVisible(...)` API 唤出。
+> 反引号键与三指手势在旧版 **Input Manager** 与新 **Input System** 下都可用。若项目只启用了新 Input System，场景里需要有一个 `EventSystem`（带 Input System UI Input Module），否则叠层上的按钮收不到点击。
 
-叠层功能与编辑器版基本一致（触屏适配）：`Clear`、`Copy`、`Collapse`、`Debugx Only`、`Members` 成员过滤、`Time` 时间戳、`Net` 网络标记（All / Server / Client 循环）、`Log / Warning / Error` 类型过滤与计数，以及搜索（命中子串高亮）。列表支持**多选复制**（对齐编辑器版）：桌面端 `Ctrl+点击` 切换选中、`Shift+点击` 范围选中，`Ctrl/Cmd+C` 复制选中项（含堆栈，加 `Shift` 仅复制消息），点击空白处取消选中并回到「复制全部」；触屏仍为单击选中单行。工具栏控件已改用图标呈现，观感与编辑器版一致。此外 **Source** 弹层提供运行时开关（`EnableLog` / `EnableLogMember` / `Only Key` 及各成员开关），直接改写真实打印行为。选中某条日志可在下方查看消息与堆栈文本（运行时不支持源码跳转）。  
+叠层功能与编辑器版基本一致（触屏适配）：`Clear`、`Copy`、`Collapse`、`Debugx Only`、`Members` 成员过滤、`Time` 时间戳、`Net` 网络标记（All / Server / Client 循环）、`Log / Warning / Error` 类型过滤与计数，以及搜索（命中子串高亮）。列表支持**多选复制**（对齐编辑器版）：桌面端 `Ctrl+点击` 切换选中、`Shift+点击` 范围选中，`Ctrl/Cmd+C` 复制选中项（含堆栈，加 `Shift` 仅复制消息），点击空白处取消选中并回到「复制全部」；触屏仍为单击选中单行。工具栏控件已改用图标呈现，观感与编辑器版一致。`Clear` 需要按住 1 秒才会清空（防误触）。此外 **Settings** 弹层提供运行时开关（`EnableLog` / `EnableLogMember` / `Only Key` 及各成员开关，直接改写真实打印行为）和缓冲容量设置。选中某条日志可在下方查看消息与堆栈文本（运行时不支持源码跳转）。  
 ![](Documents/console_ingame_1.png)
 <!-- 截图占位：真机 / Play 模式下的游戏内运行时叠层（工具栏 + 日志列表 + 详情） -->
 
 > [!TIP]
-> 运行时叠层的环形缓冲默认容量为 1000 条（对移动端友好）。
+> 运行时叠层的环形缓冲默认容量为 4000 条，可在 **Settings** 弹层的 `Capacity` 中调整（按回车生效）。
 
 ## 🧩 DebugxManager 管理器
 `DebugxManager` 在游戏运行时**自动创建**，通常无需手动管理。它的主要职责是处理 `LogOutput` 相关操作（启动 / 结束记录、设置输出路径等）。  

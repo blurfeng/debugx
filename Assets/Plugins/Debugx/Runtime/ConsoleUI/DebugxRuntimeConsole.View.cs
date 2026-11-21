@@ -80,7 +80,7 @@ namespace DebugxLog.Console.Runtime
             // Branding icon (icon_article) + "Debugx" text. Built as an icon/label row inside the Button rather than using
             // Button.text, so the glyph sits beside the label. 品牌图标（icon_article）+ “Debugx” 文字。以按钮内的图标/文字
             // 行构建，而非用 Button.text，让图标排在文字旁边。
-            var btn = new Button(() => SetVisible(true));
+            var btn = new Button(() => SetPanelVisible(true));
             btn.style.position = Position.Absolute;
             btn.style.left = 8;
             btn.style.top = 8;
@@ -156,7 +156,7 @@ namespace DebugxLog.Console.Runtime
 
             // Close (×) pinned to the panel's top-right corner, above everything.
             // 关闭（×）钉在面板右上角，置于所有内容之上。
-            Button close = BuildCloseButton(() => SetVisible(false));
+            Button close = BuildCloseButton(() => SetPanelVisible(false));
             close.style.position = Position.Absolute;
             close.style.top = 2;
             close.style.right = 2;
