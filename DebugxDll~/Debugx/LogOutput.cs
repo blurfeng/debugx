@@ -129,6 +129,8 @@ namespace DebugxLog.Tools
                 return;
             }
 
+            DeleteOldArchives(fileInfo.DirectoryName);
+
             _mainThreadId = Thread.CurrentThread.ManagedThreadId;
 
             // The threaded event also carries logs from worker threads; Application.logMessageReceived only fires for
@@ -189,6 +191,36 @@ namespace DebugxLog.Tools
         // file is deleted instead. Returns the archived path, or null when there was nothing to keep. Throws on I/O errors.
         // 将已结束的日志改名为同目录下带时间戳的文件，避免之后的会话覆盖它；空文件直接删除。返回存档路径，无需保留时返回 null。
         // I/O 出错时抛出异常。
+        // Archived logs kept per folder. Every session archives one, so a device or machine that runs a development build
+        // every day would otherwise collect log files forever.
+        // 每个目录保留的存档日志数。每次运行都会存档一个，否则每天运行开发版的设备/机器会一直累积日志文件。
+        private const int MaxArchivedLogs = 20;
+
+        // Delete the oldest archived logs beyond MaxArchivedLogs. Best effort: a file that can't be deleted is left alone.
+        // 删除超出 MaxArchivedLogs 的最旧存档日志。尽力而为：删不掉的文件保留不动。
+        private static void DeleteOldArchives(string directory)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return;
+
+                string[] archives = Directory.GetFiles(directory, FileName + "-*" + FileType);
+                if (archives.Length <= MaxArchivedLogs) return;
+
+                Array.Sort(archives, (a, b) => File.GetLastWriteTimeUtc(a).CompareTo(File.GetLastWriteTimeUtc(b)));
+                for (int i = 0; i < archives.Length - MaxArchivedLogs; i++)
+                {
+                    try { File.Delete(archives[i]); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                }
+            }
+            catch (Exception ex)
+            {
+                UnityEngine.Debug.LogWarning("[Debugx] LogOutput 清理旧日志失败。" + ex.Message);
+            }
+        }
+
         private static string ArchiveLogFile(string logPath, DateTime stamp)
         {
             if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath)) return null;

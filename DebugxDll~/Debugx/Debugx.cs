@@ -112,6 +112,7 @@
 // 3.LogOutput 录制结束的 "logOutput over" 提示由 Warning 改为普通 Log。
 // 4.LogOutput.RecordStart 先存档上次会话遗留的非空 DebugxLog.log（崩溃、进程被杀时 RecordOver 未执行），以其最后写入时间命名，不再被 FileMode.Create 清空；无法存档时改为追加写入。存档逻辑与 RecordOver 共用 ArchiveLogFile。
 // 5.LogOutput 改订阅 Application.logMessageReceivedThreaded：logMessageReceived 只在主线程触发，子线程打的日志此前进不了文件。子线程的行帧号写 "-"（Time.frameCount 只能在主线程读）。
+// 6.LogOutput.RecordStart 只保留最近 20 个存档日志（DebugxLog-*.log），更早的删除，避免日志文件无限累积。
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #endregion
