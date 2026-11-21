@@ -1405,12 +1405,12 @@ namespace DebugxLog.Console.Editor
         
         /// <summary>
         /// Find the active search's matches in the VISIBLE (tag-stripped) text of <paramref name="richText"/>, for
-        /// DrawRowText to paint highlight boxes behind (IMGUI can't render &lt;mark&gt;). Walks the rich string once,
-        /// skipping &lt;...&gt; tag spans, then collects non-overlapping substring matches as (start, end). Returns the
+        /// DrawRowText to paint highlight boxes behind (IMGUI can't render &lt;mark&gt;). Removes the recognized rich-text
+        /// tags (the same ones the search ignores), then collects non-overlapping substring matches as (start, end). Returns the
         /// visible text, or null when there's nothing to highlight (empty / regex search — the search boxes only set plain
         /// substrings, so regex highlight is intentionally skipped — or no match).
         /// 在 <paramref name="richText"/> 的可见（去标签）文本中查找当前搜索命中，供 DrawRowText 在其后绘制高亮底块（IMGUI 不支持
-        /// &lt;mark&gt;）。一次遍历富文本、跳过 &lt;...&gt; 标签段，再收集不重叠的子串命中 (start, end)。返回可见文本；无需高亮时
+        /// &lt;mark&gt;）。先移除已识别的富文本标签（与搜索忽略的相同），再收集不重叠的子串命中 (start, end)。返回可见文本；无需高亮时
         /// （搜索为空/为正则——搜索框只设纯子串，正则高亮有意跳过——或无命中）返回 null。
         /// </summary>
         /// <param name="richText">The rich text to search. 待搜索的富文本。</param>
@@ -1423,25 +1423,10 @@ namespace DebugxLog.Console.Editor
             if (query.IsEmpty || query.UseRegex) return null;
 
             string needle = query.Text;
-            int n = richText.Length;
 
-            var visible = new StringBuilder(n);
-            int i = 0;
-            while (i < n)
-            {
-                char c = richText[i];
-                if (c == '<')
-                {
-                    int close = richText.IndexOf('>', i + 1);
-                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
-                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
-                    continue;
-                }
-                visible.Append(c);
-                i++;
-            }
-
-            string hay = visible.ToString();
+            // Only real rich-text tags are invisible; any other '<' (List<int>, hp <= 0) is drawn, so it stays in the text.
+            // 只有真正的富文本标签不可见；其他 '<'（List<int>、hp <= 0）会被画出来，故保留在文本里。
+            string hay = ConsoleTextUtil.StripRichText(richText);
             if (hay.Length == 0 || needle.Length > hay.Length) return null;
 
             StringComparison cmp = query.CaseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;

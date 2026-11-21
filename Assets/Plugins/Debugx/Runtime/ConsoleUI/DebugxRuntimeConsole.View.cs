@@ -1108,13 +1108,14 @@ namespace DebugxLog.Console.Runtime
         /// <summary>
         /// Return <paramref name="richText"/> with the active search's matches wrapped in a &lt;mark=#hex&gt; highlight.
         /// The search matches the VISIBLE text, so we can't splice at those offsets directly: walk the rich string once,
-        /// skipping &lt;...&gt; tag spans, to build the visible text plus a visible-&gt;rich index map; find the matches in
+        /// skipping recognized rich-text tags (<see cref="ConsoleTextUtil.RichTagLengthAt"/>), to build the visible text
+        /// plus a visible-&gt;rich index map; find the matches in
         /// the visible text; then splice &lt;mark&gt;/&lt;/mark&gt; at the mapped rich positions. &lt;mark&gt; only paints a
         /// background, so member &lt;color&gt; foregrounds survive. No-op when the search is empty or a regex (the search
         /// boxes only ever set plain substring text, so regex highlight is intentionally skipped) — the input is returned
         /// unchanged, so the caller can wrap every row unconditionally.
         /// 返回把当前搜索命中套上 &lt;mark=#hex&gt; 高亮后的 <paramref name="richText"/>。搜索匹配的是可见文本，无法直接按其偏移拼接：
-        /// 一次遍历富文本、跳过 &lt;...&gt; 标签段，构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置
+        /// 一次遍历富文本、跳过已识别的富文本标签（<see cref="ConsoleTextUtil.RichTagLengthAt"/>），构建可见文本 + “可见→富文本”下标映射；在可见文本里找命中；再在映射后的富文本位置
         /// 拼入 &lt;mark&gt;/&lt;/mark&gt;。&lt;mark&gt; 只画背景，故成员 &lt;color&gt; 前景色得以保留。搜索为空或为正则时不处理（搜索框只设
         /// 纯子串，正则高亮有意跳过）——原样返回，故调用方可无条件地对每一行套用。
         /// </summary>
@@ -1136,16 +1137,16 @@ namespace DebugxLog.Console.Runtime
             int i = 0;
             while (i < n)
             {
-                char c = richText[i];
-                if (c == '<')
+                // Skip only real rich-text tags (the ones the search text has stripped); any other '<' is visible text.
+                // 只跳过真正的富文本标签（搜索文本已剥掉的那些）；其他 '<' 都是可见文本。
+                int tagLength = ConsoleTextUtil.RichTagLengthAt(richText, i);
+                if (tagLength > 0)
                 {
-                    int close = richText.IndexOf('>', i + 1);
-                    if (close < 0) break; // malformed trailing '<': stop scanning; the tail holds no matchable text. 残缺尾部 '<'：停止扫描；尾部无可匹配文本。
-                    i = close + 1;        // skip the whole <...> tag. 跳过整个 <...> 标签。
+                    i += tagLength;
                     continue;
                 }
                 richPos.Add(i);
-                visible.Append(c);
+                visible.Append(richText[i]);
                 i++;
             }
             richPos.Add(n); // a match ending at the last visible char closes here. 命中止于最后可见字符时在此闭合。

@@ -17,9 +17,17 @@ namespace DebugxLog.Console
         // CultureInvariant keeps IgnoreCase folding stable across locales: without it, uppercase tags containing the
         // letter i (e.g. <I>, <SIZE>, <ALIGN>) fail to strip under Turkish/Azerbaijani cultures, so the same message
         // yields different PlainText per locale (breaking collapsing and search).
-        private static readonly Regex _richTextRegex = new Regex(
-            @"</?(?:color|b|i|size|material|quad|u|s|sub|sup|mark|align|alpha|font)(?:=[^>]*)?>",
-            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        private const string RichTagPattern =
+            @"</?(?:color|b|i|size|material|quad|u|s|sub|sup|mark|align|alpha|font)(?:=[^>]*)?>";
+        private const RegexOptions TagOptions =
+            RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
+        private static readonly Regex _richTextRegex = new Regex(RichTagPattern, TagOptions);
+
+        // The same tag set anchored at a given index (\G), so callers walking rich text skip exactly the tags
+        // StripRichText removes and treat any other '<' (List<int>, hp <= 0, <null>) as visible text.
+        // 同一标签集合，锚定在指定下标（\G），使遍历富文本的调用方恰好跳过 StripRichText 会移除的标签，其他 '<'
+        // （List<int>、hp <= 0、<null>）都当作可见文本。
+        private static readonly Regex _richTagAtRegex = new Regex(@"\G" + RichTagPattern, TagOptions);
 
         /// <summary>
         /// Returns the message with recognized Unity rich-text tags removed. Null/empty inputs pass through.
@@ -29,6 +37,18 @@ namespace DebugxLog.Console
         {
             if (string.IsNullOrEmpty(message)) return message;
             return _richTextRegex.Replace(message, string.Empty);
+        }
+
+        /// <summary>
+        /// Length of the recognized rich-text tag starting at <paramref name="index"/>, or 0 when the character there is
+        /// visible text (including a literal '&lt;').
+        /// 从 <paramref name="index"/> 开始的已识别富文本标签的长度；该处是可见文本（包括字面量 '&lt;'）时返回 0。
+        /// </summary>
+        public static int RichTagLengthAt(string text, int index)
+        {
+            if (string.IsNullOrEmpty(text) || index < 0 || index >= text.Length || text[index] != '<') return 0;
+            Match m = _richTagAtRegex.Match(text, index);
+            return m.Success ? m.Length : 0;
         }
     }
 }
