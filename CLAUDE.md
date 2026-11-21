@@ -25,7 +25,8 @@ Debugx 是一个通过 UPM 分发的 Unity 调试日志插件（`com.blurfeng.de
 
 ## 仓库结构
 
-- `Assets/Plugins/Debugx/` —— UPM 包（这是发布物）。`Runtime/` + `Editor/` asmdef、`Resources/DebugxProjectSettings.asset`、`package.json`、`CHANGELOG.md`。
+- `Assets/Plugins/Debugx/` —— UPM 包（这是发布物）。`Runtime/` + `Editor/` asmdef、`Resources/`（运行时 Console 的 PanelSettings、主题、图标）、`package.json`、`CHANGELOG.md`。
+- `Assets/DebugxSettings/` —— 本开发仓库自己的用户配置：`Resources/DebugxProjectSettings.asset`、生成的 `DebugxLogger.cs` 与 `Debugx.asmref`。位于包外，不随发布。
 - `Assets/Source/DebugxTest.cs` —— 手动的 MonoBehaviour 冒烟测试；不属于包。
 - `DebugxDll~/Debugx/` —— **独立的 C# 类库工程**，唯一产物是 `DebugxLog.dll`。这是核心日志类的真源（source of truth）。见下文“DLL 工作流”——这是编辑核心逻辑前最需要理解的一点。
 - 根目录的 `Assembly-CSharp*.csproj`、`Unity.*.csproj`、`Debugx.sln`、`Library/`、`obj/` —— Unity 生成，绝不手改。`DebugxDll~/` 文件夹以 `~` 结尾命名，故 Unity 会忽略它。
@@ -53,7 +54,7 @@ cp DebugxDll~/Debugx/bin/Release/DebugxLog.dll DebugxDll~/Debugx/bin/Release/Deb
 
 - **`Debugx`**（DLL）—— 静态日志 API。`Log/LogWarning/LogError(int key | string signature, message, showTime, showNetTag)`。持有运行时开关状态（`enableLog`、`enableLogMember`、`logThisKeyMemberOnly`、各成员开关）。`LogAdm*` 是绕过成员开关的插件内部通道（仍受 `DEBUG_X` 门控）——不要在应用代码中使用。
 - **`DebugxProjectSettings`**（DLL）—— *真正的* 运行时配置对象。单例，惰性从 `Resources.Load("DebugxProjectSettings")` 加载；资源缺失时回退到默认实例（绝不返回 null）。也持有常量：`DebugxTag = "[Debugx]"`、预设成员键。
-- **`DebugxProjectSettingsAsset`**（Unity `ScriptableObject`，位于 `Resources/`）—— 可编辑、可序列化的工程配置。其 `ApplyTo(DebugxProjectSettings)` 是把资源数据拷入 DLL 运行时设置的桥梁。**设置的双重性：** 在 `Application.isEditor` 下，`ApplyTo` 的大多数值取自 `DebugxStaticData`（各用户的 `EditorPrefs`/`PlayerPrefs`）而非序列化的资源字段——于是编辑器中每个开发者的本地开关优先，而构建版使用已提交的资源值。
+- **`DebugxProjectSettingsAsset`**（Unity `ScriptableObject`，新建于项目的 `Assets/DebugxSettings/Resources/`；旧版本建在 `Assets/Plugins/Debugx/Resources/` 的也照常使用，只认 `Assets/` 下的那份）—— 可编辑、可序列化的工程配置。其 `ApplyTo(DebugxProjectSettings)` 是把资源数据拷入 DLL 运行时设置的桥梁。**设置的双重性：** 在 `Application.isEditor` 下，`ApplyTo` 的大多数值取自 `DebugxStaticData`（各用户的 `EditorPrefs`/`PlayerPrefs`）而非序列化的资源字段——于是编辑器中每个开发者的本地开关优先，而构建版使用已提交的资源值。
 - **`DebugxManager`**（`MonoBehaviour`）—— 运行时通过 `[RuntimeInitializeOnLoadMethod]` 自动创建（仅当定义了 `DEBUG_X`）。驱动 `Debugx.OnAwake/OnDestroy`，设置平台相关的 `LogOutput.DirectoryPath`（编辑器 → 工程 `Logs/`），并启停文件录制。`Create()` 为 `virtual`，供项目扩展。
 - **`DebugxStaticData`** —— 所有编辑器/用户偏好状态（`*Prefs` = 各用户 EditorPrefs，`*Set` = 默认值）、tooltip，以及通过 `IsChineseSimplified` 提供的本地化（中/英）UI 文本。
 
@@ -63,9 +64,9 @@ cp DebugxDll~/Debugx/bin/Release/DebugxLog.dll DebugxDll~/Debugx/bin/Release/Deb
 
 ## 代码生成
 
-`DebugxLoggerCodeGenerator`（Editor）生成 `Assets/Plugins/Debugx/Runtime/DebugxLogger.cs` —— 一个静态类，含各成员的便捷方法（`LogNormal`、`LogBlur`、`LogWarningMaster`……），转发到 `Debugx.Log(key, …)`。这是**生成文件，不要手改**；通过菜单 **Tools > Debugx > Regenerate DebugxLogger Class** 重新生成（成员配置变化时也会自动运行）。方法后缀由成员 signature 转 PascalCase 并做碰撞后缀处理。
+`DebugxLoggerCodeGenerator`（Editor）生成 `Assets/DebugxSettings/DebugxLogger.cs` —— 一个静态类，含各成员的便捷方法（`LogNormal`、`LogBlur`、`LogWarningMaster`……），转发到 `Debugx.Log(key, …)`。这是**生成文件，不要手改**；通过菜单 **Tools > Debugx > Regenerate DebugxLogger Class** 重新生成（成员配置变化时也会自动运行）。方法后缀由成员 signature 转 PascalCase 并做碰撞后缀处理。
 
-`DEBUGX_IN_UPM` 门控：整个生成文件包在 `#if !DEBUGX_IN_UPM` 内。Runtime asmdef 通过一条以 `com.blurfeng.debugx` 为键的 `versionDefines` 定义 `DEBUGX_IN_UPM`，于是当使用者**以 UPM 包**安装插件时，包内自带的 `DebugxLogger` 被编译掉，只保留生成到使用者自己 `Assets/` 中的那份——避免重复类错误。在本开发仓库中插件位于 `Assets/`（非 `Packages/`），故 `DEBUGX_IN_UPM` *未* 定义，生成的类处于激活状态。
+生成文件放在插件目录之外，是为了让插件升级（`.unitypackage` 覆盖导入、UPM 只读缓存）永远碰不到它。同目录的 `Debugx.asmref`（生成器缺失时自动补写）把它编进 `Debugx` 程序集，因此无论以 UPM 还是 `.unitypackage` 安装，引用 `Debugx` 的 asmdef 代码都能调用它。2.5.0 之前生成在 `Assets/Plugins/Debugx/Runtime/DebugxLogger.cs`：编辑器加载时若发现旧文件（带自动生成标记），会在同一次刷新里删掉旧文件、在新位置重新生成，避免 `Debugx` 程序集里出现重复类。
 
 ## 约定
 

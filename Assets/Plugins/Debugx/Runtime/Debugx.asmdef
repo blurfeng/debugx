@@ -9,12 +9,6 @@
     "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [
-        {
-            "name": "com.blurfeng.debugx",
-            "expression": "",
-            "define": "DEBUGX_IN_UPM"
-        }
-    ],
+    "versionDefines": [],
     "noEngineReferences": false
 }

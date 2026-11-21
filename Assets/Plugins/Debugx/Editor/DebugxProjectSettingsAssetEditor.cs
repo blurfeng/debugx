@@ -41,6 +41,7 @@ namespace DebugxLog.Editor
         {
             //项目启动时确认配置资源是否存在
             CheckDebugxProjectSettingsAsset();
+            DebugxLoggerCodeGenerator.MigrateLegacyLocation();
         }
         
         /// <summary>
@@ -51,19 +52,29 @@ namespace DebugxLog.Editor
             //在代码编译时走到这里，无法通过instance = Resources.Load<DebugxProjectSettingsAsset>(DebugxProjectSettings.fileName);方式获取到实际存在的文件
             //这会导致每次代码重编译时都创建了新的DebugxProjectSettingsAsset并覆盖了旧的
 
-            bool haveAsset = false;
-            string[] assetGUIDs = AssetDatabase.FindAssets(DebugxProjectSettings.FileName);
-            for (int i = 0; i < assetGUIDs.Length; i++)
+            // Only the project's own copy counts: under Assets/, in a Resources folder, named DebugxProjectSettings. A copy
+            // inside an installed package is read-only. Any folder works, so an asset created by an older version
+            // (Assets/Plugins/Debugx/Resources/) keeps being used.
+            // 只认项目自己的那份：位于 Assets/ 下的 Resources 目录、名为 DebugxProjectSettings。已安装包内的副本是只读的。
+            // 目录不限，因此旧版本创建的资源（Assets/Plugins/Debugx/Resources/）会继续使用。
+            List<string> found = new List<string>();
+            foreach (string guid in AssetDatabase.FindAssets("t:" + nameof(DebugxProjectSettingsAsset)))
             {
-                string path = AssetDatabase.GUIDToAssetPath(assetGUIDs[i]);
-                if (path.Contains("/Debugx/Resources/"))
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.StartsWith("Assets/") && path.Contains("/Resources/")
+                    && System.IO.Path.GetFileNameWithoutExtension(path) == DebugxProjectSettings.FileName)
                 {
                     AssetDatabase.LoadAssetAtPath<DebugxProjectSettingsAsset>(path);
-                    haveAsset = true;
+                    found.Add(path);
                 }
             }
 
-            if (!haveAsset) CreateDebugxProjectSettingsAsset();
+            // Resources.Load picks one of several same-named assets arbitrarily, so builds could use the wrong one.
+            // Resources.Load 在多个同名资源中任取一个，构建可能用错。
+            if (found.Count > 1)
+                Debug.LogWarning("[Debugx] Found more than one DebugxProjectSettings asset; keep one and delete the others. 发现多个 DebugxProjectSettings 资源，请只保留一个：\n" + string.Join("\n", found));
+
+            if (found.Count == 0) CreateDebugxProjectSettingsAsset();
         }
         
         /// <summary>

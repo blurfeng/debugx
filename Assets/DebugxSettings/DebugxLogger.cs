@@ -7,7 +7,6 @@
 // Class names ending with Logger can block at this class when double-clicking logs in the Console window, 
 // making it easier to see the business logic location that called Log.
 
-#if !DEBUGX_IN_UPM
 using System.Diagnostics;
 using DebugxLog;
 using UnityEngine;
@@ -105,4 +104,3 @@ public static class DebugxLogger
     }
 
 }
-#endif

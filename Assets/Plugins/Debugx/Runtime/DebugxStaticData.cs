@@ -8,7 +8,9 @@ namespace DebugxLog
     public static class DebugxStaticData
     {
         public static readonly bool IsChineseSimplified = Application.systemLanguage == SystemLanguage.ChineseSimplified;
-        private const string FolderPath = "/Plugins/Debugx/Resources";
+        // Project-owned folder outside the plugin, so package upgrades never overwrite the settings asset.
+        // 插件目录之外、属于项目自己的目录，插件升级不会覆盖设置资源。
+        private const string FolderPath = "/DebugxSettings/Resources";
         public static readonly string ResourcesPathRelative  = "Assets" + FolderPath;
         /// <summary>
         /// Configuration storage folder.
