@@ -142,8 +142,8 @@ namespace DebugxLog.Editor
     }
 
     /// <summary>
-    /// GUI extension tool. It includes the GUI drawing class taken from the AstarPathfindingProject plugin.
-    /// GUI扩展工具。有从AstarPathfindingProject插件拿过来的GUI绘制类
+    /// GUI extension tool: push / pop a background tint.
+    /// GUI扩展工具：背景色的压栈 / 出栈。
     /// </summary>
     public static class GUIUtilityEx
     {
