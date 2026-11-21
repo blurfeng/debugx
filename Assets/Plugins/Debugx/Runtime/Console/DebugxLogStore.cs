@@ -59,7 +59,7 @@ namespace DebugxLog.Console
             set { if (_collapseMode != value) { _collapseMode = value; _viewDirty = true; } }
         }
 
-        public DebugxLogStore(int capacity = LogRingBuffer.DefaultCapacity)
+        public DebugxLogStore(int capacity)
         {
             Buffer = new LogRingBuffer(capacity);
             _collector.EntryProduced += OnEntryProduced;

@@ -188,6 +188,19 @@ namespace DebugxLog.Console.Editor
             });
             _editorPanel.Add(stackScriptOnly);
 
+            // Buffer capacity: applied on Enter / focus loss (isDelayed), so typing a new number doesn't shrink the buffer
+            // at every keystroke. 缓冲容量：按回车/失焦时才生效（isDelayed），避免输入新数字时每个键都收缩缓冲。
+            var capacity = new IntegerField(L("缓冲容量（条）", "Buffer Capacity")) { value = _store.Capacity, isDelayed = true };
+            capacity.tooltip = L("最多保留多少条日志，超出后丢弃最旧的。", "How many logs to keep; the oldest are dropped beyond this.");
+            capacity.RegisterValueChangedCallback(evt =>
+            {
+                BufferCapacityPref = evt.newValue;
+                _store.Capacity = BufferCapacityPref;
+                capacity.SetValueWithoutNotify(_store.Capacity);
+                ForceRefresh();
+            });
+            _editorPanel.Add(capacity);
+
             // Replace native Console: redirect any focus of Unity's Console (e.g. clicking the status-bar log) here.
             // 替代原生 Console：把原生 Console 的任何聚焦（如点击状态栏日志）转到本窗口。
             var redirectNative = new Toggle(L("替代原生 Console", "Replace Native Console")) { value = NativeConsoleRedirect.Enabled };

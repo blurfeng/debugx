@@ -25,6 +25,22 @@ namespace DebugxLog.Console.Editor
     {
         private const string PrefPrefix = "Debugx.Console.";
 
+        // Logs kept by default; the oldest are dropped beyond this (per-user, Editor panel > View > Buffer Capacity).
+        // 默认保留的日志条数；超出后丢弃最旧的（按用户设置，Editor 面板 > 视图 > 缓冲容量）。
+        private const int DefaultBufferCapacity = 50000;
+
+        // Each rebuild walks the whole buffer, so new logs refresh the view at most this often (seconds).
+        // 每次重建都要遍历整个缓冲，故新日志触发的刷新最短间隔为此值（秒）。
+        private const double RebuildInterval = 0.1;
+        private double _lastRebuildTime;
+        private bool _isVisible = true; // false while the tab is hidden; the view catches up when shown. 标签页隐藏时为 false；显示时补刷。
+
+        private static int BufferCapacityPref
+        {
+            get => Mathf.Max(1, EditorPrefs.GetInt(PrefPrefix + "BufferCapacity", DefaultBufferCapacity));
+            set => EditorPrefs.SetInt(PrefPrefix + "BufferCapacity", Mathf.Max(1, value));
+        }
+
         [MenuItem("Window/Debugx/DebugxConsole", false, 4)]
         public static void Open()
         {
@@ -95,7 +111,7 @@ namespace DebugxLog.Console.Editor
 
         private void OnEnable()
         {
-            _store = new DebugxLogStore();
+            _store = new DebugxLogStore(BufferCapacityPref);
             LoadPrefs();
             _store.Collector.EntryProduced += OnEntryForErrorPause;
             _store.Start();
@@ -746,9 +762,20 @@ namespace DebugxLog.Console.Editor
             PumpCompileMirror();           // may inject compiler/import entries into the collector queue. 可能向采集队列注入编译器/导入条目。
             _store.Pump();                 // drains them (and live-channel entries) into the buffer. 将它们（及 live 通道条目）排空进缓冲。
             if (_listView == null) return; // UI not built yet (OnEnable runs before CreateGUI). UI 尚未构建。
+
+            // Throttled, and skipped while hidden: user actions still refresh at once through ForceRefresh.
+            // 限频，且隐藏时跳过：用户操作仍经 ForceRefresh 立即刷新。
+            double now = EditorApplication.timeSinceStartup;
+            if (!_isVisible || now - _lastRebuildTime < RebuildInterval) return;
             if (_store.TryRebuildView())
+            {
+                _lastRebuildTime = now;
                 RefreshView();
+            }
         }
+
+        private void OnBecameVisible() => _isVisible = true;
+        private void OnBecameInvisible() => _isVisible = false;
 
         private void OnCriteriaChanged()
         {

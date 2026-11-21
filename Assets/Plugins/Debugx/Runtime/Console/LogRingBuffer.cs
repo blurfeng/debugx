@@ -5,25 +5,17 @@ namespace DebugxLog.Console
     /// <summary>
     /// Append log buffer of <see cref="DebugxLogEntry"/> backed by a ring. The allocated storage grows on demand
     /// (doubling) up to <see cref="Capacity"/>; only once that retention cap is reached is the oldest entry dropped
-    /// (FIFO). A very large cap (e.g. int.MaxValue for the Editor Console) therefore costs nothing until entries are
-    /// actually added — an idle console does not pre-allocate. Not thread-safe by design: it is written and read only on
+    /// (FIFO). A large cap therefore costs nothing until entries are actually added — an idle console does not
+    /// pre-allocate. Not thread-safe by design: it is written and read only on
     /// the main thread (the collector marshals cross-thread captures to the main thread before adding). Callers poll
     /// <see cref="Version"/> to detect changes cheaply instead of subscribing to a per-add event (avoids event spam
     /// during log floods).
     /// 基于环形存储的追加式 <see cref="DebugxLogEntry"/> 缓冲。已分配存储按需翻倍增长，直到达到 <see cref="Capacity"/> 保留
-    /// 上限；唯有到达上限后才丢弃最旧条目（FIFO）。因此设很大的上限（如编辑器 Console 用 int.MaxValue）在真正 Add 前不占内存，
-    /// 空闲 Console 不预分配。设计上非线程安全：只在主线程读写（采集器会先把跨线程捕获汇集到主线程再 Add）。调用方通过轮询
+    /// 上限；唯有到达上限后才丢弃最旧条目（FIFO）。因此设较大的上限在真正 Add 前不占内存，空闲 Console 不预分配。设计上非线程安全：只在主线程读写（采集器会先把跨线程捕获汇集到主线程再 Add）。调用方通过轮询
     /// <see cref="Version"/> 低成本地检测变化，而非订阅每条日志的事件（避免日志洪泛时的事件风暴）。
     /// </summary>
     public sealed class LogRingBuffer
     {
-        /// <summary>
-        /// Default (retention) capacity for the Editor Console: effectively unlimited. Storage still grows on demand, so
-        /// this costs nothing until logs accumulate; entries are only ever dropped if memory is actually exhausted.
-        /// 编辑器 Console 的默认（保留）容量：实际上无上限。存储仍按需增长，故在日志累积前不占内存；只有真正耗尽内存时才会丢条目。
-        /// </summary>
-        public const int DefaultCapacity = int.MaxValue;
-
         // Smallest storage allocated on the first Add, then doubled as needed up to _maxCapacity.
         // 首次 Add 分配的最小存储，随后按需翻倍直到 _maxCapacity。
         private const int InitialCapacity = 64;

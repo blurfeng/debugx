@@ -151,6 +151,11 @@ namespace DebugxLog.Console.Runtime
         private bool _uiBuilt;
         private bool _visible;
 
+        // Each rebuild walks the whole buffer, so new logs refresh the view at most this often (seconds, unscaled).
+        // 每次重建都要遍历整个缓冲，故新日志触发的刷新最短间隔为此值（秒，不受 timeScale 影响）。
+        private const float RebuildInterval = 0.1f;
+        private float _lastRebuildTime;
+
 #if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
         // Multi-finger tap debounce: fires once when the finger count first reaches the threshold, re-armed only after
         // every finger lifts (so holding fingers down or adjusting them doesn't retoggle). Shared by both input backends;
@@ -202,8 +207,11 @@ namespace DebugxLog.Console.Runtime
 
             HandleToggleInput();
 
-            if (_uiBuilt && _visible && _store.TryRebuildView())
+            if (_uiBuilt && _visible && Time.unscaledTime - _lastRebuildTime >= RebuildInterval && _store.TryRebuildView())
+            {
+                _lastRebuildTime = Time.unscaledTime;
                 RefreshView();
+            }
         }
 
         private void TryBuildUI()
