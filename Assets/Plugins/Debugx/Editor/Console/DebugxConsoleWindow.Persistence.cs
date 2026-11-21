@@ -33,6 +33,11 @@ namespace DebugxLog.Console.Editor
         // 持久化条目上限（保留最新的）。限制 SessionState 体积；更旧的条目在重载时丢弃。
         private const int MaxPersistEntries = 2000;
 
+        // Cap on the text kept (characters across message + stack), so a few huge payloads can't make the JSON blob written
+        // on every recompile / play-mode entry / window close hundreds of MB.
+        // 保留文本的上限（消息 + 堆栈的字符总数），使少数超大内容不会让每次重编译/进入 Play/关窗时写入的 JSON 达到数百 MB。
+        private const int MaxPersistChars = 2000000;
+
         [Serializable]
         private struct PersistedEntry
         {
@@ -70,10 +75,13 @@ namespace DebugxLog.Console.Editor
 
             // Walk newest -> oldest, keep up to MaxPersistEntries non-compile entries, then reverse back to oldest -> newest.
             // 从最新到最旧遍历，保留至多 MaxPersistEntries 条非编译条目，再反转回 最旧->最新。
+            long chars = 0;
             for (int i = buf.Count - 1; i >= 0 && payload.entries.Count < MaxPersistEntries; i--)
             {
                 DebugxLogEntry e = buf[i];
                 if (e.Category == LogEntryCategory.Compile) continue;
+                chars += (e.RichText?.Length ?? 0) + (e.PlainText?.Length ?? 0) + (e.StackTrace?.Length ?? 0);
+                if (chars > MaxPersistChars && payload.entries.Count > 0) break;
                 payload.entries.Add(ToPersisted(e));
             }
             payload.entries.Reverse();

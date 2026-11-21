@@ -126,7 +126,11 @@ namespace DebugxLog.Console.Editor
 
         private void OnDisable()
         {
-            SavePersistedLogs(); // stash logs so they survive the coming domain reload / window close. 转存日志以熬过即将到来的域重载/关窗。
+            // Stash logs so they survive the coming domain reload / window close. Guarded: if it threw (e.g. out of memory),
+            // the unsubscribes below would be skipped and the closed window would keep collecting.
+            // 转存日志以熬过即将到来的域重载/关窗。加保护：若它抛异常（如内存不足），下面的取消订阅会被跳过，关掉的窗口会一直采集。
+            try { SavePersistedLogs(); }
+            catch (Exception ex) { Debug.LogError("[Debugx] Console could not keep its logs across the reload: " + ex.Message); }
             if (_store != null)
             {
                 _store.Collector.EntryProduced -= OnEntryForErrorPause;
