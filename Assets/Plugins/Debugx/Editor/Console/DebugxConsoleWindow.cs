@@ -480,6 +480,7 @@ namespace DebugxLog.Console.Editor
             // Search matches get a blue background drawn behind them (list rows only). Empty search -> no hits.
             // 搜索命中处在其后绘制蓝色底（仅列表行）。搜索为空 -> 无命中。
             rt.Visible = FindHighlights(rt.Rich, _criteria.Search, rt.Hits);
+            rt.HitWidthsMeasured = false; // new text / hits: measure again on the next repaint. 新文本/命中：下次重绘时重新测量。
             text.MarkDirtyRepaint(); // IMGUIContainer only redraws when marked dirty. IMGUIContainer 仅在标脏后重绘。
 
             var badge = element.Q<Label>("badge");
@@ -505,6 +506,14 @@ namespace DebugxLog.Console.Editor
             public string Visible;
             /// <summary>Search hits as (start, end) in <see cref="Visible"/>. 搜索命中区间（start, end），基于 <see cref="Visible"/>。</summary>
             public readonly List<Vector2Int> Hits = new List<Vector2Int>();
+            /// <summary>
+            /// Measured text widths before each hit's start / end (x, y), filled on the first repaint after a bind. They only
+            /// depend on the text and the style, so repaints (every tick during a log flood) don't re-measure.
+            /// 每个命中起点/终点之前的文本宽度（x, y），绑定后首次重绘时测量。它们只取决于文本与样式，故重绘（日志刷屏时每帧都有）不再重复测量。
+            /// </summary>
+            public readonly List<Vector2> HitWidths = new List<Vector2>();
+            /// <summary>Whether <see cref="HitWidths"/> is valid, and the skin it was measured with. 宽度是否有效，及测量时的皮肤。</summary>
+            public bool HitWidthsMeasured, HitWidthsProSkin;
         }
 
         private static GUIStyle s_rowStyle, s_rowMeasureStyle, s_rowTimeStyle;
@@ -542,12 +551,21 @@ namespace DebugxLog.Console.Editor
             {
                 // Hit x-offsets are measured on the tag-stripped text: exact for <color>, ~1px off after <b>/<i>.
                 // 命中横向偏移在去标签文本上测量：<color> 下精确，<b>/<i> 之后约有 1px 偏差。
-                float textX = r.x + s_rowStyle.padding.left, textRight = r.xMax - s_rowStyle.padding.right;
-                foreach (Vector2Int h in rt.Hits)
+                if (!rt.HitWidthsMeasured || rt.HitWidthsProSkin != s_rowStyleProSkin)
                 {
-                    float x0 = textX + MeasureRowText(rt.Visible, h.x);
+                    rt.HitWidths.Clear();
+                    foreach (Vector2Int h in rt.Hits)
+                        rt.HitWidths.Add(new Vector2(MeasureRowText(rt.Visible, h.x), MeasureRowText(rt.Visible, h.y)));
+                    rt.HitWidthsMeasured = true;
+                    rt.HitWidthsProSkin = s_rowStyleProSkin;
+                }
+
+                float textX = r.x + s_rowStyle.padding.left, textRight = r.xMax - s_rowStyle.padding.right;
+                foreach (Vector2 w in rt.HitWidths)
+                {
+                    float x0 = textX + w.x;
                     if (x0 >= textRight) break;
-                    float x1 = Mathf.Min(textX + MeasureRowText(rt.Visible, h.y), textRight);
+                    float x1 = Mathf.Min(textX + w.y, textRight);
                     EditorGUI.DrawRect(new Rect(x0, r.y + 2, x1 - x0, r.height - 4), s_rowHighlightColor);
                 }
             }
@@ -555,8 +573,14 @@ namespace DebugxLog.Console.Editor
             GUI.Label(r, rt.Rich, s_rowStyle);
         }
 
-        private static float MeasureRowText(string text, int length) =>
-            length <= 0 ? 0f : s_rowMeasureStyle.CalcSize(new GUIContent(text.Substring(0, length))).x;
+        private static readonly GUIContent s_measureContent = new GUIContent();
+
+        private static float MeasureRowText(string text, int length)
+        {
+            if (length <= 0) return 0f;
+            s_measureContent.text = text.Substring(0, length);
+            return s_rowMeasureStyle.CalcSize(s_measureContent).x;
+        }
 
         // ---------- Detail pane ----------
 
