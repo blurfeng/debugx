@@ -206,7 +206,13 @@ namespace DebugxLog.Console.Runtime
 
             HandleToggleInput();
 
-            if (_uiBuilt && _visible && Time.unscaledTime - _lastRebuildTime >= RebuildInterval && _store.TryRebuildView())
+            // Not while the list is scrolled up: once the buffer is full every new log evicts the oldest and shifts every
+            // row, so the history being read would keep sliding away. It catches up when scrolled back to the bottom;
+            // user actions still refresh at once (ForceRefresh).
+            // 列表往上翻时不刷新：缓冲满后每条新日志都会挤掉最旧的一条、让所有行前移，正在看的历史会一直滑走。回到底部后补刷；
+            // 用户操作仍立即刷新（ForceRefresh）。
+            if (_uiBuilt && _visible && _stickToBottom
+                && Time.unscaledTime - _lastRebuildTime >= RebuildInterval && _store.TryRebuildView())
             {
                 _lastRebuildTime = Time.unscaledTime;
                 RefreshView();
@@ -313,6 +319,7 @@ namespace DebugxLog.Console.Runtime
             ApplyVisible();
             if (visible && _uiBuilt)
             {
+                _stickToBottom = true; // reopening shows the newest logs. 重新打开时显示最新日志。
                 _store.MarkViewDirty();
                 _store.TryRebuildView();
                 RefreshView();
