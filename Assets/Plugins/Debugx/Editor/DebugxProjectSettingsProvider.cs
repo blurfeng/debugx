@@ -84,8 +84,8 @@ namespace DebugxLog.Editor
 
             EditorGUILayout.HelpBox(
                 DebugxStaticData.IsChineseSimplified
-                    ? "此处为项目设置，项目设置会影响所有人的项目和打包后的包体软件。\n如果你仅想对自己的项目做一些本地化的设置，请在 Preferences/Debugx 用户设置中配置。"
-                    : "This section is for project settings, which affect everyone’s project and the packaged build software.\nIf you only want to make some local settings for your own project, please configure them in Preferences/Debugx user settings.",
+                    ? "此处为项目设置，随项目提交、所有人共享：成员配置对所有人生效。\n下方的日志开关与日志输出选项是打包版本使用的值；在编辑器中，每个人以自己的 Preferences/Debugx 用户设置为准。"
+                    : "Project settings are committed with the project and shared by everyone: the member configuration applies to all.\nThe log switches and log output options below are the values builds use; in the editor, each person's own Preferences/Debugx user settings take effect.",
                 MessageType.Info);
 
             EditorGUILayout.BeginHorizontal();
